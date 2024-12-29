@@ -1,0 +1,7 @@
+[package]
+name = "giter-utils"
+authors = ["Fanick"]
+version = "0.0.1"
+
+[dependencies]
+gix = { workspace = true, features = ["blob-diff", "max-performance", "status"] }
