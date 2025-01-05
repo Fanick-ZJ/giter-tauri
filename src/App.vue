@@ -1,14 +1,28 @@
 <script setup lang="ts">
-
+import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { invoke } from '@tauri-apps/api/core';
 import { onMounted } from 'vue';
 
 // when using `"withGlobalTauri": true`, you may use
 // const { getCurrentWindow } = window.__TAURI__.window;
 
 const appWindow = getCurrentWindow();
+const watchRepo = () => {
+  invoke('add_watch', {
+    path: "E:\\workSpace\\JavaScript\\giter-tauri\\"
+  }).then(() => {
+    console.log("finished")
+  })
+      .catch(e => {
+    console.log(e)
+  })
+}
 
 onMounted(() => {
+  listen('emit_test', (event) => {
+    console.log(event)
+  })
   document
   .getElementById('titlebar-minimize')
   ?.addEventListener('click', () => appWindow.minimize());
@@ -22,23 +36,26 @@ document
 </script>
 
 <template>
-  <div data-tauri-drag-region class="titlebar">
-  <div class="titlebar-button" id="titlebar-minimize">
-    <img
-      src="https://api.iconify.design/mdi:window-minimize.svg"
-      alt="minimize"
-    />
+  <div>
+<!--    <div data-tauri-drag-region class="titlebar">-->
+<!--      <div class="titlebar-button" id="titlebar-minimize">-->
+<!--        <img-->
+<!--            src="https://api.iconify.design/mdi:window-minimize.svg"-->
+<!--            alt="minimize"-->
+<!--        />-->
+<!--      </div>-->
+<!--      <div class="titlebar-button" id="titlebar-maximize">-->
+<!--        <img-->
+<!--            src="https://api.iconify.design/mdi:window-maximize.svg"-->
+<!--            alt="maximize"-->
+<!--        />-->
+<!--      </div>-->
+<!--      <div class="titlebar-button" id="titlebar-close">-->
+<!--        <img src="https://api.iconify.design/mdi:close.svg" alt="close" />-->
+<!--      </div>-->
+<!--    </div>-->
+    <button @click="watchRepo">aaa</button>
   </div>
-  <div class="titlebar-button" id="titlebar-maximize">
-    <img
-      src="https://api.iconify.design/mdi:window-maximize.svg"
-      alt="maximize"
-    />
-  </div>
-  <div class="titlebar-button" id="titlebar-close">
-    <img src="https://api.iconify.design/mdi:close.svg" alt="close" />
-  </div>
-</div>
 </template>
 
 <style scoped>

@@ -1,0 +1,9 @@
+[package]
+name = "giter-watcher"
+authors = ["Fanick"]
+version = "0.0.1"
+
+[dependencies]
+notify = { version = "6.1.1", features = ["serde"] }
+log = "0.4.22"
+parking_lot = "0.12.3"
