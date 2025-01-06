@@ -1428,6 +1428,7 @@ dependencies = [
  "giter-utils",
  "giter-watcher",
  "gix",
+ "imara-diff",
  "log",
  "log4rs",
  "notify",
@@ -1446,6 +1447,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "gix",
+ "imara-diff",
  "log",
  "serde",
 ]

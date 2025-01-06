@@ -4,6 +4,7 @@ use serde::ser::SerializeStruct;
 #[derive(Deserialize, Debug)]
 pub enum CommandError {
     RepositoryHasWatched(String),
+    InvalidRepository(String),
 }
 
 impl Serialize for CommandError {
@@ -15,6 +16,10 @@ impl Serialize for CommandError {
         match *self {
             CommandError::RepositoryHasWatched(ref path) => {
                 s.serialize_field("error", "RepositoryHasWatched")?;
+                s.serialize_field("data", path)?;
+            },
+            CommandError::InvalidRepository(ref path) => {
+                s.serialize_field("error", "InvalidRepository")?;
                 s.serialize_field("data", path)?;
             }
         }

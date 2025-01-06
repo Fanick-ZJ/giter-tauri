@@ -10,7 +10,7 @@ import { onMounted } from 'vue';
 const appWindow = getCurrentWindow();
 const watchRepo = () => {
   invoke('add_watch', {
-    path: "E:\\workSpace\\JavaScript\\giter-tauri\\"
+    path: "E:\\workSpace\\JavaScript\\giter-tauri1\\"
   }).then(() => {
     console.log("finished")
   })

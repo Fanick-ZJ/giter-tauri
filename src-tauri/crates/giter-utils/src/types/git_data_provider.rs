@@ -3,7 +3,7 @@ use std::iter::{Chain, Flatten};
 use std::path::{Path, PathBuf};
 use anyhow::{Result};
 use gix::status::index_worktree::iter::Item;
-use gix::{refs, ObjectId, Reference};
+use gix::{refs, ObjectId, Reference, Repository};
 use gix::reference::iter::Iter;
 use gix::revision::Walk;
 use types::progress::FuncProgress;
@@ -30,10 +30,15 @@ impl PartialEq<String> for GitDataProvider
 }
 
 impl GitDataProvider {
-    pub fn new(repository: &str) -> Self {
-        let repo = validate_git_repository(repository).unwrap();
-        Self {
-            repository: repo,
+    pub fn new(repository: &str) -> Result<Self, String> {
+        let repo = validate_git_repository(repository);
+        match repo {
+            Ok(repo) => {
+                Ok(GitDataProvider { repository: repo })
+            }
+            Err(_) => {
+                Err("INVALID GIT REPOSITORY".to_owned())
+            }
         }
     }
 
@@ -127,13 +132,16 @@ impl GitDataProvider {
         Ok(false)
     }
 
-    pub fn branches(&self) -> Result<Vec<String>> {
+    pub fn branches(&self) -> Result<Vec<Branch>> {
         let platform = self.repository.references()?;
         let local_branches = platform.local_branches()?;
         let remote_branches = platform.remote_branches()?;
-        let mut branches: Vec<String> = Vec::new();
+        let mut branches: Vec<Branch> = Vec::new();
         for branch in local_branches.chain(remote_branches).flatten(){
-            branches.push(branch.name().as_bstr().to_string());
+            let reference = branch.name().as_bstr().to_string();
+            let is_remote = reference.starts_with("refs/remotes/");
+            let basename = reference.split('/').last().unwrap().to_string();
+            branches.push(Branch::new(basename, is_remote, reference));
         }
         Ok(branches)
     }
@@ -228,59 +236,64 @@ impl GitDataProvider {
         Ok(commits)
     }
 
+    ///获取分支的提交
+    ///
     pub fn get_branch_commits(&self, branch: &Branch, count: i32) -> Result<Box<Vec<Commit>>> {
         // 获取分支所在的提交
         let commit = self.repository.find_reference(&branch.reference)?.peel_to_commit();
         let commits = commit?.ancestors().all()?;
         let commits = self.build_commits(commits, count)?;
         Ok(commits)
-
     }
 
 }
 
 #[cfg(test)]
 mod tests {
+    use gix::bstr::ByteSlice;
+    use gix::diff::blob::intern::InternedInput;
+    use gix::diff::tree_with_rewrites::Change;
+    use imara_diff::{diff, Algorithm, UnifiedDiffBuilder};
     use super::*;
     #[test]
     fn test_is_dirty() {
-        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL");
+        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
         println!("test_is_dirty: {}", provider.is_dirty().unwrap());
     }
 
     #[test]
     fn test_untracked_files() {
-        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL");
+        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
         println!("test_untracked_files: {:?}", provider.untracked_files().unwrap());
     }
 
     #[test]
     fn test_has_modified_files() {
-        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL");
+        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
         println!("test_has_modified_files： {}", provider.has_modified_files().unwrap());
     }
 
     #[test]
     fn test_modified_files() {
-        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL");
+        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
         println!("test_modified_files： {:?}", provider.modified_files().unwrap());
     }
 
     #[test]
     fn test_uncommit() {
-        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL");
+        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
         println!("test_uncommit: {}", provider.uncommit().unwrap());
     }
 
     #[test]
     fn test_unpushed_commits() {
-        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL");
+        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
         println!("test_unpushed_commits: {}", provider.unpushed_commits().unwrap());
     }
 
     #[test]
     fn test_branches() {
-        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL");
+        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
         for branch in provider.branches().unwrap() {
             println!("{:?}", branch)
         }
@@ -288,11 +301,77 @@ mod tests {
 
     #[test]
     fn test_branch_commit() {
-        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL");
+        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
         let branch = Branch::new("gh-pages".to_string(), true, "refs/remotes/origin/gh-pages".to_string());
         let commits = provider.get_branch_commits(&branch,1000).unwrap();
         for commit in commits.iter() {
             println!("{:?}", commit);
+        }
+    }
+
+    #[test]
+    fn test_commit_content() {
+        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
+        let commit = provider.repository.head_commit().unwrap();
+        let tree = commit.tree().unwrap();
+        let prev_commit = commit.parent_ids().next().unwrap();
+        let prev_commit = provider.repository.find_commit(prev_commit).unwrap();
+        let prev_commit_tree = prev_commit.tree().unwrap();
+        let diff = provider.repository.diff_tree_to_tree(&prev_commit_tree, &tree, gix::diff::Options::default()).unwrap();
+        for change in diff.iter() {
+            match change {
+                Change::Addition { .. } => {}
+                Change::Deletion { .. } => {}
+                Change::Modification { id, previous_id, .. } => {
+                    let old_content = provider.repository.find_blob(*previous_id).unwrap();
+                    let new_content = provider.repository.find_blob(*id).unwrap();
+                    println!("-----------------------old--------------------------------");
+                    println!("{}", old_content.data.to_str().unwrap());
+                    println!("------------------------new-------------------------------");
+                    println!("{}", new_content.data.to_str().unwrap());
+                }
+                Change::Rewrite { .. } => {}
+            }
+        }
+    }
+
+    #[test]
+    fn test_blob_diff() {
+        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
+        let commit = provider.repository.head_commit().unwrap();
+        let tree = commit.tree().unwrap();
+        let prev_commit = commit.parent_ids().next().unwrap();
+        let prev_commit = provider.repository.find_commit(prev_commit).unwrap();
+        let prev_commit_tree = prev_commit.tree().unwrap();
+        let diff_tree = provider.repository.diff_tree_to_tree(&prev_commit_tree, &tree, gix::diff::Options::default()).unwrap();
+        for change in diff_tree.iter() {
+            match change {
+                Change::Addition { .. } => {}
+                Change::Deletion { .. } => {}
+                Change::Modification { id, previous_id, .. } => {
+                    let old_content = provider.repository.find_blob(*previous_id).unwrap();
+                    let new_content = provider.repository.find_blob(*id).unwrap();
+                    let input = InternedInput::new(
+                        old_content.data.to_str().unwrap(),
+                        new_content.data.to_str().unwrap());
+                    let alg = Algorithm::Histogram;
+                    let diff = diff(alg, &input, UnifiedDiffBuilder::new(&input));
+                    println!("diff {}", diff);
+                }
+                Change::Rewrite { .. } => {}
+            }
+        }
+    }
+    #[test]
+    fn valid_provider() {
+        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL");
+        match provider {
+            Ok(_) => {
+                println!("valid_provider");
+            }
+            Err(_) => {
+                println!("invalid_provider");
+            }
         }
     }
 }

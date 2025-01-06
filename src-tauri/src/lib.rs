@@ -5,6 +5,7 @@ mod types;
 
 use std::collections::HashMap;
 use crate::utils::resolve;
+use imara_diff;
 use std::sync::Mutex;
 use tauri::{ Manager};
 use giter_utils::types::git_data_provider::GitDataProvider;
@@ -30,14 +31,17 @@ pub fn run() {
         match (watcher_center.lock(), data_providers.lock()) {
             (Ok(mut watcher), Ok(mut providers)) => {
                 // 判断是否已经加载过了
-                match providers.get(&path) {
-                    None => {
-                        providers.insert(path.clone(), GitDataProvider::new(&path));
+                if let None = providers.get(&path) {
+                    let provider = GitDataProvider::new(&path);
+                    if let Ok(provider) = provider {
+                        providers.insert(path.clone(), provider);
                         watcher.add_watch(path);
-                    },
-                    _ => {
-                        return Err(CommandError::RepositoryHasWatched(path))
+                    } else {
+                        // 非法路径
+                        return Err(CommandError::InvalidRepository(path))
                     }
+                } else {
+                    return Err(CommandError::RepositoryHasWatched(path))
                 }
             },
             _ => {}
