@@ -261,11 +261,13 @@ impl GitDataProvider {
                 let mut _entry_mode;
                 let mut _id;
                 let mut _size;
+                let mut _status;
                 match change {
                     Change::Addition { location, relation, entry_mode, id } => {
                         _location = location.to_string();
                         _entry_mode = entry_mode;
                         _id = id.to_string();
+                        _status = FileStatus::Added;
                         if EntryMode::is_tree(entry_mode) {
                             _size = 0;
                         }
@@ -277,6 +279,7 @@ impl GitDataProvider {
                         _location = location.to_string();
                         _entry_mode = entry_mode;
                         _id = id.to_string();
+                        _status = FileStatus::Deleted;
                         if EntryMode::is_tree(entry_mode) {
                             _size = 0;
                         }
@@ -289,6 +292,7 @@ impl GitDataProvider {
                         _entry_mode = entry_mode;
                         _id = id.to_string();
                         _entry_mode = entry_mode;
+                        _status = FileStatus::Modified;
                         if EntryMode::is_tree(entry_mode) {
                             _size = 0;
                         }
@@ -310,6 +314,7 @@ impl GitDataProvider {
                         _entry_mode = entry_mode;
                         _id = id.to_string();
                         _entry_mode = entry_mode;
+                        _status = FileStatus::Modified;
                         if EntryMode::is_tree(entry_mode) {
                             _size = 0;
                         }
@@ -321,7 +326,7 @@ impl GitDataProvider {
                 let file = File::new(
                     _location,
                     _size,
-                    FileStatus::Modified,
+                    _status,
                     _id,
                     EntryKind::from(*_entry_mode),
                 );
@@ -469,7 +474,7 @@ mod tests {
     #[test]
     fn test_commit_content() {
         let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
-        let obj_id = ObjectId::from_hex("49303db3e8b86adddc940b7973cd1e9db16091db".as_bytes()).unwrap();
+        let obj_id = ObjectId::from_hex("e8b2cb4314f04ce70e14940eaed3b4b4bbe531bb".as_bytes()).unwrap();
         let commit = provider.get_commit_content(obj_id);
         for file in commit.unwrap() {
             println!("{:?}", file);

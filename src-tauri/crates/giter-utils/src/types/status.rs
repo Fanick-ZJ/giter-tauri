@@ -12,7 +12,7 @@ pub enum WorkStatus {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum FileStatus {
-    Created,
+    Added,
     Deleted,
     Modified,
     Renamed
