@@ -4,7 +4,7 @@ authors = ["Fanick"]
 version = "0.0.1"
 
 [dependencies]
-gix = { workspace = true, features = ["blob-diff", "max-performance", "status"] }
+gix = { workspace = true, features = ["blob-diff", "max-performance", "status", "serde"] }
 serde = { version = "1.0.216", features = ["derive"] }
 imara-diff = "0.1.7"
 log = "0.4.22"

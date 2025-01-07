@@ -1,17 +1,23 @@
 use std::convert::TryFrom;
-use std::iter::{Chain, Flatten};
-use std::path::{Path, PathBuf};
+use std::io::Write;
+use std::path::{Path};
 use anyhow::{Result};
+use gix::bstr::ByteSlice;
+use gix::objs::tree::{EntryKind, EntryMode};
 use gix::status::index_worktree::iter::Item;
-use gix::{refs, ObjectId, Reference, Repository};
-use gix::reference::iter::Iter;
+use gix::{refs, ObjectId};
+use gix::diff::tree_with_rewrites::Change;
 use gix::revision::Walk;
 use types::progress::FuncProgress;
-use types::status::FileStatus;
+use types::status::WorkStatus;
 use log::{ error };
 use types::branch::Branch;
 use types::commit::Commit;
 use crate::func::validate_git_repository;
+use crate::types::status::FileStatus;
+use crate::util::build_commit;
+
+use types::file::File;
 
 pub struct GitDataProvider {
     pub repository: gix::Repository,
@@ -51,8 +57,8 @@ impl GitDataProvider {
         Ok(false)
     }
 
-    /// 获取位追踪的文件列表
-    ///
+    // 获取位追踪的文件列表
+    //
     pub fn untracked_files(&self) -> Result<Vec<String>> {
         let fn_progress = FuncProgress::new("UntrackFiles", [0, 0, 0, 0]);
         let ret = self.repository.status(fn_progress)?;
@@ -65,8 +71,8 @@ impl GitDataProvider {
         }
         Ok(untracks)
     }
-    ///是否有修改的文件
-    ///
+    //是否有修改的文件
+    //
     pub fn has_modified_files(&self) -> Result<bool> {
         let ret = self.repository.status(FuncProgress::new("HasModifiedFiles", [0, 0, 0, 0])).unwrap();
         let iter = ret.into_index_worktree_iter(Vec::new()).unwrap().into_iter();
@@ -77,8 +83,8 @@ impl GitDataProvider {
         }
         Ok(false)
     }
-    /// 获取修改文件的列表
-    ///
+    // 获取修改文件的列表
+    //
     pub fn modified_files(&self) -> Result<Vec<String>> {
         let ret = self.repository.status(FuncProgress::new("ModifiedFiles", [0, 0, 0, 0])).unwrap();
         let iter = ret.into_index_worktree_iter(Vec::new())?.into_iter();
@@ -90,8 +96,8 @@ impl GitDataProvider {
         }
         Ok(modified_files)
     }
-    /// 是否还未提交
-    ///
+    // 是否还未提交
+    //
     pub fn uncommit(&self) -> Result<bool> {
         let ret = self.repository.status(FuncProgress::new("Uncommit", [0, 0, 0, 0])).unwrap();
         let iter = ret.into_index_worktree_iter(Vec::new())?.into_iter();
@@ -100,8 +106,8 @@ impl GitDataProvider {
         }
         Ok(false)
     }
-    /// 是否为推送提交
-    ///
+    // 是否为推送提交
+    //
     pub fn unpushed_commits(&self) -> Result<bool> {
         let repo = &self.repository;
         let head_name = match repo.head_name()? {
@@ -146,12 +152,12 @@ impl GitDataProvider {
         Ok(branches)
     }
 
-    pub fn file_status(&self) -> Result<FileStatus> {
+    pub fn file_status(&self) -> Result<WorkStatus> {
         let path = self.repository.path().to_str().unwrap();
         match self.untracked_files() {
             Ok(untracks) => {
                 if !untracks.is_empty() {
-                    return Ok(FileStatus::untracked);
+                    return Ok(WorkStatus::Untracked);
                 }
             }
             _ => {
@@ -161,7 +167,7 @@ impl GitDataProvider {
         match self.modified_files() {
             Ok(modified_files) => {
                 if !modified_files.is_empty() {
-                    return Ok(FileStatus::modified);
+                    return Ok(WorkStatus::Modified);
                 }
             }
             _ => {
@@ -171,7 +177,7 @@ impl GitDataProvider {
         match self.uncommit() {
             Ok(uncommitted) => {
                 if !uncommitted {
-                    return Ok(FileStatus::uncommited)
+                    return Ok(WorkStatus::Uncommited)
                 }
             }
             _ => {
@@ -181,14 +187,14 @@ impl GitDataProvider {
         match self.unpushed_commits() {
             Ok(unpushed) => {
                 if !unpushed {
-                    return Ok(FileStatus::unpushed);
+                    return Ok(WorkStatus::Unpushed);
                 }
             }
             _ => {
                 error!("No unpushed commits found {}", path);
             }
         }
-        Ok(FileStatus::ok)
+        Ok(WorkStatus::Ok)
     }
 
     pub fn build_commits(&self, mut revwalk: Walk, count: i32) -> Result<Box<Vec<Commit>>> {
@@ -198,28 +204,16 @@ impl GitDataProvider {
             if let Some(commit_info) = commit_info {
                 let commit_info = commit_info?;
                 let commit = self.repository.find_commit(commit_info.id())?;
-                let commit = commit.decode()?;
                 commits.push(
-                    *Box::new(Commit::new(
-                        commit_info.id.to_string(),
-                        commit.author().name.to_string(),
-                        commit.author().email.to_string(),
-                        commit.committer().name.to_string(),
-                        commit.committer().email.to_string(),
-                        commit.message().summary().to_string(),
-                        commit.message.to_string(),
-                        commit_info.commit_time.unwrap_or_else(|| commit.time().seconds),
-                        commit.parents.len() as i64,
-                        self.repository.path().to_str().unwrap().to_string(),
-                    ))
+                    *Box::new(build_commit(&commit))
                 );
             }
         }
         Ok(commits)
     }
 
-    /// 从当前HEAD获取所有之前的提交
-    ///
+    // 从当前HEAD获取所有之前的提交
+    //
     pub fn get_commits(&self, count: i32) -> Result<Box<Vec<Commit>>> {
         let head_id = self.repository.head_id()?;
         let mut revwalk = head_id.ancestors().all()?;
@@ -227,8 +221,8 @@ impl GitDataProvider {
         Ok(commits)
     }
 
-    /// 根据commit_id 获取之前的指定数量提交
-    ///
+    // 根据commit_id 获取之前的指定数量提交
+    //
     pub fn get_commits_before(&self, commit_id:impl Into<ObjectId>, count: i32) -> Result<Box<Vec<Commit>>> {
         let commits = self.repository.find_commit(commit_id.into())?;
         let revwalk = commits.ancestors().all()?;
@@ -236,8 +230,8 @@ impl GitDataProvider {
         Ok(commits)
     }
 
-    ///获取分支的提交
-    ///
+    //获取分支的提交
+    //
     pub fn get_branch_commits(&self, branch: &Branch, count: i32) -> Result<Box<Vec<Commit>>> {
         // 获取分支所在的提交
         let commit = self.repository.find_reference(&branch.reference)?.peel_to_commit();
@@ -246,10 +240,105 @@ impl GitDataProvider {
         Ok(commits)
     }
 
+    // 获取一个提交的内容
+    //
+    pub fn get_commit_content(&self, commit_id: impl Into<ObjectId>) -> Result<Vec<File>> {
+        let commit = self.repository.find_commit(commit_id.into());
+        if let Err(_) = commit {
+            return Err(anyhow::anyhow!("Commit not found"));
+        }
+        let commit = commit?;
+        let tree = commit.tree()?;
+        // 获取父提交
+        let parent = commit.parent_ids().into_iter().next();
+        if let Some(parent) = parent {
+            let parent = self.repository.find_commit(parent)?;
+            let parent_tree = parent.tree()?;
+            let diff = self.repository.diff_tree_to_tree(&parent_tree, &tree, gix::diff::Options::default())?;
+            let mut files: Vec<File> = Vec::new();
+            for change in diff.iter() {
+                let mut _location;
+                let mut _entry_mode;
+                let mut _id;
+                let mut _size;
+                match change {
+                    Change::Addition { location, relation, entry_mode, id } => {
+                        _location = location.to_string();
+                        _entry_mode = entry_mode;
+                        _id = id.to_string();
+                        if EntryMode::is_tree(entry_mode) {
+                            _size = 0;
+                        }
+                        else {
+                            _size = self.repository.find_blob(*id)?.data.len();
+                        }
+                    }
+                    Change::Deletion { location, relation, entry_mode, id } => {
+                        _location = location.to_string();
+                        _entry_mode = entry_mode;
+                        _id = id.to_string();
+                        if EntryMode::is_tree(entry_mode) {
+                            _size = 0;
+                        }
+                        else {
+                            _size = self.repository.find_blob(*id)?.data.len();
+                        }
+                    }
+                    Change::Modification { location, previous_entry_mode, previous_id,  entry_mode, id } => {
+                        _location = location.to_string();
+                        _entry_mode = entry_mode;
+                        _id = id.to_string();
+                        _entry_mode = entry_mode;
+                        if EntryMode::is_tree(entry_mode) {
+                            _size = 0;
+                        }
+                        else {
+                            _size = self.repository.find_blob(*id)?.data.len();
+                        }
+                    }
+                    Change::Rewrite { source_location,
+                                    source_entry_mode, 
+                                    source_relation, 
+                                    source_id, 
+                                    diff, 
+                                    entry_mode,
+                                    id, 
+                                    location, 
+                                    relation, 
+                                    copy } => {
+                        _location = location.to_string();
+                        _entry_mode = entry_mode;
+                        _id = id.to_string();
+                        _entry_mode = entry_mode;
+                        if EntryMode::is_tree(entry_mode) {
+                            _size = 0;
+                        }
+                        else {
+                            _size = self.repository.find_blob(*id)?.data.len();
+                        }
+                    }
+                }
+                let file = File::new(
+                    _location,
+                    _size,
+                    FileStatus::Modified,
+                    _id,
+                    EntryKind::from(*_entry_mode),
+                );
+                files.push(file);
+            }
+            Ok(files)
+        } else {
+            todo!();
+        }
+    }
+
 }
 
 #[cfg(test)]
 mod tests {
+    use std::io::Write;
+
     use gix::bstr::ByteSlice;
     use gix::diff::blob::intern::InternedInput;
     use gix::diff::tree_with_rewrites::Change;
@@ -309,31 +398,32 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_commit_content() {
-        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
-        let commit = provider.repository.head_commit().unwrap();
-        let tree = commit.tree().unwrap();
-        let prev_commit = commit.parent_ids().next().unwrap();
-        let prev_commit = provider.repository.find_commit(prev_commit).unwrap();
-        let prev_commit_tree = prev_commit.tree().unwrap();
-        let diff = provider.repository.diff_tree_to_tree(&prev_commit_tree, &tree, gix::diff::Options::default()).unwrap();
-        for change in diff.iter() {
-            match change {
-                Change::Addition { .. } => {}
-                Change::Deletion { .. } => {}
-                Change::Modification { id, previous_id, .. } => {
-                    let old_content = provider.repository.find_blob(*previous_id).unwrap();
-                    let new_content = provider.repository.find_blob(*id).unwrap();
-                    println!("-----------------------old--------------------------------");
-                    println!("{}", old_content.data.to_str().unwrap());
-                    println!("------------------------new-------------------------------");
-                    println!("{}", new_content.data.to_str().unwrap());
-                }
-                Change::Rewrite { .. } => {}
-            }
-        }
-    }
+    // #[test]
+    // fn test_commit_content() {
+    //     let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
+    //     let commit = provider.repository.head_commit().unwrap();
+    //     println!("{:?}", commit.id.to_string());
+    //     let tree = commit.tree().unwrap();
+    //     let prev_commit = commit.parent_ids().next().unwrap();
+    //     let prev_commit = provider.repository.find_commit(prev_commit).unwrap();
+    //     let prev_commit_tree = prev_commit.tree().unwrap();
+    //     let diff = provider.repository.diff_tree_to_tree(&prev_commit_tree, &tree, gix::diff::Options::default()).unwrap();
+    //     for change in diff.iter() {
+    //         match change {
+    //             Change::Addition { .. } => {}
+    //             Change::Deletion { .. } => {}
+    //             Change::Modification { id, previous_id, .. } => {
+    //                 let old_content = provider.repository.find_blob(*previous_id).unwrap();
+    //                 let new_content = provider.repository.find_blob(*id).unwrap();
+    //                 // println!("-----------------------old--------------------------------");
+    //                 // println!("{}", old_content.data.to_str().unwrap());
+    //                 // println!("------------------------new-------------------------------");
+    //                 // println!("{}", new_content.data.to_str().unwrap());
+    //             }
+    //             Change::Rewrite { .. } => {}
+    //         }
+    //     }
+    // }
 
     #[test]
     fn test_blob_diff() {
@@ -356,6 +446,7 @@ mod tests {
                         new_content.data.to_str().unwrap());
                     let alg = Algorithm::Histogram;
                     let diff = diff(alg, &input, UnifiedDiffBuilder::new(&input));
+
                     println!("diff {}", diff);
                 }
                 Change::Rewrite { .. } => {}
@@ -372,6 +463,16 @@ mod tests {
             Err(_) => {
                 println!("invalid_provider");
             }
+        }
+    }
+
+    #[test]
+    fn test_commit_content() {
+        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
+        let obj_id = ObjectId::from_hex("49303db3e8b86adddc940b7973cd1e9db16091db".as_bytes()).unwrap();
+        let commit = provider.get_commit_content(obj_id);
+        for file in commit.unwrap() {
+            println!("{:?}", file);
         }
     }
 }

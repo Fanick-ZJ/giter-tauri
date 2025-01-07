@@ -6,3 +6,4 @@ extern crate imara_diff;
 
 pub mod func;
 pub mod types;
+mod util;

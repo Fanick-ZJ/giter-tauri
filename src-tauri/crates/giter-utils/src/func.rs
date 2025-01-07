@@ -20,9 +20,7 @@ pub fn has_git() -> bool {
 #[cfg(test)]
 mod tests {
     use std::path::Path;
-    use gix::discover::is_git::Error;
     use gix::discover::repository::Kind;
-    use gix::Repository;
     use func::validate_git_repository;
 
     #[test]

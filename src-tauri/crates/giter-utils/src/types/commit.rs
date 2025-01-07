@@ -1,5 +1,3 @@
-use std::ffi::CString;
-
 #[derive(Debug)]
 pub struct Commit {
     pub commit_id: String,
