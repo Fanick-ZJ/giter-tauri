@@ -13,16 +13,17 @@ pub struct Commit {
 }
 
 impl Commit {
-    pub fn new(commit_id: String,
-               author_name: String,
-               author_email: String,
-               committer_name: String,
-               committer_email: String,
-               title: String,
-               message: String,
-               datetime: i64,
-               parents_count: i64,
-               repo: String,
+    pub fn new(
+        commit_id: String,
+        author_name: String,
+        author_email: String,
+        committer_name: String,
+        committer_email: String,
+        title: String,
+        message: String,
+        datetime: i64,
+        parents_count: i64,
+        repo: String,
     ) -> Self {
         Commit {
             commit_id,
@@ -34,7 +35,7 @@ impl Commit {
             message,
             datetime,
             parents_count,
-            repo
+            repo,
         }
     }
 }

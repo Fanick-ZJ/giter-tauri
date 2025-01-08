@@ -1,5 +1,3 @@
-
-
 pub fn validate_git_repository(repository: &str) -> Result<gix::Repository, String> {
     let git_repository = gix::open(repository);
     if git_repository.is_err() {
@@ -8,7 +6,6 @@ pub fn validate_git_repository(repository: &str) -> Result<gix::Repository, Stri
     let repository = git_repository.ok().unwrap();
     Ok(repository)
 }
-
 
 pub fn has_git() -> bool {
     if let Err(_) = std::process::Command::new("git").arg("--version").output() {
@@ -19,34 +16,32 @@ pub fn has_git() -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-    use gix::discover::repository::Kind;
     use func::validate_git_repository;
+    use gix::discover::repository::Kind;
+    use std::path::Path;
 
     #[test]
     fn is_git() {
         let dir_path = Path::new(r"E:\workSpace\Rust\GQL\.git");
         let ret = gix::discover::is_git(dir_path);
         match ret {
-            Ok(kind) => {
-                match &kind {
-                    Kind::PossiblyBare => {
-                        println!("is bare");
-                    }
-                    Kind::WorkTree { .. } => {
-                        println!("is worktree");
-                    }
-                    Kind::WorkTreeGitDir { .. } => {
-                        println!("is work tree");
-                    }
-                    Kind::Submodule { .. } => {
-                        println!("is submodule");
-                    }
-                    Kind::SubmoduleGitDir => {
-                        println!("is submodule git");
-                    }
+            Ok(kind) => match &kind {
+                Kind::PossiblyBare => {
+                    println!("is bare");
                 }
-            }
+                Kind::WorkTree { .. } => {
+                    println!("is worktree");
+                }
+                Kind::WorkTreeGitDir { .. } => {
+                    println!("is work tree");
+                }
+                Kind::Submodule { .. } => {
+                    println!("is submodule");
+                }
+                Kind::SubmoduleGitDir => {
+                    println!("is submodule git");
+                }
+            },
             Err(err) => {
                 println!("{:?}", err);
             }

@@ -1,13 +1,13 @@
+use notify::{Config, Event, RecommendedWatcher, Watcher};
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::{mpsc, Arc, Mutex};
-use parking_lot::{ RwLock};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
-use notify::{Config, Event, RecommendedWatcher, Watcher};
 
 pub struct ModifyWatcher {
     pub name: String,
@@ -16,7 +16,7 @@ pub struct ModifyWatcher {
     cb: Option<Arc<dyn FnMut(Event) + Send + Sync>>,
 }
 
-impl ModifyWatcher{
+impl ModifyWatcher {
     pub fn new() -> Self {
         let repos: Arc<RwLock<Vec<PathBuf>>> = Arc::new(RwLock::new(Vec::new()));
 
@@ -33,8 +33,10 @@ impl ModifyWatcher{
         let path = p.into();
         match self.watcher {
             Some(ref mut watcher) => {
-                watcher.watch(path, notify::RecursiveMode::Recursive).unwrap();
-            },
+                watcher
+                    .watch(path, notify::RecursiveMode::Recursive)
+                    .unwrap();
+            }
             None => {}
         }
     }
@@ -48,9 +50,13 @@ impl ModifyWatcher{
             // 新建文件监听器
             let cb = Arc::new(cb);
             let cb_clone = Arc::clone(&cb);
-            let mut watcher = RecommendedWatcher::new(move |event: notify::Result<Event>| {
-                cb_clone(event.unwrap());
-            }, config).unwrap();
+            let mut watcher = RecommendedWatcher::new(
+                move |event: notify::Result<Event>| {
+                    cb_clone(event.unwrap());
+                },
+                config,
+            )
+            .unwrap();
             self.watcher = Some(watcher);
             self.cb = Some(cb);
             // 添加监听路径

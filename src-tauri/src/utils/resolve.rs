@@ -1,11 +1,11 @@
-use std::sync::Mutex;
-use std::collections::HashMap;
-use tauri::{App, Emitter, Manager};
-use giter_utils::types::git_data_provider::GitDataProvider;
-use giter_watcher::types::modify_watcher::ModifyWatcher;
 use crate::core::handle;
 use crate::emit::repos_modified_emit_cb;
 use crate::utils::init;
+use giter_utils::types::git_data_provider::GitDataProvider;
+use giter_watcher::types::modify_watcher::ModifyWatcher;
+use std::collections::HashMap;
+use std::sync::Mutex;
+use tauri::{App, Emitter, Manager};
 
 pub async fn resolve_setup(app: &mut App) {
     handle::Handle::global().init(app.app_handle());

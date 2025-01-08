@@ -1,3 +1,3 @@
-pub mod resolve;
-mod init;
 mod dirs;
+mod init;
+pub mod resolve;

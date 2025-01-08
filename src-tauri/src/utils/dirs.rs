@@ -1,7 +1,7 @@
-use std::path::PathBuf;
-use anyhow::Result;
-use tauri::Manager;
 use crate::core::handle;
+use anyhow::Result;
+use std::path::PathBuf;
+use tauri::Manager;
 
 pub static APP_ID: &str = "giter";
 pub static BACKUP_DIR: &str = "giter-backup";
@@ -15,7 +15,7 @@ pub fn app_home_dir() -> Result<PathBuf> {
         Err(e) => {
             log::error!(target: "app", "Failed to the app home directory: {}", e);
             Err(anyhow::anyhow!("Failed to the app home directory"))
-        },
+        }
     }
 }
 

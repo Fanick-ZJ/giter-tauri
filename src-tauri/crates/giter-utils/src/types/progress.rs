@@ -1,23 +1,23 @@
-use std::sync::atomic::Ordering;
-use gix::{Count};
 use gix::progress::{Id, MessageLevel, Progress, Step, StepShared, Unit};
+use gix::Count;
+use std::sync::atomic::Ordering;
 
 pub struct FuncProgress {
     name: String,
     id: Id,
     step: StepShared,
     max: Option<Step>,
-    unit: Option<Unit>
+    unit: Option<Unit>,
 }
 
-impl FuncProgress{
-    pub fn new (name: impl Into<String>, id: Id) -> Self {
-        FuncProgress{
+impl FuncProgress {
+    pub fn new(name: impl Into<String>, id: Id) -> Self {
+        FuncProgress {
             name: name.into(),
             id: [0, 0, 0, 0],
             step: Default::default(),
             max: None,
-            unit: None
+            unit: None,
         }
     }
 }

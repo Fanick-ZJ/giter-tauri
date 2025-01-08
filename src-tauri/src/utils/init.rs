@@ -1,12 +1,12 @@
-use std::fs;
+use crate::utils::dirs;
+use anyhow::Result;
 use chrono::Local;
+use log::LevelFilter;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::append::file::FileAppender;
 use log4rs::config::{Appender, Logger, Root};
 use log4rs::encode::pattern::PatternEncoder;
-use log::LevelFilter;
-use anyhow::Result;
-use crate::utils::dirs;
+use std::fs;
 
 pub fn init_log() -> Result<()> {
     let log_dir = dirs::app_logs_dir()?;
@@ -27,7 +27,9 @@ pub fn init_log() -> Result<()> {
     // 控制台日志输出
     let stdout = ConsoleAppender::builder().encoder(encode.clone()).build();
     // 文件日志输出
-    let tofile = FileAppender::builder().encoder(encode.clone()).build(log_file)?;
+    let tofile = FileAppender::builder()
+        .encoder(encode.clone())
+        .build(log_file)?;
 
     let mut logger_builder = Logger::builder();
     let mut root_builder = Root::builder();
