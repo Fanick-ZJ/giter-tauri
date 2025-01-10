@@ -1,6 +1,7 @@
 use std::hash::Hash;
+use serde::{Deserialize, Serialize};
 
-#[derive(Hash, Debug, PartialEq)]
+#[derive(Deserialize, Serialize, Hash, Debug, PartialEq, Clone)]
 pub struct Author {
     pub name: String,
     pub email: String,

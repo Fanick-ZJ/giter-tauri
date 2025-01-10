@@ -1,3 +1,6 @@
+use crate::core::cache::GitCache;
+use crate::core::handle;
+use crate::utils::consts::GIT_CACHE;
 use crate::utils::dirs;
 use anyhow::Result;
 use chrono::Local;
@@ -6,7 +9,10 @@ use log4rs::append::console::ConsoleAppender;
 use log4rs::append::file::FileAppender;
 use log4rs::config::{Appender, Logger, Root};
 use log4rs::encode::pattern::PatternEncoder;
+use tauri::Manager;
+use std::collections::HashMap;
 use std::fs;
+use std::sync::Arc;
 
 pub fn init_log() -> Result<()> {
     let log_dir = dirs::app_logs_dir()?;
@@ -32,7 +38,7 @@ pub fn init_log() -> Result<()> {
         .build(log_file)?;
 
     let mut logger_builder = Logger::builder();
-    let mut root_builder = Root::builder();
+    let root_builder = Root::builder();
     logger_builder = logger_builder.appender("file");
 
     let (config, _) = log4rs::config::Config::builder()
@@ -40,7 +46,7 @@ pub fn init_log() -> Result<()> {
         .appender(Appender::builder().build("file", Box::new(tofile)))
         .logger(logger_builder.additive(false).build("app", log_level))
         .build_lossy(root_builder.build(log_level));
-
+  
     log4rs::init_config(config)?;
 
     Ok(())

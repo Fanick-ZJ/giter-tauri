@@ -5,6 +5,12 @@ use serde::{Deserialize, Serialize, Serializer};
 pub enum CommandError {
     RepositoryHasWatched(String),
     InvalidRepository(String),
+    FindAuthorsError(String),
+    DataProviderMapNotExist,
+    DataProviderNotExist(String),
+    BranchNotFound(String),
+    BranchesFindError(String),
+    GetAuthorError(String),
 }
 
 impl Serialize for CommandError {
@@ -21,7 +27,30 @@ impl Serialize for CommandError {
             CommandError::InvalidRepository(ref path) => {
                 s.serialize_field("error", "InvalidRepository")?;
                 s.serialize_field("data", path)?;
-            }
+            },
+            CommandError::FindAuthorsError(ref path) => {
+                s.serialize_field("error", "FindAuthorsError")?;
+                s.serialize_field("data", path)?;
+            },
+            CommandError::DataProviderMapNotExist => {
+                s.serialize_field("error", "DataProviderNotExist")?;
+            },
+            CommandError::BranchNotFound(ref path) => {
+                s.serialize_field("error", "BranchNotFound")?;
+                s.serialize_field("data", path)?;
+            },
+            CommandError::DataProviderNotExist(ref path) => {
+                s.serialize_field("error", "DataProviderNotExist")?;
+                s.serialize_field("data", path)?;
+            },
+            CommandError::GetAuthorError(ref path) => {
+                s.serialize_field("error", "GetAuthorError")?;
+                s.serialize_field("data", path)?;
+            },
+            CommandError::BranchesFindError(ref path) => {
+                s.serialize_field("error", "BranchesFindError")?;
+                s.serialize_field("data", path)?;
+            },
         }
         s.end()
     }

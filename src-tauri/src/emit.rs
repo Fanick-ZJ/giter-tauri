@@ -1,9 +1,13 @@
 use crate::core::handle;
-use giter_utils::types::{git_data_provider::GitDataProvider, status::FileStatus};
+use giter_utils::types::{
+    git_data_provider::GitDataProvider,
+    status::{WorkStatus},
+};
 use giter_watcher::types::modify_watcher::ModifyWatcher;
 use notify::Event;
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use std::collections::hash_set::HashSet;
+use std::{collections::hash_set::HashSet};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -15,7 +19,7 @@ pub fn repos_modified_emit_cb() -> impl Fn(Event) {
     #[derive(Serialize, Debug, Deserialize, Clone)]
     struct Status {
         path: String,
-        status: FileStatus,
+        status: WorkStatus,
     }
     move |event| {
         let app = handle::Handle::global().app_handle().unwrap();

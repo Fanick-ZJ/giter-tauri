@@ -2,19 +2,48 @@
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
-import { onMounted } from 'vue';
+import { onMounted, Ref, ref } from 'vue';
 
 // when using `"withGlobalTauri": true`, you may use
 // const { getCurrentWindow } = window.__TAURI__.window;
-
+type Branch = {
+  name: string,
+  is_remote: boolean,
+  reference: string,
+}
+const branches: Ref<Branch[]> = ref([])
 const appWindow = getCurrentWindow();
 const watchRepo = () => {
   invoke('add_watch', {
-    path: "E:\\workSpace\\JavaScript\\giter-tauri1\\"
+    path: "E:\\workSpace\\Rust\\GQL"
   }).then(() => {
     console.log("finished")
   })
       .catch(e => {
+    console.log(e)
+  })
+}
+
+const getBranches = () => {
+  invoke('branches', {
+    repo: "E:\\workSpace\\Rust\\GQL"
+  }).then((res: Branch[]) => {
+    branches.value = res
+    console.log(res)
+  })
+     .catch(e => {
+    console.log(e)
+  })
+}
+
+const getAuthors = () => {
+  invoke('authors', {
+    repo: "E:\\workSpace\\Rust\\GQL",
+    branch: branches.value[0]
+  }).then((res) => {
+    console.log(res)
+  })
+    .catch(e => {
     console.log(e)
   })
 }
@@ -54,7 +83,9 @@ document
 <!--        <img src="https://api.iconify.design/mdi:close.svg" alt="close" />-->
 <!--      </div>-->
 <!--    </div>-->
-    <button @click="watchRepo">aaa</button>
+    <button @click="watchRepo">add_watch</button>
+    <button @click="getBranches">get branches</button>
+    <button @click="getAuthors">get authors</button>
   </div>
 </template>
 

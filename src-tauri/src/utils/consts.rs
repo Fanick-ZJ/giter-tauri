@@ -1,0 +1,1 @@
+pub const GIT_CACHE: &str = "cache";

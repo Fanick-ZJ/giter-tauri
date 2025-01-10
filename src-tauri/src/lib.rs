@@ -1,15 +1,16 @@
 mod core;
 mod emit;
+mod cmd;
 mod types;
 mod utils;
 
 use crate::utils::resolve;
+use cmd::{authors, branches};
 use giter_utils::types::git_data_provider::GitDataProvider;
 use giter_watcher::types::modify_watcher::ModifyWatcher;
-use imara_diff;
+use core::cache::GitCache;
 use std::collections::HashMap;
 use std::sync::Mutex;
-use tauri::Manager;
 
 use types::error::CommandError;
 
@@ -25,14 +26,17 @@ pub fn run() {
     fn add_watch(
         path: String,
         watcher_center: tauri::State<'_, Mutex<ModifyWatcher>>,
-        data_providers: tauri::State<'_, Mutex<HashMap<String, GitDataProvider>>>,
+        data_providers: tauri::State<'_, Mutex<HashMap<String, GitDataProvider>>>
     ) -> Result<(), CommandError> {
+
         match (watcher_center.lock(), data_providers.lock()) {
             (Ok(mut watcher), Ok(mut providers)) => {
                 // 判断是否已经加载过了
                 if let None = providers.get(&path) {
-                    let provider = GitDataProvider::new(&path);
-                    if let Ok(provider) = provider {
+                    let mut provider = GitDataProvider::new(&path);
+                    if let Ok(mut provider) = provider {
+                        let cache = GitCache::new(&path);
+                        provider.set_cache(cache);
                         providers.insert(path.clone(), provider);
                         watcher.add_watch(path);
                     } else {
@@ -49,6 +53,7 @@ pub fn run() {
     }
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_sql::Builder::new().build())
         .setup(|app| {
             tauri::async_runtime::block_on(async move {
@@ -57,7 +62,7 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, add_watch])
+        .invoke_handler(tauri::generate_handler![greet, add_watch, authors, branches])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

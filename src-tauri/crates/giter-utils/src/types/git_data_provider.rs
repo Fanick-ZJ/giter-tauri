@@ -1,7 +1,7 @@
-use crate::func::validate_git_repository;
+use crate::util::validate_git_repository;
 use crate::types::status::FileStatus;
 use crate::util::{build_commit, build_file_between_tree, get_blob_size};
-use anyhow::Result;
+use anyhow::{Result};
 use gix::objs::tree::EntryKind;
 use gix::revision::Walk;
 use gix::status::index_worktree::iter::Item;
@@ -9,33 +9,31 @@ use gix::{refs, ObjectId};
 use log::error;
 use std::collections::HashSet;
 use std::convert::TryFrom;
-use std::path::Path;
+use std::rc::Rc;
 use types::{
     author::Author, branch::Branch, commit::Commit, file::File, progress::FuncProgress,
     status::WorkStatus,
 };
 
+use super::cache::Cache;
+
 pub struct GitDataProvider {
     pub repository: gix::Repository,
+    cache: Option<Box<dyn Cache + Send>>
 }
 
-impl PartialEq<String> for GitDataProvider {
-    fn eq(&self, other: &String) -> bool {
-        if other.ends_with(".git") {
-            self.repository.path() == Path::new(other)
-        } else {
-            self.repository.path() == Path::new(other).join(".git")
-        }
-    }
-}
 
 impl GitDataProvider {
     pub fn new(repository: &str) -> Result<Self, String> {
         let repo = validate_git_repository(repository);
         match repo {
-            Ok(repo) => Ok(GitDataProvider { repository: repo }),
+            Ok(repo) => Ok(GitDataProvider { repository: repo, cache: None }),
             Err(_) => Err("INVALID GIT REPOSITORY".to_owned()),
         }
+    }
+
+    pub fn set_cache(&mut self, cache: impl Cache + Send + 'static) {
+        self.cache = Some(Box::new(cache));
     }
 
     pub fn is_dirty(&self) -> Result<bool, String> {
@@ -151,6 +149,7 @@ impl GitDataProvider {
         Ok(false)
     }
 
+    
     pub fn branches(&self) -> Result<Vec<Branch>> {
         let platform = self.repository.references()?;
         let local_branches = platform.local_branches()?;
@@ -210,6 +209,16 @@ impl GitDataProvider {
         Ok(WorkStatus::Ok)
     }
 
+    pub fn get_branch(&self, branch_name: &str) -> Result<Branch> {
+        let branches = self.branches()?;
+        for branch in branches {
+            if branch.name == branch_name {
+                return Ok(branch);
+            }
+        }
+        Err(anyhow::anyhow!("Branch not found"))
+    }
+
     pub fn build_commits(&self, mut revwalk: Walk, count: i32) -> Result<Box<Vec<Commit>>> {
         let mut commits: Box<Vec<Commit>> = Box::new(Vec::new());
         for i in 0..count {
@@ -225,7 +234,7 @@ impl GitDataProvider {
 
     /// 从当前HEAD获取所有之前的提交
     ///
-    pub fn get_commits(&self, count: i32) -> Result<Box<Vec<Commit>>> {
+    pub fn commits(&self, count: i32) -> Result<Box<Vec<Commit>>> {
         let head_id = self.repository.head_id()?;
         let mut revwalk = head_id.ancestors().all()?;
         let commits = self.build_commits(revwalk, count)?;
@@ -245,22 +254,33 @@ impl GitDataProvider {
         Ok(commits)
     }
 
+    /// 获取分支所有提交，gix中的提交对象
+    fn branch_commit_inner(&self, branch: &Branch) -> Result<gix::Commit> {
+        let branch_reference = self.repository.find_reference(&branch.reference);
+        if let Err(_) = branch_reference {
+            return Err(anyhow::anyhow!("Branch not found"));
+        }
+        let mut branch_reference = branch_reference?;
+        let branch_commit = branch_reference.peel_to_commit();
+        if let Err(_) = branch_commit {
+            return Err(anyhow::anyhow!("Branch not found"));
+        }
+        Ok(branch_commit?)
+    }
+
     /// 获取分支的提交
     ///
     pub fn get_branch_commits(&self, branch: &Branch, count: i32) -> Result<Box<Vec<Commit>>> {
         // 获取分支所在的提交
-        let commit = self
-            .repository
-            .find_reference(&branch.reference)?
-            .peel_to_commit();
-        let commits = commit?.ancestors().all()?;
+        let commit = self.branch_commit_inner(branch)?;
+        let commits = commit.ancestors().all()?;
         let commits = self.build_commits(commits, count)?;
         Ok(commits)
     }
 
     /// 获取一个提交的内容
     ///
-    pub fn get_commit_content(&self, commit_id: impl Into<ObjectId>) -> Result<Vec<File>> {
+    pub fn commit_content(&self, commit_id: impl Into<ObjectId>) -> Result<Vec<File>> {
         let commit = self.repository.find_commit(commit_id.into());
         if let Err(_) = commit {
             return Err(anyhow::anyhow!("Commit not found"));
@@ -294,23 +314,27 @@ impl GitDataProvider {
         Ok(files)
     }
 
-    pub fn get_contributors(&self, branch: &Branch) -> Result<Vec<Author>> {
-        // 获取所有贡献者
-        // 1. 获取分支的提交
-        let branch_reference = self.repository.find_reference(&branch.reference);
-        if let Err(_) = branch_reference {
-            return Err(anyhow::anyhow!("Branch not found"));
-        }
-        let mut branch_reference = branch_reference?;
-        let branch_commit = branch_reference.peel_to_commit();
-        if let Err(_) = branch_commit {
-            return Err(anyhow::anyhow!("Branch not found"));
-        }
-        let branch_commit = branch_commit?;
+    /// 获取分支的贡献者
+    pub fn authors(&self, branch: &Branch) -> Result<Vec<Author>> {
+        let mut lasted_commit_id = Option::<ObjectId>::None;
         let mut author_set = HashSet::new();
+        // 获取缓存
+        let cache_value = self.authors_cache();
+        if let Ok(cache_value) = cache_value {
+            lasted_commit_id = Some(cache_value.1);
+            author_set.extend(cache_value.0);
+        }
+        println!("test_authors_cache: {:?}", author_set);
+
+        // 1. 获取分支的提交
+        let branch_commit = self.branch_commit_inner(branch)?;
         // 2. 获取提交的作者, 获取作者的邮箱
         for commit in branch_commit.ancestors().all()? {
             let commit = commit?;
+            // 如果当前提交的id和缓存的id相同，说明之后的记录都已经缓存过了，直接退出
+            if lasted_commit_id.is_some() && commit.id == lasted_commit_id.unwrap() {
+                break;
+            }
             let commit_obj = commit.object()?;
             let author = commit_obj.author().unwrap();
             author_set.insert(Author::new(
@@ -318,8 +342,34 @@ impl GitDataProvider {
                 author.email.to_string(),
             ));
         }
-        Ok(author_set.into_iter().collect())
+        let lasted_id = branch_commit.id().to_string();
+        let authors: Vec<Author> = author_set.into_iter().collect();
+        // 3. 设置缓存
+        self.set_authors_cache(authors.clone(), lasted_id.parse().unwrap());
+        Ok(authors)
     }
+
+    /// 获取提交者缓存
+    fn authors_cache(&self) -> Result<(Vec<Author>, ObjectId)> {
+        println!("test_authors_cache");
+        let cache = self.cache.as_ref();
+        if let Some(cache) = cache {
+            let authors = cache.authors(self.repository.path().to_str().unwrap());
+            if let Ok(authors) = authors {
+                return Ok(authors);
+            }
+        }
+        Err(anyhow::anyhow!("Cache not found"))
+    }
+    /// 设置提交者缓存
+    /// 
+    pub fn set_authors_cache(&self, authors: Vec<Author>, lasted_id: ObjectId) {
+        let cache = self.cache.as_ref();
+        if let Some(cache) = cache {
+            cache.set_authors(self.repository.path().to_str().unwrap(), &authors, &lasted_id);
+        }
+    }
+    
 }
 
 #[cfg(test)]
@@ -480,7 +530,7 @@ mod tests {
         let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
         let obj_id =
             ObjectId::from_hex("6fc635a95b94c0f59236505ce8977bbc4c235f9f".as_bytes()).unwrap();
-        let commit = provider.get_commit_content(obj_id);
+        let commit = provider.commit_content(obj_id);
         // println!("{:?}", &commit.unwrap().len());
         for file in commit.unwrap() {
             println!("{:?}, {}", file.status, file.path);
@@ -491,13 +541,13 @@ mod tests {
     fn test_get_all_commit() {
         let provider =
             GitDataProvider::new(r"E:\workSpace\Python_Project_File\wizvision3").unwrap();
-        let commits = provider.get_commits(1000000).unwrap();
+        let commits = provider.commits(1000000).unwrap();
         let save_path = r"C:\Users\ZJFan\OneDrive\桌面\commit.txt";
         let mut f = std::fs::File::create(save_path).unwrap();
         for commit in commits.iter() {
             // println!("{:?}", commit);
             let obj_id = ObjectId::from_hex(commit.commit_id.as_bytes()).unwrap();
-            let files = provider.get_commit_content(obj_id).unwrap();
+            let files = provider.commit_content(obj_id).unwrap();
             f.write(
                 format!(
                     "-------------------{}--------------------\n",
@@ -514,14 +564,14 @@ mod tests {
     }
 
     #[test]
-    fn test_get_contributors() {
+    fn test_get_authors() {
         let provider =
             GitDataProvider::new(r"E:\workSpace\Python_Project_File\wizvision3").unwrap();
         let branchs = provider.branches().unwrap();
         for branch in branchs.iter() {
             println!("{:?}", branch);
-            let contributors = provider.get_contributors(branch).unwrap();
-            for contributor in contributors.iter() {
+            let authors = provider.authors(branch).unwrap();
+            for contributor in authors.iter() {
                 println!("{:?}", contributor);
             }
         }

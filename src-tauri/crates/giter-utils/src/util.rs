@@ -1,9 +1,30 @@
 use std::any::Any;
+use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use gix::diff::tree_with_rewrites::Change;
 use gix::objs::tree::{EntryKind, EntryMode};
 use gix::{self, Repository};
+
+pub fn validate_git_repository(repository: &str) -> Result<gix::Repository, String> {
+    let git_repository = gix::open(repository);
+    if git_repository.is_err() {
+        return Err(git_repository.unwrap_err().to_string());
+    }
+    let repository = git_repository.ok().unwrap();
+    Ok(repository)
+}
+
+pub fn has_git() -> bool {
+    if let Err(_) = std::process::Command::new("git").arg("--version").output() {
+        return false; // git 命令运行失败，说明没有安装 git
+    }
+    true
+}
+
+pub fn string_to_object_id(id: String) -> Result<gix::ObjectId> {
+    Ok(gix::ObjectId::from_str(id.as_str())?)
+}
 
 use crate::types::commit::Commit;
 use crate::types::file::File;

@@ -4,6 +4,5 @@ extern crate imara_diff;
 extern crate log;
 extern crate serde;
 
-pub mod func;
 pub mod types;
 mod util;

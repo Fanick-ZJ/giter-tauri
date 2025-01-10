@@ -1,12 +1,12 @@
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use std::sync::Arc;
-use tauri::{AppHandle, Manager, WebviewWindow, Window};
+use tauri::AppHandle;
 
 #[derive(Debug, Default, Clone)]
 pub struct Handle {
     pub app_handle: Arc<RwLock<Option<AppHandle>>>,
-    pub is_exiting: Arc<RwLock<bool>>,
+    pub is_exiting: Arc<RwLock<bool>>
 }
 
 impl Handle {
@@ -25,14 +25,8 @@ impl Handle {
         *handle = Some(app_handle.clone());
     }
 
+
     pub fn app_handle(&self) -> Option<AppHandle> {
         self.app_handle.read().clone()
-    }
-
-    pub fn get_window(&self) -> Option<WebviewWindow> {
-        let handle = self.app_handle().unwrap();
-        let window: Option<WebviewWindow> = handle.get_webview_window("main");
-        if window.is_none() {}
-        window
     }
 }
