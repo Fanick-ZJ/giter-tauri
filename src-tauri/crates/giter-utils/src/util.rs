@@ -4,6 +4,11 @@ use anyhow::{anyhow, Result};
 use gix::diff::tree_with_rewrites::Change;
 use gix::objs::tree::EntryKind;
 use gix::Repository;
+use gix::discover;
+
+use crate::types::commit::Commit;
+use crate::types::file::File;
+use crate::types::status::FileStatus;
 
 pub fn validate_git_repository(repository: &str) -> Result<Repository, String> {
     let git_repository = gix::open(repository);
@@ -24,10 +29,6 @@ pub fn has_git() -> bool {
 pub fn string_to_object_id(id: String) -> Result<gix::ObjectId> {
     Ok(gix::ObjectId::from_str(id.as_str())?)
 }
-
-use crate::types::commit::Commit;
-use crate::types::file::File;
-use crate::types::status::FileStatus;
 
 pub fn build_commit(commit: &gix::Commit) -> Commit {
     let message = if let Some(body) = commit.message().unwrap().body() {
@@ -67,7 +68,7 @@ pub fn get_blob_size(repo: &Repository, id: impl Into<gix::ObjectId>) -> (bool, 
     }
 }
 
-// 从change中构建file
+/// 从change中构建file
 pub fn build_file_from_change(repo: &Repository, change: &Change) -> Result<File> {
     if change.entry_mode().is_tree() {
         return Err(anyhow!("It's tree!"));
@@ -120,4 +121,13 @@ pub fn build_file_between_tree(
         Err(_) => {}
     }
     files
+}
+
+/// 判断是否是git仓库
+pub fn is_git_repo(path: &str) -> bool {
+    if let Ok(repo) = gix::open(path) {
+        return true;
+    } else {
+        return false;
+    }
 }

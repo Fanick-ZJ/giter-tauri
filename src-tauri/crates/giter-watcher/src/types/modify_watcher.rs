@@ -37,7 +37,7 @@ impl ModifyWatcher {
         }
     }
 
-    pub fn init(&mut self, cb: impl Fn(Event) + Sync + Send + 'static) {
+    pub fn init(&mut self, cb: fn(notify::event::Event)) {
         if self.watcher.is_none() {
             // 默认配置
             let config = Config::default()

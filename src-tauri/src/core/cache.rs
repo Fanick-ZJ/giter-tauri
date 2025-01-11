@@ -6,12 +6,7 @@ use serde::{Deserialize, Serialize};
 use tauri::Wry;
 use tauri_plugin_store::Store;
 
-use super::store::git_cache_store;
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct RepositoryCache {
-    authors_cache: Option<AuthorCache>,
-}
+use super::store::{git_cache_store, repository_cache_store};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BranchAuthorCache {
@@ -98,5 +93,18 @@ impl Cache for GitCache {
         branch_info.authors = Some(authors.clone());
         branch_info.last_commit_id = Some(last_commit_id.clone());
         self.store.set("authors", serde_json::json!(&cache));
+    }
+}
+
+
+pub struct RepositoryCache {
+    store: Arc<Store<Wry>>
+}
+
+impl RepositoryCache {
+    pub fn new() -> Self {
+        Self {
+            store: repository_cache_store()
+        }
     }
 }

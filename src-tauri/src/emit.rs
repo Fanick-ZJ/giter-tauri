@@ -4,7 +4,7 @@ use giter_utils::types::{
     status::{WorkStatus},
 };
 use giter_watcher::types::modify_watcher::ModifyWatcher;
-use notify::Event;
+use notify::{Event, Watcher};
 use serde::{Deserialize, Serialize};
 use std::{collections::hash_set::HashSet};
 use std::collections::HashMap;
@@ -14,13 +14,13 @@ use tauri::{Emitter, Manager};
 
 /// 仓库监控到文件修改后执行的回调函数
 ///
-pub fn repos_modified_emit_cb() -> impl Fn(Event) {
+pub fn repos_modified_emit_cb() -> fn(Event) {
     #[derive(Serialize, Debug, Deserialize, Clone)]
     struct Status {
         path: String,
         status: WorkStatus,
     }
-    move |event| {
+    move |event: Event| {
         let app = handle::Handle::global().app_handle().unwrap();
         let watcher = app.state::<Mutex<ModifyWatcher>>();
         let providers = app.state::<Mutex<HashMap<String, GitDataProvider>>>();
@@ -42,12 +42,13 @@ pub fn repos_modified_emit_cb() -> impl Fn(Event) {
                 .unwrap()
                 .file_status()
                 .unwrap();
-            println!("{:?}", path);
             app.emit(
                 "emit_test",
                 Status {
                     path: path.to_str().unwrap().to_string(),
                     status,
+
+                    
                 },
             ).expect("TODO: panic message");
         }

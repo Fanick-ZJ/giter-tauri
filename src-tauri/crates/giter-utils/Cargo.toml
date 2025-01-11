@@ -5,6 +5,7 @@ version = "0.0.1"
 
 [dependencies]
 gix = { workspace = true, features = ["blob-diff", "max-performance", "status", "serde"] }
+gix-discover = "0.37.0"
 serde = { version = "1.0.216", features = ["derive"] }
 imara-diff = "0.1.7"
 log = "0.4.22"

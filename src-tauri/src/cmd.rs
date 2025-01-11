@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Mutex};
 use giter_utils::types::{author::Author, branch::Branch, git_data_provider::GitDataProvider};
-use crate::types::error::CommandError;
+use giter_watcher::types::modify_watcher::ModifyWatcher;
+use crate::{core::cache::GitCache, types::error::CommandError};
 
 fn get_provider<'a>(
   repo: &str,
@@ -8,6 +9,37 @@ fn get_provider<'a>(
 ) -> Result<&'a GitDataProvider, CommandError> {
   // let provider = data_provider.lock().unwrap();
   data_provider.get(repo).ok_or(CommandError::DataProviderNotExist(repo.to_string()))
+}
+
+
+#[tauri::command]
+pub fn add_watch(
+  path: String,
+  watcher_center: tauri::State<'_, Mutex<ModifyWatcher>>,
+  data_providers: tauri::State<'_, Mutex<HashMap<String, GitDataProvider>>>
+) -> Result<(), CommandError> {
+
+  match (watcher_center.lock(), data_providers.lock()) {
+      (Ok(mut watcher), Ok(mut providers)) => {
+          // 判断是否已经加载过了
+          if let None = providers.get(&path) {
+              let provider = GitDataProvider::new(&path);
+              if let Ok(mut provider) = provider {
+                  let cache = GitCache::new(&path);
+                  provider.set_cache(cache);
+                  providers.insert(path.clone(), provider);
+                  watcher.add_watch(path);
+              } else {
+                  // 非法路径
+                  return Err(CommandError::InvalidRepository(path));
+              }
+          } else {
+              return Err(CommandError::RepositoryHasWatched(path));
+          }
+      }
+      _ => {}
+  }
+  Ok(())
 }
 
 #[tauri::command]

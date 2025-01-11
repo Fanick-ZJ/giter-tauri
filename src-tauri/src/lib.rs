@@ -5,14 +5,7 @@ mod types;
 mod utils;
 
 use crate::utils::resolve;
-use cmd::{ authors, branches };
-use giter_utils::types::git_data_provider::GitDataProvider;
-use giter_watcher::types::modify_watcher::ModifyWatcher;
-use core::cache::GitCache;
-use std::collections::HashMap;
-use std::sync::Mutex;
-
-use types::error::CommandError;
+use cmd::{ authors, branches, add_watch };
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -22,35 +15,6 @@ fn greet(name: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    #[tauri::command]
-    fn add_watch(
-        path: String,
-        watcher_center: tauri::State<'_, Mutex<ModifyWatcher>>,
-        data_providers: tauri::State<'_, Mutex<HashMap<String, GitDataProvider>>>
-    ) -> Result<(), CommandError> {
-
-        match (watcher_center.lock(), data_providers.lock()) {
-            (Ok(mut watcher), Ok(mut providers)) => {
-                // 判断是否已经加载过了
-                if let None = providers.get(&path) {
-                    let mut provider = GitDataProvider::new(&path);
-                    if let Ok(mut provider) = provider {
-                        let cache = GitCache::new(&path);
-                        provider.set_cache(cache);
-                        providers.insert(path.clone(), provider);
-                        watcher.add_watch(path);
-                    } else {
-                        // 非法路径
-                        return Err(CommandError::InvalidRepository(path));
-                    }
-                } else {
-                    return Err(CommandError::RepositoryHasWatched(path));
-                }
-            }
-            _ => {}
-        }
-        Ok(())
-    }
 
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
