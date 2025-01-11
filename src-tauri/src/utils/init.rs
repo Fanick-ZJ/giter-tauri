@@ -1,6 +1,3 @@
-use crate::core::cache::GitCache;
-use crate::core::handle;
-use crate::utils::consts::GIT_CACHE;
 use crate::utils::dirs;
 use anyhow::Result;
 use chrono::Local;
@@ -10,9 +7,7 @@ use log4rs::append::file::FileAppender;
 use log4rs::config::{Appender, Logger, Root};
 use log4rs::encode::pattern::PatternEncoder;
 use tauri::Manager;
-use std::collections::HashMap;
 use std::fs;
-use std::sync::Arc;
 
 pub fn init_log() -> Result<()> {
     let log_dir = dirs::app_logs_dir()?;

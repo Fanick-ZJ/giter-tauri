@@ -1,12 +1,11 @@
-use std::any::Any;
 use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use gix::diff::tree_with_rewrites::Change;
-use gix::objs::tree::{EntryKind, EntryMode};
-use gix::{self, Repository};
+use gix::objs::tree::EntryKind;
+use gix::Repository;
 
-pub fn validate_git_repository(repository: &str) -> Result<gix::Repository, String> {
+pub fn validate_git_repository(repository: &str) -> Result<Repository, String> {
     let git_repository = gix::open(repository);
     if git_repository.is_err() {
         return Err(git_repository.unwrap_err().to_string());
@@ -95,7 +94,7 @@ pub fn build_file_between_tree(
     repo: &Repository,
     old_tree: &gix::Tree,
     new_tree: &gix::Tree,
-) -> Vec<(File)> {
+) -> Vec<File> {
     let mut files: Vec<File> = Vec::new();
     let diff = repo.diff_tree_to_tree(old_tree, new_tree, gix::diff::Options::default());
     match diff {

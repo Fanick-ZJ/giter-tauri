@@ -1,10 +1,9 @@
-use std::{collections::HashMap, path::Path, sync::Arc};
+use std::{path::Path, sync::Arc};
 
 use tauri::{Manager, Wry};
 use tauri_plugin_store::{Store, StoreExt};
 
 use super::handle;
-use crate::utils::consts::GIT_CACHE;
 
 /// 获取Git缓存  tauri的store插件
 /// 

@@ -5,7 +5,6 @@ use giter_utils::types::{
 };
 use giter_watcher::types::modify_watcher::ModifyWatcher;
 use notify::Event;
-use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::{collections::hash_set::HashSet};
 use std::collections::HashMap;
@@ -50,7 +49,7 @@ pub fn repos_modified_emit_cb() -> impl Fn(Event) {
                     path: path.to_str().unwrap().to_string(),
                     status,
                 },
-            );
+            ).expect("TODO: panic message");
         }
 
         // app.emit("emit_test", event.paths);

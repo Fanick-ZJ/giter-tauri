@@ -14,7 +14,7 @@ impl FuncProgress {
     pub fn new(name: impl Into<String>, id: Id) -> Self {
         FuncProgress {
             name: name.into(),
-            id: [0, 0, 0, 0],
+            id,
             step: Default::default(),
             max: None,
             unit: None,

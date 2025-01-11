@@ -1,12 +1,8 @@
 use notify::{Config, Event, RecommendedWatcher, Watcher};
 use parking_lot::RwLock;
-use std::collections::HashMap;
 use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{mpsc, Arc, Mutex};
-use std::thread;
-use std::thread::JoinHandle;
+use std::path::PathBuf;
+use std::sync:: Arc;
 use std::time::Duration;
 
 pub struct ModifyWatcher {
@@ -50,7 +46,7 @@ impl ModifyWatcher {
             // 新建文件监听器
             let cb = Arc::new(cb);
             let cb_clone = Arc::clone(&cb);
-            let mut watcher = RecommendedWatcher::new(
+            let watcher = RecommendedWatcher::new(
                 move |event: notify::Result<Event>| {
                     cb_clone(event.unwrap());
                 },

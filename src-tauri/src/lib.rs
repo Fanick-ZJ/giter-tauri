@@ -5,7 +5,7 @@ mod types;
 mod utils;
 
 use crate::utils::resolve;
-use cmd::{authors, branches};
+use cmd::{ authors, branches };
 use giter_utils::types::git_data_provider::GitDataProvider;
 use giter_watcher::types::modify_watcher::ModifyWatcher;
 use core::cache::GitCache;
