@@ -13,9 +13,9 @@ type Branch = {
 }
 const branches: Ref<Branch[]> = ref([])
 const appWindow = getCurrentWindow();
-const watchRepo = () => {
+const watchRepo = (path: string) => {
   invoke('add_watch', {
-    path: "E:\\workSpace\\Rust\\GQL"
+    path: path
   }).then(() => {
     console.log("finished")
   })
@@ -24,9 +24,9 @@ const watchRepo = () => {
   })
 }
 
-const getBranches = () => {
+const getBranches = (path: string) => {
   invoke('branches', {
-    repo: "E:\\workSpace\\Rust\\GQL"
+    repo: path
   }).then((res: Branch[]) => {
     branches.value = res
     console.log(res)
@@ -36,14 +36,34 @@ const getBranches = () => {
   })
 }
 
-const getAuthors = () => {
+const getAuthors = ( path: string) => {
   invoke('authors', {
-    repo: "E:\\workSpace\\Rust\\GQL",
+    repo: path,
     branch: branches.value[0]
   }).then((res) => {
     console.log(res)
   })
     .catch(e => {
+    console.log(e)
+  })
+}
+
+const clear_all_cache = () => {
+  invoke('clear_all_cache').then((res) => {
+    console.log(res)
+  })
+    .catch(e => {
+    console.log(e)
+  })
+}
+
+const clear_cache = (path: string) => {
+  invoke('clear_cache', {
+    repo: path
+  }).then((res) => {
+    console.log(res)
+  })
+   .catch(e => {
     console.log(e)
   })
 }
@@ -83,9 +103,16 @@ document
 <!--        <img src="https://api.iconify.design/mdi:close.svg" alt="close" />-->
 <!--      </div>-->
 <!--    </div>-->
-    <button @click="watchRepo">add_watch</button>
-    <button @click="getBranches">get branches</button>
-    <button @click="getAuthors">get authors</button>
+    <button @click="watchRepo('E:\\workSpace\\Rust\\GQL')">add_watch</button>
+    <button @click="getBranches('E:\\workSpace\\Rust\\GQL')">get branches</button>
+    <button @click="getAuthors('E:\\workSpace\\Rust\\GQL')">get authors</button>
+    <button @click="clear_cache('E:\\workSpace\\Rust\\GQL')">clear repo</button>
+    <p>
+      <button @click="clear_all_cache()"> clear </button>
+    </p>
+    <button @click="watchRepo('E:\\workSpace\\Python_Project_File\\wizvision3')">add_watch</button>
+    <button @click="getBranches('E:\\workSpace\\Python_Project_File\\wizvision3')">get branches</button>
+    <button @click="getAuthors('E:\\workSpace\\Python_Project_File\\wizvision3')">get authors</button>
   </div>
 </template>
 

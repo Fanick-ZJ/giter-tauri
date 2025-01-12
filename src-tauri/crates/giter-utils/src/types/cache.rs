@@ -10,5 +10,9 @@ pub trait Cache {
     fn branch_authors(&self, repo: &str, branch: &Branch) -> Option<(Vec<Author>, ObjectId)>;
 
     /// 设置commit的作者
-    fn set_authors(&self, repo: &str, authors: &Vec<Author>, branch: &Branch, last_commit_id: &ObjectId);
+    fn set_authors(&mut self, repo: &str, authors: &Vec<Author>, branch: &Branch, last_commit_id: &ObjectId);
+
+    fn clear(&mut self, repo: &str);
+
+    fn clear_all(&mut self);
 }

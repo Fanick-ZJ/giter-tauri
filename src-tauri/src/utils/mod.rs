@@ -1,4 +1,4 @@
-mod dirs;
+pub mod dirs;
 mod init;
-pub mod consts;
+pub mod fs;
 pub mod resolve;

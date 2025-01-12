@@ -4,6 +4,7 @@ authors = ["Fanick"]
 version = "0.0.1"
 
 [dependencies]
+parking_lot = "0.12.3"
 gix = { workspace = true, features = ["blob-diff", "max-performance", "status", "serde"] }
 gix-discover = "0.37.0"
 serde = { version = "1.0.216", features = ["derive"] }

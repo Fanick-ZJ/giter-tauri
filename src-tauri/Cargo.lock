@@ -1566,6 +1566,7 @@ dependencies = [
  "gix-discover",
  "imara-diff",
  "log",
+ "parking_lot",
  "serde",
 ]
 

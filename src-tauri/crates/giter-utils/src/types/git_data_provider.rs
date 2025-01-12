@@ -7,32 +7,40 @@ use gix::revision::Walk;
 use gix::status::index_worktree::iter::Item;
 use gix::{refs, ObjectId};
 use log::error;
+use std::cell::RefCell;
 use std::collections::HashSet;
 use std::convert::TryFrom;
+use std::fmt::Pointer;
 use types::{
   author::Author, branch::Branch, commit::Commit, file::File, progress::FuncProgress,
   status::WorkStatus,
 };
 
 use super::cache::Cache;
-
 pub struct GitDataProvider {
   pub repository: gix::Repository,
-  cache: Option<Box<dyn Cache + Send>>
+  cache: RefCell<Option<Box<dyn Cache + Send>>>
 }
 
+impl Pointer for GitDataProvider {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    f.debug_struct("GitDataProvider")
+      .field(&format!("{:p}", &self.repository).to_string(), &"".to_string())
+      .finish()
+  }
+}
 
 impl GitDataProvider {
   pub fn new(repository: &str) -> Result<Self, String> {
     let repo = validate_git_repository(repository);
     match repo {
-      Ok(repo) => Ok(GitDataProvider { repository: repo, cache: None }),
+      Ok(repo) => Ok(GitDataProvider { repository: repo, cache: RefCell::new(None) }),
       Err(_) => Err("INVALID GIT REPOSITORY".to_owned()),
     }
   }
 
   pub fn set_cache(&mut self, cache: impl Cache + Send + 'static) {
-    self.cache = Some(Box::new(cache));
+    self.cache = RefCell::new(Some(Box::new(cache)));
   }
 
   pub fn is_dirty(&self) -> Result<bool, String> {
@@ -316,12 +324,12 @@ impl GitDataProvider {
     // 获取缓存
     let cache_value = self.authors_cache(branch);
     if let Some(cache_value) = cache_value {
-      lasted_commit_id = Some(cache_value.1);
       author_set.extend(cache_value.0);
-      println!("test_authors_cache: {:?}", author_set);
+      lasted_commit_id = Some(cache_value.1);
     }
     // 1. 获取分支的提交
     let branch_commit = self.branch_commit_inner(branch)?;
+    println!("branch_commit: {:?}", branch_commit);
     // 2. 获取提交的作者, 获取作者的邮箱
     for commit in branch_commit.ancestors().all()? {
       let commit = commit?;
@@ -345,7 +353,7 @@ impl GitDataProvider {
 
   /// 获取提交者缓存
   fn authors_cache(&self, branch: &Branch) -> Option<(Vec<Author>, ObjectId)> {
-    if let Some(cache) = self.cache.as_ref() {
+    if let Some(cache) = self.cache.borrow().as_ref() {
       let authors = cache.branch_authors(self.repository.path().to_str().unwrap(), branch);
       if let Some((authors, last_commit_id)) = authors {
         return Some((authors, last_commit_id));
@@ -356,8 +364,7 @@ impl GitDataProvider {
   /// 设置提交者缓存
   ///
   pub fn set_authors_cache(&self, authors: Vec<Author>, branch: &Branch, lasted_id: ObjectId) {
-    let cache = self.cache.as_ref();
-    if let Some(cache) = cache {
+    if let Some(cache) = self.cache.borrow_mut().as_mut() {
       cache.set_authors(self.repository.path().to_str().unwrap(), &authors, branch, &lasted_id);
     }
   }
@@ -558,7 +565,7 @@ mod tests {
   #[test]
   fn test_get_authors() {
     let provider =
-      GitDataProvider::new(r"E:\workSpace\Python_Project_File\wizvision3").unwrap();
+        GitDataProvider::new(r"E:\workSpace\Python_Project_File\wizvision3").unwrap();
     let branchs = provider.branches().unwrap();
     for branch in branchs.iter() {
       println!("{:?}", branch);

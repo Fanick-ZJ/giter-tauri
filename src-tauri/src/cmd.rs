@@ -1,7 +1,7 @@
-use std::{collections::HashMap, sync::Mutex};
-use giter_utils::types::{author::Author, branch::Branch, git_data_provider::GitDataProvider};
+use std::{collections::HashMap, sync::Mutex, thread};
+use giter_utils::types::{author::Author, branch::Branch, cache::Cache, git_data_provider::GitDataProvider};
 use giter_watcher::types::modify_watcher::ModifyWatcher;
-use crate::{core::cache::GitCache, types::error::CommandError};
+use crate::{core::{cache::GitCache, handle}, types::error::CommandError};
 
 fn get_provider<'a>(
   repo: &str,
@@ -25,8 +25,10 @@ pub fn add_watch(
           if let None = providers.get(&path) {
               let provider = GitDataProvider::new(&path);
               if let Ok(mut provider) = provider {
-                  let cache = GitCache::new(&path);
+                  let cache = handle::Handle::global().cache().unwrap();
+                  println!("clone cache: {:p}", &cache);
                   provider.set_cache(cache);
+                  println!("add watch: {:p}", provider);
                   providers.insert(path.clone(), provider);
                   watcher.add_watch(path);
               } else {
@@ -70,4 +72,16 @@ pub fn branches(
     return Err(CommandError::BranchNotFound(repo));
   }
   Ok(branches.unwrap())
+}
+
+#[tauri::command]
+pub fn clear_cache(repo: String) {
+  let mut cache = handle::Handle::global().cache().unwrap();
+  cache.clear(&repo);
+}
+
+#[tauri::command]
+pub fn clear_all_cache() {
+  let mut cache = handle::Handle::global().cache().unwrap();
+  cache.clear_all();
 }

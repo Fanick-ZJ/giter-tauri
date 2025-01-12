@@ -1,110 +1,108 @@
-use std::{collections::HashMap, sync::Arc};
-use std::collections::HashSet;
-use giter_utils::types::{author::Author, branch::Branch, cache::Cache};
+use std::{collections::HashSet, io::Write, path::PathBuf, thread};
 use gix::ObjectId;
-use serde::{Deserialize, Serialize};
-use tauri::Wry;
-use tauri_plugin_store::Store;
 
-use super::store::{git_cache_store, repository_cache_store};
+use giter_utils::types::{author::Author, branch::Branch, cache::Cache as ProviderCache};
+use windows::Win32::Foundation::ERROR_PRINTER_DRIVER_DOWNLOAD_NEEDED;
+use crate::{
+  types::cache::{AppCache, Repository}, 
+  utils::{dirs::cache_dir, fs::read_json_file}
+};
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct BranchAuthorCache {
-    // branch: Branch,
-    authors: Option<Vec<Author>>,
-    last_commit_id: Option<ObjectId>
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct AuthorCache {
-    // 各个分支的作者列表
-    branch_authors: HashMap<String, BranchAuthorCache>
-}
-
-impl AuthorCache {
-    pub fn new() -> Self {
-        AuthorCache {
-            branch_authors: HashMap::new()
-        }
-    }
-}
-
-
+#[derive(Debug, Clone)]
 pub struct GitCache {
-    store: Arc<Store<Wry>>
-}
-impl GitCache {
-    pub fn new(repo: &str) -> Self {
-        Self {
-            store: git_cache_store(repo)
-        }
-    }
+  path: PathBuf,
+  cache: AppCache,
 }
 
 impl GitCache {
-    fn get_author_cache_meta(&self) -> AuthorCache {
-        let cache = self.store.get("authors");
-        if let None = cache {
-            return AuthorCache::new()
-        }
-        let author_cache = serde_json::from_str::<AuthorCache>(&cache.unwrap().to_string());
-        if let Err(_) = author_cache {
-            return AuthorCache::new()
-        }
-        author_cache.unwrap()
+  pub fn new() -> Self {
+    let path = cache_dir().unwrap().join("cache.json");
+    let cache= read_json_file::<AppCache>(&path).unwrap_or_else(|_| {
+      AppCache::new()
+    });
+    GitCache {
+      path,
+      cache
     }
+  }
 }
 
-impl Cache for GitCache {
-
-    fn authors(&self, repo: &str) -> Option<Vec<Author>> {
-        let author_cache = self.get_author_cache_meta();
-        let mut author_set = HashSet::new();
-        for (_branch, cache) in author_cache.branch_authors {
-            if let Some(author) = cache.authors {
-                author_set.extend(author);
-            }
-        }
-        Some(author_set.into_iter().collect())
+impl GitCache {
+  pub fn update_cache(&self) {
+    let cache = serde_json::json!(self.cache);
+    if !cache_dir().unwrap().exists() {
+      std::fs::create_dir_all(&cache_dir().unwrap()).unwrap();
     }
+    let mut file = std::fs::File::create(&self.path).unwrap();
+    file.write_all(cache.to_string().as_bytes()).unwrap_or_else(|e| {
+      println!("write cache failed: {:?}", e);
+    });
+  }
+}
 
-    fn branch_authors(&self, repo: &str, branch: &Branch) -> Option<(Vec<Author>, ObjectId)> {
-        let author_cache = self.get_author_cache_meta();
-        let branch_author = author_cache.branch_authors.get(branch.name.as_str());
-        if let None = branch_author {
-            return None
+impl ProviderCache for GitCache {
+
+  fn authors(&self, _repo: &str) -> Option<Vec<Author>> {
+    let author_cache = &self.cache.authors;
+    let mut author_set: HashSet<Author> = HashSet::new();
+    for (_repo, cache) in &author_cache.branch_authors {
+      for (_, branch_cache) in cache {
+        if let Some(authors) = &branch_cache.authors {
+          author_set.extend(authors.clone());
         }
-        let branch_author = branch_author.unwrap();
-        if let None = branch_author.authors {
-            return None
-        }
-        let authors = branch_author.authors.clone().unwrap();
-        let last_commit_id = branch_author.last_commit_id.unwrap();
-        Some((authors, last_commit_id))
+      }
+    }
+    Some(author_set.into_iter().collect())
+  }
+
+  fn branch_authors(&self, repo: &str, branch: &Branch) -> Option<(Vec<Author>, ObjectId)> {
+    let author_cache = &self.cache.authors;
+    let branch_author = author_cache.get_authors(repo, branch.name.as_str());
+    println!("branch_author: {:?}", branch_author);
+    if let None = branch_author {
+      return None;
+    }
+    let branch_author = branch_author.unwrap();
+    let authors = branch_author.authors.clone().unwrap();
+    let last_commit_id = branch_author.last_commit_id.clone().unwrap();
+    Some((authors, last_commit_id))
+  }
+  
+  fn set_authors(&mut self, repo: &str, authors: &Vec<Author>, branch: &Branch, last_commit_id: &ObjectId) {
+    self.cache.authors.set_authors(repo, &branch.name, authors, last_commit_id);
+    self.update_cache();
+  }
+  
+  fn clear(&mut self, repo: &str) {
+    self.cache.authors.branch_authors.remove(repo);
+    self.update_cache();
     }
     
-    fn set_authors(&self, repo: &str, authors: &Vec<Author>, branch: &Branch, last_commit_id: &ObjectId) {
-        let mut cache = self.get_author_cache_meta();
-        let branch_info =cache.branch_authors.entry(branch.name.to_string()).or_insert(BranchAuthorCache {
-            // branch: branch.clone(),
-            authors: None,
-            last_commit_id: None
-        });
-        branch_info.authors = Some(authors.clone());
-        branch_info.last_commit_id = Some(last_commit_id.clone());
-        self.store.set("authors", serde_json::json!(&cache));
-    }
+  fn clear_all(&mut self) {
+      println!("clear cache: {:p}", &self);
+      self.cache = AppCache::new();
+      self.update_cache();
+  }
 }
 
+impl GitCache {
 
-pub struct RepositoryCache {
-    store: Arc<Store<Wry>>
-}
+  fn repos(&self) -> &Vec<Repository> {
+    &self.cache.repos
+  }
 
-impl RepositoryCache {
-    pub fn new() -> Self {
-        Self {
-            store: repository_cache_store()
-        }
+  fn set_repos(&mut self, repos: &Vec<Repository>) {
+    self.cache.repos = repos.clone();
+    self.update_cache();
+  }
+
+  fn add_repo(&mut self, repo: &Repository) {
+    for r in &self.cache.repos {
+      if r.path == repo.path {
+        return;
+      }
     }
+    self.cache.repos.push(repo.clone());
+  }
+
 }
