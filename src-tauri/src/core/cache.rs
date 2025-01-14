@@ -1,108 +1,191 @@
-use std::{collections::HashSet, io::Write, path::PathBuf, thread};
+use std::{collections::HashMap, path::PathBuf, str::FromStr,};
 use gix::ObjectId;
-
 use giter_utils::types::{author::Author, branch::Branch, cache::Cache as ProviderCache};
-use windows::Win32::Foundation::ERROR_PRINTER_DRIVER_DOWNLOAD_NEEDED;
 use crate::{
-  types::cache::{AppCache, Repository}, 
-  utils::{dirs::cache_dir, fs::read_json_file}
+  types::cache::{AuthorCache, BranchAuthorCache, BranchName, RepoPath},
+  utils::{db::conn_db, dirs::app_cache_file}
 };
 
 #[derive(Debug, Clone)]
 pub struct GitCache {
-  path: PathBuf,
-  cache: AppCache,
+  path: PathBuf
 }
 
 impl GitCache {
   pub fn new() -> Self {
-    let path = cache_dir().unwrap().join("cache.json");
-    let cache= read_json_file::<AppCache>(&path).unwrap_or_else(|_| {
-      AppCache::new()
-    });
+    let path = app_cache_file().unwrap();
     GitCache {
-      path,
-      cache
+      path
     }
   }
 }
 
 impl GitCache {
-  pub fn update_cache(&self) {
-    let cache = serde_json::json!(self.cache);
-    if !cache_dir().unwrap().exists() {
-      std::fs::create_dir_all(&cache_dir().unwrap()).unwrap();
+
+  /// 从数据库中获取缓存
+  pub fn authors_cache(&self, repo: &str) -> BranchAuthorCache {
+    let conn = conn_db(self.path.clone()).unwrap();
+    let mut stmt = conn.prepare("select * from branch_author where path=?1").unwrap();
+    let caches = stmt.query_map(
+      [repo], |row| {
+        match (
+          row.get::<_, String>(2),
+          row.get::<_, String>(3),
+          row.get::<_, String>(4))
+        {
+          (Ok(branch), Ok(authors), Ok(last_commit_id)) => {
+            let authors: Vec<Author> = serde_json::from_str(&authors).unwrap();
+            let last_commit_id = ObjectId::from_str(&last_commit_id).unwrap();
+            Ok((branch, AuthorCache {
+              authors: Some(authors),
+              last_commit_id: Some(last_commit_id)
+            }))
+          },
+          _ => Err(rusqlite::Error::QueryReturnedNoRows)
+        }
+      }
+    );
+    if let Err(e) = caches {
+      println!("get cache error: {:?}", e);
+      return HashMap::new();
     }
-    let mut file = std::fs::File::create(&self.path).unwrap();
-    file.write_all(cache.to_string().as_bytes()).unwrap_or_else(|e| {
-      println!("write cache failed: {:?}", e);
-    });
+    let cache_iter = caches.unwrap();
+    let mut cache_map: HashMap<BranchName, AuthorCache> = HashMap::new();
+    for item in cache_iter {
+      if let Ok((branch, authors)) = item {
+        cache_map.insert(branch.to_string(), authors);
+      }
+    }
+    cache_map
+  }
+
+  /// 更新作者缓存
+  fn update_author_inner(&self, repo: RepoPath, author_cache: &BranchAuthorCache) {
+    let insert_sql = "Insert into branch_author (id, path, branch, authors, last_commit_id) values (null, ?1, ?2, ?3, ?4)";
+    let select_sql = "select count(*) from branch_author where path=?1 and branch=?2";
+    let update_sql = "update branch_author set authors=?1, last_commit_id=?2 where path=?3 and branch=?4";
+    // 查询是否存在
+    let conn = conn_db(self.path.clone()).unwrap();
+    let mut stmt = conn.prepare(select_sql).unwrap();
+    for (branch, cache) in author_cache {
+      let select: Result<i32, rusqlite::Error> = stmt.query_row([repo.as_str(), branch.as_str()], |row| {
+        row.get::<_, i32>(0)
+      });
+      if let Err(e) = select {
+        println!("select author cache error: {:?}", e);
+        continue;
+      }
+      // 存在则更新
+      if select.unwrap() > 0 {
+        let update = conn.execute(update_sql, [
+          serde_json::to_string(&cache.authors).unwrap(),
+          cache.last_commit_id.unwrap().to_string(),
+          repo.to_string(),
+          branch.to_string()
+        ]);
+        if let Err(e) = update {
+          println!("update author cache error: {:?}", e);
+        }
+      } else {
+        // 不存在则插入
+        let insert = conn.execute(insert_sql, [
+          repo.as_str(),
+          branch.as_str(),
+          serde_json::to_string(&cache.authors).unwrap().as_str(),
+          cache.last_commit_id.unwrap().to_string().as_str()
+        ]);
+        if let Err(e) = insert {
+          println!("insert author cache error: {:?}", e);
+        }
+      }
+    }
+  }
+
+  pub fn update_author(&self, repo: RepoPath, author_cache: &BranchAuthorCache) {
+    self.update_author_inner(repo, author_cache);
+  }
+
+  /// 获取分支作者缓存
+  pub fn branch_authors_inner(&self, repo: RepoPath, branch: BranchName) -> Option<(Vec<Author>, ObjectId)> {
+    let conn = conn_db(self.path.clone()).unwrap();
+    let mut stmt = conn.prepare("select * from branch_author where path=?1 and branch=?2").unwrap();
+    let caches = stmt.query_row(
+      [repo, branch], |row| {
+        match (row.get::<_, String>(3), row.get::<_, String>(4)) {
+          (Ok(authors), Ok(last_commit_id)) => {
+            let authors: Vec<Author> = serde_json::from_str(&authors).unwrap();
+            let last_commit_id = ObjectId::from_str(&last_commit_id).unwrap();
+            Ok((authors,last_commit_id))
+          },
+          _ => Err(rusqlite::Error::QueryReturnedNoRows)
+        }
+      }
+    );
+    if let Err(e) = caches {
+      println!("get cache error: {:?}", e);
+      return None;
+    }
+    Some(caches.unwrap())
+
+  }
+
+  /// 清除所有作者缓存
+  pub fn clear_author_cache(&self) {
+    let conn = conn_db(self.path.clone()).unwrap();
+    let clear_sql = "delete from branch_author where";
+    let clear = conn.execute(clear_sql, []);
+    match clear {
+      Ok(count) => { println!("clear author cache success: {}", count);}
+      Err(e) => {
+        println!("clear author cache error: {:?}", e);
+      }
+    }
+  }
+
+  /// 清除指定仓库的作者缓存
+  pub fn clear_repo_author_cache(&self, repo: RepoPath) {
+    let conn = conn_db(self.path.clone()).unwrap();
+    let clear_sql = "delete from branch_author where path=?1";
+    let clear = conn.execute(clear_sql, [repo]);
+    match clear {
+      Ok(count) => { println!("clear author cache success: {}", count);}
+      Err(e) => {
+        println!("clear author cache error: {:?}", e);
+      }
+    }
+  }
+
+  /// 清除所有缓存
+  pub fn clear_inner(&self) {
+    self.clear_author_cache();
   }
 }
 
 impl ProviderCache for GitCache {
 
-  fn authors(&self, _repo: &str) -> Option<Vec<Author>> {
-    let author_cache = &self.cache.authors;
-    let mut author_set: HashSet<Author> = HashSet::new();
-    for (_repo, cache) in &author_cache.branch_authors {
-      for (_, branch_cache) in cache {
-        if let Some(authors) = &branch_cache.authors {
-          author_set.extend(authors.clone());
-        }
-      }
-    }
-    Some(author_set.into_iter().collect())
-  }
-
   fn branch_authors(&self, repo: &str, branch: &Branch) -> Option<(Vec<Author>, ObjectId)> {
-    let author_cache = &self.cache.authors;
-    let branch_author = author_cache.get_authors(repo, branch.name.as_str());
-    println!("branch_author: {:?}", branch_author);
-    if let None = branch_author {
-      return None;
-    }
-    let branch_author = branch_author.unwrap();
-    let authors = branch_author.authors.clone().unwrap();
-    let last_commit_id = branch_author.last_commit_id.clone().unwrap();
-    Some((authors, last_commit_id))
+    let author_cache = self.branch_authors_inner(repo.to_string(), branch.name.to_string());
+    author_cache
   }
   
   fn set_authors(&mut self, repo: &str, authors: &Vec<Author>, branch: &Branch, last_commit_id: &ObjectId) {
-    self.cache.authors.set_authors(repo, &branch.name, authors, last_commit_id);
-    self.update_cache();
+    let mut author_cache = AuthorCache {
+      authors: Some(authors.clone()),
+      last_commit_id: Some(last_commit_id.clone())
+    };
+    let map = HashMap::from([(branch.name.clone(), author_cache)]);
+    self.update_author(repo.to_string(), &map);
   }
   
   fn clear(&mut self, repo: &str) {
-    self.cache.authors.branch_authors.remove(repo);
-    self.update_cache();
-    }
+    self.clear_repo_author_cache(repo.to_string());
+  }
     
   fn clear_all(&mut self) {
-      println!("clear cache: {:p}", &self);
-      self.cache = AppCache::new();
-      self.update_cache();
+      self.clear_inner();
   }
-}
-
-impl GitCache {
-
-  fn repos(&self) -> &Vec<Repository> {
-    &self.cache.repos
-  }
-
-  fn set_repos(&mut self, repos: &Vec<Repository>) {
-    self.cache.repos = repos.clone();
-    self.update_cache();
-  }
-
-  fn add_repo(&mut self, repo: &Repository) {
-    for r in &self.cache.repos {
-      if r.path == repo.path {
-        return;
-      }
+  
+  fn authors(&self, repo: &str) -> Option<Vec<Author>> {
+        todo!()
     }
-    self.cache.repos.push(repo.clone());
-  }
-
 }

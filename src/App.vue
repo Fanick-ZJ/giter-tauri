@@ -106,7 +106,7 @@ document
     <button @click="watchRepo('E:\\workSpace\\Rust\\GQL')">add_watch</button>
     <button @click="getBranches('E:\\workSpace\\Rust\\GQL')">get branches</button>
     <button @click="getAuthors('E:\\workSpace\\Rust\\GQL')">get authors</button>
-    <button @click="clear_cache('E:\\workSpace\\Rust\\GQL')">clear repo</button>
+    <button @click="clear_cache('E:\\workSpace\\Rust\\GQL\\.git')">clear repo</button>
     <p>
       <button @click="clear_all_cache()"> clear </button>
     </p>

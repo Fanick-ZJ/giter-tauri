@@ -6,8 +6,7 @@ pub enum CommandError {
     RepositoryHasWatched(String),
     InvalidRepository(String),
     FindAuthorsError(String),
-    DataProviderMapNotExist,
-    DataProviderNotExist(String),
+    DataProviderBuildError(String),
     BranchNotFound(String),
     BranchesFindError(String),
     GetAuthorError(String),
@@ -32,15 +31,12 @@ impl Serialize for CommandError {
                 s.serialize_field("error", "FindAuthorsError")?;
                 s.serialize_field("data", path)?;
             },
-            CommandError::DataProviderMapNotExist => {
-                s.serialize_field("error", "DataProviderNotExist")?;
-            },
             CommandError::BranchNotFound(ref path) => {
                 s.serialize_field("error", "BranchNotFound")?;
                 s.serialize_field("data", path)?;
             },
-            CommandError::DataProviderNotExist(ref path) => {
-                s.serialize_field("error", "DataProviderNotExist")?;
+            CommandError::DataProviderBuildError(ref path) => {
+                s.serialize_field("error", "DataProviderBuildError")?;
                 s.serialize_field("data", path)?;
             },
             CommandError::GetAuthorError(ref path) => {

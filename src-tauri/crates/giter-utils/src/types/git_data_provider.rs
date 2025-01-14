@@ -329,7 +329,6 @@ impl GitDataProvider {
     }
     // 1. 获取分支的提交
     let branch_commit = self.branch_commit_inner(branch)?;
-    println!("branch_commit: {:?}", branch_commit);
     // 2. 获取提交的作者, 获取作者的邮箱
     for commit in branch_commit.ancestors().all()? {
       let commit = commit?;

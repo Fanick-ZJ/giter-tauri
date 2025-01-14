@@ -23,6 +23,18 @@ pub fn cache_dir() -> Result<PathBuf> {
     Ok(app_home_dir()?.join("cache"))
 }
 
+pub fn app_cache_file() -> Result<PathBuf> {
+    Ok(cache_dir()?.join("cache.db"))
+}
+
+pub fn store_dir() -> Result<PathBuf> {
+    Ok(app_home_dir()?.join("store"))
+}
+
+pub fn store_file() -> Result<PathBuf> {
+    Ok(store_dir()?.join("store.db"))
+}
+
 pub fn app_logs_dir() -> Result<PathBuf> {
     Ok(app_home_dir()?.join("logs"))
 }

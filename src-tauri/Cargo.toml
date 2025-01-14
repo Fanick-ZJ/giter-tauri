@@ -44,7 +44,7 @@ log4rs = "1"
 anyhow = "1.0"
 chrono = "0.4"
 gix = { workspace = true, features = ["blob-diff", "max-performance", "serde"] }
-gix-discover = "0.37.0"
+rusqlite = { version = "0.32.0", features = ["bundled"] }
 parking_lot = "0.12.3"
 
 tauri = { version = "2", features = [] }
