@@ -1,10 +1,10 @@
-use crate::{core::handle, types::fs::{Catalog, Dir, File}};
+use crate::{core::handle, types::{cache::RepoPath, fs::{Catalog, Dir, File}}};
 use anyhow::Result;
 use std::path::PathBuf;
 use tauri::Manager;
-use giter_utils::util::is_git_repo;
 
-use windows::Win32::Storage::FileSystem::*;
+static DOT_GIT: &str = ".git";
+
 pub static APP_ID: &str = "giter";
 
 pub fn app_home_dir() -> Result<PathBuf> {
@@ -37,4 +37,18 @@ pub fn store_file() -> Result<PathBuf> {
 
 pub fn app_logs_dir() -> Result<PathBuf> {
     Ok(app_home_dir()?.join("logs"))
+}
+
+pub fn is_dot_git_dir(dir: &RepoPath) -> bool {
+    let dir = PathBuf::from(dir);
+    dir.is_absolute() && dir.ends_with(DOT_GIT)
+}
+
+pub fn repo_default_alias(repo: &RepoPath) -> String {
+    let _repo = PathBuf::from(repo);
+    if is_dot_git_dir(repo) {
+        _repo.parent().unwrap().file_name().unwrap().to_str().unwrap().to_string()
+    } else {
+        _repo.file_name().unwrap().to_str().unwrap().to_string()
+    }
 }

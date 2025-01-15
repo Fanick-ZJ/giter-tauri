@@ -13,13 +13,24 @@ type Branch = {
 }
 const branches: Ref<Branch[]> = ref([])
 const appWindow = getCurrentWindow();
-const watchRepo = (path: string) => {
-  invoke('add_watch', {
+
+const addRepo = (path: string) => {
+  invoke('add_repo', {
     path: path
-  }).then(() => {
+  }).then((res) => {
+    console.log(res)
     console.log("finished")
   })
       .catch(e => {
+    console.log(e)
+  })
+}
+
+const getRepos = () => {
+  invoke('repos').then((res) => {
+    console.log(res)
+  })
+    .catch(e => {
     console.log(e)
   })
 }
@@ -103,14 +114,15 @@ document
 <!--        <img src="https://api.iconify.design/mdi:close.svg" alt="close" />-->
 <!--      </div>-->
 <!--    </div>-->
-    <button @click="watchRepo('E:\\workSpace\\Rust\\GQL')">add_watch</button>
+    <button @click="addRepo('E:\\workSpace\\Rust\\GQL')">add_repo</button>
     <button @click="getBranches('E:\\workSpace\\Rust\\GQL')">get branches</button>
     <button @click="getAuthors('E:\\workSpace\\Rust\\GQL')">get authors</button>
     <button @click="clear_cache('E:\\workSpace\\Rust\\GQL\\.git')">clear repo</button>
     <p>
       <button @click="clear_all_cache()"> clear </button>
+      <button @click="getRepos()"> getRepos </button>
     </p>
-    <button @click="watchRepo('E:\\workSpace\\Python_Project_File\\wizvision3')">add_watch</button>
+    <button @click="addRepo('E:\\workSpace\\Python_Project_File\\wizvision3')">add_repo</button>
     <button @click="getBranches('E:\\workSpace\\Python_Project_File\\wizvision3')">get branches</button>
     <button @click="getAuthors('E:\\workSpace\\Python_Project_File\\wizvision3')">get authors</button>
   </div>

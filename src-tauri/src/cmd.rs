@@ -1,7 +1,8 @@
-use std::{collections::HashMap, sync::Mutex, thread};
+use std::sync::Mutex;
 use giter_utils::types::{author::Author, branch::Branch, cache::Cache, git_data_provider::GitDataProvider};
 use giter_watcher::types::modify_watcher::ModifyWatcher;
-use crate::{core::{cache::GitCache, handle}, types::error::CommandError};
+use tauri::Manager;
+use crate::{core::handle, types::{cache::RepoPath, error::CommandError, store}};
 
 fn get_provider(
   repo: &str
@@ -20,20 +21,58 @@ fn get_provider(
   }
 }
 
+fn watch(repo: RepoPath) -> Result<(), CommandError> {
+  let app = handle::Handle::global().app_handle().unwrap();
+  let watch_center = app.state::<Mutex<ModifyWatcher>>();
+  let watcher = watch_center.lock();
+  if let Ok(mut watcher) = watcher {
+    watcher.add_watch(repo);
+    Ok(())
+  } else {
+    log::error!("watcher center is not ready");
+    Err(CommandError::AddWatcherError(repo))
+  }
+}
+
+#[tauri::command]
+pub fn add_repo(
+  path: String,
+  alias: Option<String>,
+  has_watch: Option<bool>,
+  order: Option<i32>,
+  top: Option<bool>
+) -> Result<store::Repository, CommandError> {
+  let handle = handle::Handle::global();
+  let store = handle.store().unwrap();
+  let repo = store.add_repo(path, alias, has_watch, order, top);
+  match repo {
+    Ok(repo) => {
+      if repo.has_watch {
+        watch(repo.path.clone())?;
+      }
+      Ok(repo)
+    }
+    Err(e) => {
+      Err(CommandError::AddRepositoryStoreError(e.to_string()))
+    }
+  }
+}
+
+#[tauri::command]
+pub fn repos() -> Result<Vec<store::Repository>, CommandError> {
+  let store = handle::Handle::global().store().unwrap();
+  let repos = store.get_repos();
+  match repos {
+    Ok(repos) => Ok(repos),
+    Err(e) => Err(CommandError::FindAuthorsError(e.to_string()))
+  }
+}
 
 #[tauri::command]
 pub fn add_watch(
-  path: String,
-  watcher_center: tauri::State<'_, Mutex<ModifyWatcher>>,
+  path: String
 ) -> Result<(), CommandError> {
-
-  match watcher_center.lock() {
-      Ok(mut watcher) => {
-        watcher.add_watch(path);
-      }
-      _ => {}
-  }
-  Ok(())
+  watch(path)
 }
 
 #[tauri::command]
@@ -72,3 +111,10 @@ pub fn clear_all_cache() {
   let mut cache = handle::Handle::global().cache().unwrap();
   cache.clear_all();
 }
+
+// TODO: 根据路径获取一个仓库的基本信息
+//  1. 仓库名称
+//  2. 仓库路径
+//  3. 仓库别名
+//  4. 是否置顶
+//  5. 排序情况

@@ -1,9 +1,10 @@
 use std::{collections::HashMap, path::PathBuf, str::FromStr,};
-use gix::ObjectId;
+use gix::{hashtable::hash_set::HashSet, ObjectId};
 use giter_utils::types::{author::Author, branch::Branch, cache::Cache as ProviderCache};
+use rusqlite::params;
 use crate::{
-  types::cache::{AuthorCache, BranchAuthorCache, BranchName, RepoPath},
-  utils::{db::conn_db, dirs::app_cache_file}
+  types::{cache::{AuthorCache, BranchAuthorCache, BranchName, RepoPath}, store},
+  utils::{db::conn_db, dirs::{app_cache_file, repo_default_alias}}
 };
 
 #[derive(Debug, Clone)]
@@ -46,7 +47,7 @@ impl GitCache {
       }
     );
     if let Err(e) = caches {
-      println!("get cache error: {:?}", e);
+      log::error!(target: "app", "Failed to the app home directory: {}", e);
       return HashMap::new();
     }
     let cache_iter = caches.unwrap();
@@ -72,7 +73,7 @@ impl GitCache {
         row.get::<_, i32>(0)
       });
       if let Err(e) = select {
-        println!("select author cache error: {:?}", e);
+        log::error!(target: "app", "Failed to the app home directory: {}", e);
         continue;
       }
       // 存在则更新
@@ -84,7 +85,7 @@ impl GitCache {
           branch.to_string()
         ]);
         if let Err(e) = update {
-          println!("update author cache error: {:?}", e);
+          log::error!(target: "app", "Failed to the app home directory: {}", e)
         }
       } else {
         // 不存在则插入
@@ -95,7 +96,7 @@ impl GitCache {
           cache.last_commit_id.unwrap().to_string().as_str()
         ]);
         if let Err(e) = insert {
-          println!("insert author cache error: {:?}", e);
+          log::error!(target: "app", "Failed to the app home directory: {}", e)
         }
       }
     }
@@ -122,7 +123,7 @@ impl GitCache {
       }
     );
     if let Err(e) = caches {
-      println!("get cache error: {:?}", e);
+      log::error!(target: "app", "Failed to the app home directory: {}", e);
       return None;
     }
     Some(caches.unwrap())
@@ -135,9 +136,9 @@ impl GitCache {
     let clear_sql = "delete from branch_author where";
     let clear = conn.execute(clear_sql, []);
     match clear {
-      Ok(count) => { println!("clear author cache success: {}", count);}
+      Ok(count) => { log::info!("clear author cache success: {}", count)}
       Err(e) => {
-        println!("clear author cache error: {:?}", e);
+        log::error!("clear author cache error: {:?}", e);
       }
     }
   }
@@ -148,9 +149,9 @@ impl GitCache {
     let clear_sql = "delete from branch_author where path=?1";
     let clear = conn.execute(clear_sql, [repo]);
     match clear {
-      Ok(count) => { println!("clear author cache success: {}", count);}
+      Ok(count) => { log::info!("clear author cache success: {}", count);}
       Err(e) => {
-        println!("clear author cache error: {:?}", e);
+        log::error!("clear author cache error: {:?}", e);
       }
     }
   }
@@ -169,7 +170,7 @@ impl ProviderCache for GitCache {
   }
   
   fn set_authors(&mut self, repo: &str, authors: &Vec<Author>, branch: &Branch, last_commit_id: &ObjectId) {
-    let mut author_cache = AuthorCache {
+    let author_cache = AuthorCache {
       authors: Some(authors.clone()),
       last_commit_id: Some(last_commit_id.clone())
     };
@@ -186,6 +187,33 @@ impl ProviderCache for GitCache {
   }
   
   fn authors(&self, repo: &str) -> Option<Vec<Author>> {
-        todo!()
+    let sql = "select * from branch_author where path=?1";
+    let mut author_set: HashSet<Author> = HashSet::new();
+    let conn = conn_db(self.path.clone()).unwrap();
+    let mut stmt = conn.prepare(sql).unwrap();
+    let caches = stmt.query_map(
+      [repo], |row| {
+        match row.get::<_, String>(3) {
+          Ok(authors) => {
+            let authors: Vec<Author> = serde_json::from_str(&authors).unwrap();
+            Ok(authors)
+          },
+          _ => Err(rusqlite::Error::QueryReturnedNoRows)
+        }
+      }
+    );
+    if let Err(e) = caches {
+      println!("get cache error: {:?}", e);
+      return None;
     }
+    let cache_iter = caches.unwrap();
+    for item in cache_iter {
+      if let Ok(authors) = item {
+        for author in authors {
+          author_set.insert(author);
+        }
+      }
+    }
+    Some(author_set.into_iter().collect())
+  }
 }

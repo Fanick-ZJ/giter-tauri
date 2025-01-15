@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize, Serializer};
 #[derive(Deserialize, Debug)]
 pub enum CommandError {
     RepositoryHasWatched(String),
+    AddWatcherError(String),
+    AddRepositoryStoreError(String),
     InvalidRepository(String),
     FindAuthorsError(String),
     DataProviderBuildError(String),
@@ -22,7 +24,15 @@ impl Serialize for CommandError {
             CommandError::RepositoryHasWatched(ref path) => {
                 s.serialize_field("error", "RepositoryHasWatched")?;
                 s.serialize_field("data", path)?;
-            }
+            },
+            CommandError::AddWatcherError(ref path) => {
+                s.serialize_field("error", "AddWatcherError")?;
+                s.serialize_field("data", path)?;
+            },
+            CommandError::AddRepositoryStoreError(ref path) => {
+                s.serialize_field("error", "AddRepositoryStoreError")?;
+                s.serialize_field("data", path)?;
+            },
             CommandError::InvalidRepository(ref path) => {
                 s.serialize_field("error", "InvalidRepository")?;
                 s.serialize_field("data", path)?;

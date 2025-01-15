@@ -5,7 +5,7 @@ mod types;
 mod utils;
 
 use crate::utils::resolve;
-use cmd::{ add_watch, authors, branches, clear_all_cache, clear_cache };
+use cmd::{ add_repo, add_watch, authors, branches, clear_all_cache, clear_cache, repos };
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -26,7 +26,7 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, add_watch, authors, branches, clear_all_cache, clear_cache])
+        .invoke_handler(tauri::generate_handler![add_repo, add_watch, repos, authors, branches, clear_all_cache, clear_cache])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

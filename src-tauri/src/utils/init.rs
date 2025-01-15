@@ -76,7 +76,7 @@ pub fn init_store() -> Result<()> {
   println!("{:?}", store_path);
   let conn = Connection::open(store_path)?;
   conn.execute("
-    create table if not exists store (
+    create table if not exists repository (
         id integer primary key,
         path text not null unique,
         alias text default NULL,
