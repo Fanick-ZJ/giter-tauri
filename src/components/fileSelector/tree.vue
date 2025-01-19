@@ -17,7 +17,7 @@ const props = defineProps({
     type: Boolean,
     required: false,
   },
-  filters: {
+  filter: {
     type: Object as PropType<SelectFilter>,
     required: false,
   },
@@ -103,23 +103,24 @@ onMounted(async () => {
 
 // 不断的获取子文件夹
 const handleLoad = async (option: TreeOption | Folder) => {
+  // 官方文档写的不是很好，如果children不赋值的话，会一直重新调用这个函数
+  option.children = [];
   return new Promise((resolve) => {
     invoke('get_folders', {
       path: option.path,
     }).then((res) => {
-      option.children = (res as [T_Dir]).map((dir) => {
-        return {
-          path: dir.path,
-          name: dir.name,
-          is_repo: false,
-          children: undefined,
-          isLeaf:false
-        }
+      (res as Folder[]).forEach((dir) => {
+        if (props.filter && !props.filter(dir.path)) return
+        option.children?.push({
+            path: dir.path,
+            name: dir.name,
+            is_repo: false,
+            children: undefined,
+            isLeaf:false
+          })
       })
     }).catch((err) => {
       console.log(err)
-      // 官方文档写的不是很好，如果children不赋值的话，会一直重新调用这个函数
-      option.children = []
     }).finally(() => {
       resolve(true)
     })

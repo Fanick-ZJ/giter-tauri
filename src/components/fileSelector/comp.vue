@@ -7,7 +7,7 @@ defineOptions({
   name: 'FileSelector'
 })
 
-defineProps({
+const props = defineProps({
   path: {
     type: String,
     required: false,
@@ -20,7 +20,7 @@ defineProps({
     type: Boolean,
     required: false,
   },
-  filters: {
+  filter: {
     type: Object as PropType<SelectFilter>,
     required: false,
   },
@@ -93,6 +93,7 @@ defineExpose({
       <NCard title="选择文件" size="small" closable @close="close">
         <NInput placeholder="请输入文件路径" type="text" size="tiny" clearable :value="selected"/>
         <FileTree ref="fileTreeRef"
+          v-bind="{...props}"
           @change="changed"
         />
         <template #footer>

@@ -7,7 +7,7 @@ defineOptions({
 })
 
 const add = () => {
-  useFileSelector({}).then((res) => {
+  useFileSelector({filter: (path: string) => {return true}}).then((res) => {
     console.log(res)
   })
 }
