@@ -4,7 +4,7 @@ use giter_utils::types::{author::Author, branch::Branch, cache::Cache as Provide
 use rusqlite::params;
 use crate::{
   types::{cache::{AuthorCache, BranchAuthorCache, BranchName, RepoPath}, store},
-  utils::{db::conn_db, dirs::{app_cache_file, repo_default_alias}}
+  utils::{db::conn_db, dirs::{cache_file, repo_default_alias}}
 };
 
 #[derive(Debug, Clone)]
@@ -14,7 +14,7 @@ pub struct GitCache {
 
 impl GitCache {
   pub fn new() -> Self {
-    let path = app_cache_file().unwrap();
+    let path = cache_file().unwrap();
     GitCache {
       path
     }

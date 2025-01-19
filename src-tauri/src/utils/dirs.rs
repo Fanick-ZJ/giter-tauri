@@ -19,20 +19,20 @@ pub fn app_home_dir() -> Result<PathBuf> {
     }
 }
 
-pub fn cache_dir() -> Result<PathBuf> {
-    Ok(app_home_dir()?.join("cache"))
+pub fn database_dir() -> Result<PathBuf> {
+    Ok(app_home_dir()?.join("database"))
 }
 
-pub fn app_cache_file() -> Result<PathBuf> {
-    Ok(cache_dir()?.join("cache.db"))
-}
-
-pub fn store_dir() -> Result<PathBuf> {
-    Ok(app_home_dir()?.join("store"))
+pub fn cache_file() -> Result<PathBuf> {
+    Ok(database_dir()?.join("cache.db"))
 }
 
 pub fn store_file() -> Result<PathBuf> {
-    Ok(store_dir()?.join("store.db"))
+    Ok(database_dir()?.join("store.db"))
+}
+
+pub fn config_file() -> Result<PathBuf> {
+    Ok(database_dir()?.join("config.db"))
 }
 
 pub fn app_logs_dir() -> Result<PathBuf> {

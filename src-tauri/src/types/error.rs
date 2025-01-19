@@ -12,6 +12,8 @@ pub enum CommandError {
     BranchNotFound(String),
     BranchesFindError(String),
     GetAuthorError(String),
+    DbNotFound(String),
+    GetFoldersError(String),
 }
 
 impl Serialize for CommandError {
@@ -55,6 +57,14 @@ impl Serialize for CommandError {
             },
             CommandError::BranchesFindError(ref path) => {
                 s.serialize_field("error", "BranchesFindError")?;
+                s.serialize_field("data", path)?;
+            },
+            CommandError::DbNotFound(ref path) => {
+                s.serialize_field("error", "DbNotFound")?;
+                s.serialize_field("data", path)?;
+            },
+            CommandError::GetFoldersError(ref path) => {
+                s.serialize_field("error", "GetFoldersError")?;
                 s.serialize_field("data", path)?;
             },
         }

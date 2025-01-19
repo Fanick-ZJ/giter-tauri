@@ -15,6 +15,8 @@ pub async fn resolve_setup(app: &mut App) -> Result<()> {
     println!("init cache success");
     init::init_store()?;
     println!("init store success");
+    init::init_config()?;
+    println!("init conifg success");
     let mut watcher_center = ModifyWatcher::new();
     watcher_center.init(repos_modified_emit_cb());
     // 修改监控器

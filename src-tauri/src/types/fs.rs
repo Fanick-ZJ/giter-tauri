@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 #[derive(Debug, Clone)]
 pub struct File {
   pub name: String,
@@ -13,7 +15,8 @@ impl File {
     }
   }
 }
-#[derive(Debug, Clone)]
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Dir {
   pub name: String,
   pub path: String,

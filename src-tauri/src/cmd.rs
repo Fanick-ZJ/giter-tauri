@@ -2,7 +2,7 @@ use std::sync::Mutex;
 use giter_utils::types::{author::Author, branch::Branch, cache::Cache, git_data_provider::GitDataProvider};
 use giter_watcher::types::modify_watcher::ModifyWatcher;
 use tauri::Manager;
-use crate::{core::handle, types::{cache::RepoPath, error::CommandError, store}};
+use crate::{core::handle, types::{cache::RepoPath, error::CommandError, fs::Dir, store}, utils::{dirs, fs::{get_first_level_dirs, get_logical_driver}}};
 
 fn get_provider(
   repo: &str
@@ -112,9 +112,52 @@ pub fn clear_all_cache() {
   cache.clear_all();
 }
 
-// TODO: 根据路径获取一个仓库的基本信息
-//  1. 仓库名称
-//  2. 仓库路径
-//  3. 仓库别名
-//  4. 是否置顶
-//  5. 排序情况
+#[tauri::command]
+pub fn get_db_path(db: String) -> Result<String, CommandError> {
+  match db.as_str() {
+    "store" => Ok(dirs::store_file().unwrap().to_str().unwrap().to_string()),
+    "cache" => Ok(dirs::cache_file().unwrap().to_str().unwrap().to_string()),
+    "config" => Ok(dirs::config_file().unwrap().to_str().unwrap().to_string()),
+    _ => Err(CommandError::DbNotFound(db))
+  }
+}
+
+#[tauri::command]
+pub fn get_drive() -> Result<Vec<Dir>, CommandError> {
+  let driver = get_logical_driver();
+  let mut folders = vec![];
+  for item in driver {
+    // 舍去最后两个//
+    let name = item.chars().take(item.len() - 1).collect();
+    folders.push(Dir {
+      name,
+      path: item,
+      is_repo: false,
+    });
+  }
+  Ok(folders)
+}
+
+#[tauri::command]
+pub fn get_folders(path: String) -> Result<Vec<Dir>, CommandError> {
+  let catalog = get_first_level_dirs(&path);
+  match catalog {
+    Ok(catalog) => {
+      let mut folders = vec![];
+      for item in catalog.dirs {
+        folders.push(Dir {
+          name: item.name,
+          path: item.path,
+          is_repo: item.is_repo,
+        });
+      }
+      Ok(folders)
+    },
+    Err(e) => Err(CommandError::GetFoldersError(e.to_string()))
+  }
+}
+
+#[tauri::command]
+pub fn get_separator() -> String {
+  std::path::MAIN_SEPARATOR.to_string()
+}

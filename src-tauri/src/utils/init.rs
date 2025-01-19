@@ -49,15 +49,15 @@ pub fn init_log() -> Result<()> {
 
 
 pub fn init_cache() -> Result<()> {
-  let cache_path = dirs::cache_dir()?;
-  if !cache_path.exists() {
-    fs::create_dir_all(&cache_path)?;
+  let database_path = dirs::database_dir()?;
+  if !database_path.exists() {
+    fs::create_dir_all(&database_path)?;
   }
-  let cache_path = cache_path.join("cache.db");
+  let cache_path = database_path.join("cache.db");
   let conn = Connection::open(cache_path)?;
   conn.execute(
   "create table if not exists branch_author (
-        id integer primary key,
+        id integer primary key autoincrement,
         path text not null,
         branch text not null,
         authors text not null,
@@ -68,21 +68,42 @@ pub fn init_cache() -> Result<()> {
 }
 
 pub fn init_store() -> Result<()> {
-  let store_path = dirs::store_dir()?;
-  if!store_path.exists() {
-    fs::create_dir_all(&store_path)?;
+  let database_path = dirs::database_dir()?;
+  if!database_path.exists() {
+    fs::create_dir_all(&database_path)?;
   }
-  let store_path = store_path.join("store.db");
+  let store_path = database_path.join("store.db");
   println!("{:?}", store_path);
   let conn = Connection::open(store_path)?;
   conn.execute("
     create table if not exists repository (
-        id integer primary key,
+        id integer primary key autoincrement,
         path text not null unique,
         alias text default NULL,
         has_watch integer default 1,
         `order` integer default NULL,
         top integer default 0
+    )
+    ", ()).unwrap_or_else(|e| {
+      println!("{}", e);
+      (1)
+    });
+  Ok(())
+}
+
+pub fn init_config() -> Result<()> {
+  let database_path = dirs::database_dir()?;
+  if!database_path.exists() {
+    fs::create_dir_all(&database_path)?;
+  }
+  let config_path = database_path.join("config.db");
+  println!("{:?}", config_path);
+  let conn = Connection::open(config_path)?;
+  conn.execute("
+    create table if not exists config (
+        id integer primary key autoincrement,
+        key varchar(255) not null unique,
+        value text not null
     )
     ", ()).unwrap_or_else(|e| {
       println!("{}", e);
