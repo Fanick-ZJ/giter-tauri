@@ -1,10 +1,11 @@
+import { GET_DB_PATH } from "@/const/command";
 import { invoke } from "@tauri-apps/api/core"
 import Database from '@tauri-apps/plugin-sql';
 
 type DbName = 'store' | 'cache' | 'config'
 
 const get_db = async (db: DbName): Promise<Database> => {
-  let path = await invoke('get_db_path', { db })
+  let path = await invoke(GET_DB_PATH, { db })
   return Database.load(`sqlite:${path}`)
 }
 

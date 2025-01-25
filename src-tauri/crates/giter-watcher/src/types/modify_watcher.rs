@@ -1,6 +1,5 @@
 use notify::{Config, Event, RecommendedWatcher, Watcher};
 use parking_lot::RwLock;
-use std::io::Write;
 use std::path::PathBuf;
 use std::sync:: Arc;
 use std::time::Duration;
@@ -42,12 +41,13 @@ impl ModifyWatcher {
             // 默认配置
             let config = Config::default()
                 .with_poll_interval(Duration::from_secs(3))
-                .with_compare_contents(true);
+                .with_compare_contents(false);
             // 新建文件监听器
             let cb = Arc::new(cb);
             let cb_clone = Arc::clone(&cb);
             let watcher = RecommendedWatcher::new(
                 move |event: notify::Result<Event>| {
+                    println!("发生了变化");
                     cb_clone(event.unwrap());
                 },
                 config,

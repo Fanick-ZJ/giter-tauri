@@ -13,9 +13,9 @@
     "windows": [
       {
         "title": "giter-tauri",
-        "width": 250,
+        "width": 330,
         "height": 600,
-        "minWidth": 250,
+        "minWidth": 330,
         "minHeight": 600
       }
     ],

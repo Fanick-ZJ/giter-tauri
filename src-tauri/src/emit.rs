@@ -1,12 +1,12 @@
 use crate::core::handle;
 use giter_utils::types::{
     git_data_provider::GitDataProvider,
-    status::{WorkStatus},
+    status::WorkStatus,
 };
 use giter_watcher::types::modify_watcher::ModifyWatcher;
-use notify::{Event, Watcher};
+use notify::Event;
 use serde::{Deserialize, Serialize};
-use std::{collections::hash_set::HashSet};
+use std::collections::hash_set::HashSet;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -18,12 +18,11 @@ pub fn repos_modified_emit_cb() -> fn(Event) {
     #[derive(Serialize, Debug, Deserialize, Clone)]
     struct Status {
         path: String,
-        status: WorkStatus,
+        status: Vec<WorkStatus>,
     }
     move |event: Event| {
         let app = handle::Handle::global().app_handle().unwrap();
         let watcher = app.state::<Mutex<ModifyWatcher>>();
-        let providers = app.state::<Mutex<HashMap<String, GitDataProvider>>>();
         let paths = event.paths;
         let mut repo_set: HashSet<PathBuf> = HashSet::new();
         for repo in watcher.lock().unwrap().repos.read().iter() {
@@ -35,22 +34,20 @@ pub fn repos_modified_emit_cb() -> fn(Event) {
         }
 
         for path in repo_set.iter() {
-            let status = providers
-                .lock()
-                .unwrap()
-                .get(path.to_str().unwrap())
-                .unwrap()
-                .file_status()
-                .unwrap();
-            app.emit(
-                "emit_test",
-                Status {
-                    path: path.to_str().unwrap().to_string(),
-                    status,
-
-                    
-                },
-            ).expect("TODO: panic message");
+            let path = path.to_str().unwrap();
+            let provider = GitDataProvider::new(path);
+            let status = provider.unwrap().file_status();
+            if let Ok(status) = status {
+                app.emit(
+                    "giter://status_changed",
+                    Status {
+                        path: path.to_string(),
+                        status,
+                    },
+                ).expect("TODO: panic message");
+            } else {
+                log::error!("status: {:?}", status);
+            }
         }
 
         // app.emit("emit_test", event.paths);

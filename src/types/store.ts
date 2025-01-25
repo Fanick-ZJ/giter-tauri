@@ -1,6 +1,6 @@
 export type Repository = {
   id: number,
-  name: string,
+  path: string,
   alias: string,
   hasWatch: boolean,
   order: number

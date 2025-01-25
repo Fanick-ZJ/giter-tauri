@@ -15,11 +15,10 @@ export type Folder = {
 }
 
 export type FileSelectorOptions = {
-  path?: string,
-  multiple?: boolean,
+  path?: string
+  multiple?: boolean
   directory?: boolean
-  filter?: SelectFilter,
+  filter?: SelectFilter
+  repoTip?: boolean
   root?: HTMLElement
 }
-
-export type DialogStatus = 'success' | 'close'

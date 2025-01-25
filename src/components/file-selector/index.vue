@@ -2,7 +2,7 @@
 import { PropType, ref, useTemplateRef } from 'vue';
 import FileTree from './tree.vue';
 import { NCard, NButton, NFlex, NInput } from 'naive-ui';
-import { DialogStatus, SelectFilter } from './types';
+import { SelectFilter } from './types';
 defineOptions({
   name: 'FileSelector'
 })
@@ -10,10 +10,6 @@ defineOptions({
 const props = defineProps({
   path: {
     type: String,
-    required: false,
-  },
-  multiple: {
-    type: Boolean,
     required: false,
   },
   directory: {
@@ -24,6 +20,11 @@ const props = defineProps({
     type: Object as PropType<SelectFilter>,
     required: false,
   },
+  repoTip: {
+    type: Boolean,
+    required: false,
+    default: true
+  },
   root: {
     type: String,
     required: false,
@@ -33,8 +34,6 @@ const props = defineProps({
 const __show = ref<Boolean>(false)
 // 选中的文件路径
 const selected = ref<string>('')
-// 窗口状态
-let status: DialogStatus | null = null
 // 关闭回调
 let closeCallback: (() => any ) | null = null
 const fileTreeRef = useTemplateRef<typeof FileTree>('fileTreeRef')
@@ -52,11 +51,7 @@ let show = () => {
 
 const close = () => {
   // 关闭时, 调用resolve或reject
-  if (status === 'close') {
-    reject()
-  } else {
-    resolve(undefined)
-  }
+  resolve(undefined)
   __show.value = false
   if (closeCallback) {
     closeCallback()
@@ -64,7 +59,6 @@ const close = () => {
 }
 
 const ok = () => {
-  status = 'success'
   resolve(selected.value)
   close()
 }
@@ -75,7 +69,6 @@ const changed = (val: string) => {
 
 defineExpose({
   selected,
-  status,
   closeCb: (close: () => any) => {
     closeCallback = close
   },
@@ -89,7 +82,7 @@ defineExpose({
   <div v-if="__show" 
     class="w-screen h-screen bg-slate-400/50
     flex items-center justify-center fixed top-0 left-0">
-    <div class="w-[230px]">
+    <div class="w-[280px]">
       <NCard title="选择文件" size="small" closable @close="close">
         <NInput placeholder="请输入文件路径" type="text" size="tiny" clearable :value="selected"/>
         <FileTree ref="fileTreeRef"

@@ -21,7 +21,7 @@ members = [
 ]
 
 [workspace.dependencies]
-gix = { version = "0.69.1", default-features = false }
+gix = { version = "0.70.0", default-features = false }
 log = "0.4.22"
 parking_lot = "0.12.3"
 tauri = { version = "2", features = [] }

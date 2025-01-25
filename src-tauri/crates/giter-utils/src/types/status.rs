@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 pub enum WorkStatus {
     Modified,
     Untracked,
-    Uncommited,
+    Uncommitted,
     Unpushed,
     Ok,
 }

@@ -5,7 +5,7 @@ mod types;
 mod utils;
 
 use crate::utils::resolve;
-use cmd::{ add_repo, add_watch, authors, branches, clear_all_cache, clear_cache, get_db_path, get_drive, get_folders, get_separator, repos };
+use cmd::{ add_repo, add_watch, authors, branches, clear_all_cache, clear_cache, get_db_path, get_driver, get_folders, get_separator, is_repo, repos };
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -21,7 +21,7 @@ pub fn run() {
         .plugin(tauri_plugin_sql::Builder::new().build())
         .setup(|app| {
             tauri::async_runtime::block_on(async move {
-                resolve::resolve_setup(app).await;
+                let _ = resolve::resolve_setup(app).await;
             });
             Ok(())
         })
@@ -31,8 +31,9 @@ pub fn run() {
                                                 repos, authors, 
                                                 branches, clear_all_cache, 
                                                 clear_cache, get_db_path,
-                                                get_drive, get_folders,
-                                                get_separator])
+                                                get_driver, get_folders,
+                                                get_separator, is_repo,
+                                                ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

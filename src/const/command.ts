@@ -1,0 +1,6 @@
+export const ADD_WATCH = 'add_watch'
+export const GET_DRIVER = 'get_driver'
+export const GET_SEPARATOR = 'get_separator'
+export const GET_FOLDERS = 'get_folders'
+export const IS_REPO = 'is_repo'
+export const GET_DB_PATH = 'get_db_path'

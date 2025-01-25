@@ -2,6 +2,7 @@
 import { useThemeStore } from '@/store/modules/theme';
 import { NConfigProvider,
         darkTheme,
+        useMessage,
       } from 'naive-ui';
 import { computed } from 'vue';
 import AppProvider from './components/common/app-provider.vue';

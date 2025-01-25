@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { NTree, TreeOption, NSpace, TreeInst } from 'naive-ui';
-import { onMounted, PropType, ref } from 'vue';
+import { h, onMounted, PropType, ref, useTemplateRef } from 'vue';
 import { Folder, SelectFilter, T_Dir } from './types';
 import { invoke } from '@tauri-apps/api/core';
+import { Icon } from '@iconify/vue/dist/iconify.js';
+import { SEPERATOR } from '@/const';
+import { GET_DRIVER, GET_FOLDERS } from '@/const/command';
 
 defineOptions({
   name: 'FileTree'
@@ -21,6 +24,11 @@ const props = defineProps({
     type: Object as PropType<SelectFilter>,
     required: false,
   },
+  repoTip: {
+    type: Boolean,
+    required: false,
+    default: true
+  },
   root: {
     type: String,
     required: false,
@@ -29,11 +37,11 @@ const props = defineProps({
 
 const options =ref<Folder[]>()
 const defaultKeys = ref<string[]>([])
-const treeRef = ref<TreeInst>()
+const treeRef = useTemplateRef<TreeInst>('treeRef')
 let selected: string = ''
 
 const getDrive = () => {
-  invoke('get_drive').then((res) => {
+  invoke(GET_DRIVER).then((res) => {
     options.value = (res as [T_Dir]).map((dir) => {
       return {
         path: dir.path,
@@ -48,11 +56,8 @@ const getDrive = () => {
 
 const getDefault = async () => {
   let defaultKeys: string[] = []
-  await invoke('get_separator').then((res) => {
-    seperator = res as string
-  })
   if (props.path) {
-    const paths = props.path.split(seperator)
+    const paths = props.path.split(SEPERATOR)
     let current: Folder
     // 获取第一个文件夹
     let index = options.value?.findIndex((dir) => {
@@ -90,8 +95,6 @@ const scrollToDefault = () => {
   }
 }
 
-let seperator: string = ''
-
 onMounted(async () => {
   getDrive()
   // 如果有path，逐级获取子文件夹
@@ -106,7 +109,7 @@ const handleLoad = async (option: TreeOption | Folder) => {
   // 官方文档写的不是很好，如果children不赋值的话，会一直重新调用这个函数
   option.children = [];
   return new Promise((resolve) => {
-    invoke('get_folders', {
+    invoke(GET_FOLDERS, {
       path: option.path,
     }).then((res) => {
       (res as Folder[]).forEach((dir) => {
@@ -114,7 +117,22 @@ const handleLoad = async (option: TreeOption | Folder) => {
         option.children?.push({
             path: dir.path,
             name: dir.name,
-            is_repo: false,
+            is_repo: dir.is_repo,
+            // 添加图标
+            prefix: () => {
+              const icon = props.directory
+                          ? dir.is_repo && props.repoTip
+                            ? "lucide:folder-git-2" 
+                            : "cuida:folder-outline"
+                          : "lucide:file";
+              return h(Icon,{
+                  icon: icon,
+                  width: "20",
+                  height: "20",
+                  color: "gray"
+                }
+              )
+            },
             children: undefined,
             isLeaf:false
           })
@@ -140,20 +158,20 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <NSpace vertical>
+  <NSpace vertical :wrap="false">
+    <!-- @vue-expect-error -->
     <NTree
       ref="treeRef"
       block-line
       :data="options"
       :key-field="'path'"
       :label-field="'name'"
+      :block-node="true"
       :default-expanded-keys="defaultKeys"
       :override-default-node-click-behavior="handleSelect"
       style="height: 320px"
       virtual-scroll
       expand-on-click
-      :on-load="handleLoad">
-
-    </NTree>
+      :on-load="handleLoad" />
   </NSpace>
 </template>

@@ -82,7 +82,9 @@ pub fn init_store() -> Result<()> {
         alias text default NULL,
         has_watch integer default 1,
         `order` integer default NULL,
-        top integer default 0
+        top integer default 0,
+        trusted integer default 0,
+        to_trusted integer default 0
     )
     ", ()).unwrap_or_else(|e| {
       println!("{}", e);

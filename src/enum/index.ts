@@ -3,3 +3,11 @@ export enum SetupStoreId {
   Theme = 'theme-store',
   Repo = 'repo-store'
 }
+
+export enum RepoStatus {
+  Modified = 'Modified',
+  Untracked = 'Untracked',
+  UnCommitted = 'UnCommitted',
+  Unpushed = 'Unpushed',
+  Ok = 'Ok',
+}

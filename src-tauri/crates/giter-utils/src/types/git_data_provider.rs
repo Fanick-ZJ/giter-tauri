@@ -4,13 +4,15 @@ use crate::util::{build_commit, build_file_between_tree, get_blob_size};
 use anyhow::Result;
 use gix::objs::tree::EntryKind;
 use gix::revision::Walk;
-use gix::status::index_worktree::iter::Item;
+use gix::status::index_worktree::Item;
 use gix::{refs, ObjectId};
+use gix::status;
 use log::error;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::convert::TryFrom;
 use std::fmt::Pointer;
+use std::process::Command;
 use types::{
   author::Author, branch::Branch, commit::Commit, file::File, progress::FuncProgress,
   status::WorkStatus,
@@ -36,6 +38,14 @@ impl GitDataProvider {
     match repo {
       Ok(repo) => Ok(GitDataProvider { repository: repo, cache: RefCell::new(None) }),
       Err(_) => Err("INVALID GIT REPOSITORY".to_owned()),
+    }
+  }
+
+  /// 设置不信任的仓库为信任的仓库，本身就信任的仓库不变
+  pub fn to_trust(&mut self) {
+    if self.is_trusted() {
+      let opts = self.repository.open_options().clone().with(gix::sec::Trust::Full);
+      self.repository = gix::open_opts(self.repository.path(), opts).unwrap();
     }
   }
 
@@ -101,18 +111,43 @@ impl GitDataProvider {
     }
     Ok(modified_files)
   }
-  /// 是否还未提交
-  ///
-  pub fn uncommit(&self) -> Result<bool> {
-    let ret = self
-      .repository
-      .status(FuncProgress::new("Uncommit", [0, 0, 0, 0]))?;
-    let iter = ret.into_index_worktree_iter(Vec::new())?.into_iter();
-    for _ in iter {
-      return Ok(true);
+  
+  pub fn uncommitted (&self) -> bool {
+    let repo = &self.repository;
+    let path = repo.work_dir().unwrap();
+    let output = if cfg!(target_os = "windows") {
+      Command::new("cmd")
+       .arg("/C")
+       .arg("git")
+       .arg("status")
+       .arg("-s")
+       .current_dir(path)
+       .output()
+      .expect("failed to execute process")
+    } else {
+      Command::new("sh")
+        .arg("-c")
+        .arg("git status -s")
+        .output()
+        .expect("failed to execute process")
+    };
+    match output.status.success() {
+      true => {
+        let output = String::from_utf8_lossy(&output.stdout);
+        for line in output.lines() {
+          let status = &line[0..2];
+          if status.chars().nth(0).unwrap() != ' ' {
+            return true;
+          }
+        }
+      } 
+      false => {
+        println!("{}", String::from_utf8_lossy(&output.stderr)); 
+      }
     }
-    Ok(false)
+    false
   }
+
   /// 是否为推送提交
   ///
   pub fn unpushed_commits(&self) -> Result<bool> {
@@ -127,14 +162,9 @@ impl GitDataProvider {
         .to_string(),
       None => return Ok(false), // Head分离的情况下，不存在分支信息
     }; // 获取当前分支名字
-    let remote_names: Vec<String> = repo
-      .remote_names()
-      .into_iter()
-      .map(|name| name.to_string())
-      .collect();
-    // 最近head指向分支最新的提交，
+    let remote_names = self.remotes();
+    // 最近head指向分支最新的提交
     let latest_commit_id = repo.head_commit()?.id;
-
     // 在所有远程分支上找，是否能找到最新的本地提交，找得到的话，就说明已经提交过了，找不到就说明远程的不是最新的
     for remote_name in remote_names {
       let ref_string = format!("refs/remotes/{}/{}", remote_name, head_name);
@@ -152,7 +182,17 @@ impl GitDataProvider {
     Ok(false)
   }
 
+  /// 获取远程仓库列表
+  pub fn remotes(&self) -> Vec<String> {
+    let remote_names: Vec<String> = self.repository
+      .remote_names()
+      .into_iter()
+      .map(|name| name.to_string())
+      .collect();
+    remote_names
+  }
 
+  /// 获取分支列表
   pub fn branches(&self) -> Result<Vec<Branch>> {
     let platform = self.repository.references()?;
     let local_branches = platform.local_branches()?;
@@ -167,12 +207,14 @@ impl GitDataProvider {
     Ok(branches)
   }
 
-  pub fn file_status(&self) -> Result<WorkStatus> {
+  /// 获取仓库的文件状态
+  pub fn file_status(&self) -> Result<Vec<WorkStatus>> {
     let path = self.repository.path().to_str().unwrap();
+    let mut statuses: Vec<WorkStatus> = Vec::new();
     match self.untracked_files() {
       Ok(untracks) => {
         if !untracks.is_empty() {
-          return Ok(WorkStatus::Untracked);
+          statuses.push(WorkStatus::Untracked);
         }
       }
       _ => {
@@ -182,34 +224,33 @@ impl GitDataProvider {
     match self.modified_files() {
       Ok(modified_files) => {
         if !modified_files.is_empty() {
-          return Ok(WorkStatus::Modified);
+          statuses.push(WorkStatus::Modified);
         }
       }
       _ => {
         error!("No modified files found {}", path);
       }
     }
-    match self.uncommit() {
-      Ok(uncommitted) => {
-        if !uncommitted {
-          return Ok(WorkStatus::Uncommited);
-        }
-      }
-      _ => {
-        error!("No uncommitted files found {}", path);
-      }
-    }
+    // match self.uncommitted() {
+    //   true => {
+    //     statuses.push(WorkStatus::Uncommitted); 
+    //   }
+    //   false => {}
+    // }
     match self.unpushed_commits() {
       Ok(unpushed) => {
-        if !unpushed {
-          return Ok(WorkStatus::Unpushed);
+        if unpushed {
+          statuses.push(WorkStatus::Unpushed);
         }
       }
       _ => {
         error!("No unpushed commits found {}", path);
       }
     }
-    Ok(WorkStatus::Ok)
+    if statuses.is_empty() {
+      statuses.push(WorkStatus::Ok);
+    }
+    Ok(statuses)
   }
 
   pub fn get_branch(&self, branch_name: &str) -> Result<Branch> {
@@ -368,15 +409,21 @@ impl GitDataProvider {
     }
   }
 
+  // 当前仓库是否为可信的
+  pub fn is_trusted(&self) -> bool {
+    self.repository.git_dir_trust() == gix::sec::Trust::Full
+  }
+
 }
 
 #[cfg(test)]
 mod tests {
 
-  use std::io::Write;
+  use std::{io::Write, ops::Index};
 
   use super::*;
   use gix::bstr::ByteSlice;
+  use std::process::Command;
   use gix::diff::blob::intern::InternedInput;
   use gix::diff::tree_with_rewrites::Change;
   use imara_diff::{diff, Algorithm, UnifiedDiffBuilder};
@@ -406,7 +453,7 @@ mod tests {
 
   #[test]
   fn test_modified_files() {
-    let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
+    let provider = GitDataProvider::new(r"E:\workSpace\git\test_repo").unwrap();
     println!(
       "test_modified_files： {:?}",
       provider.modified_files().unwrap()
@@ -414,10 +461,41 @@ mod tests {
   }
 
   #[test]
-  fn test_uncommit() {
-    let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
-    println!("test_uncommit: {}", provider.uncommit().unwrap());
+  fn test_uncommit_files() {
+    let provider = GitDataProvider::new(r"E:\workSpace\git\test_repo").unwrap();
+    let output = if cfg!(target_os = "windows") {
+      Command::new("cmd")
+       .arg("/C")
+       .arg("git")
+       .arg("status")
+       .arg("-s")
+       .current_dir(r"E:\workSpace\git\test_repo")
+       .output()
+      .expect("failed to execute process")
+    } else {
+      Command::new("sh")
+        .arg("-c")
+        .arg("git status -s")
+        .output()
+        .expect("failed to execute process")
+    };
+    match output.status.success() {
+      true => {
+        let output = String::from_utf8_lossy(&output.stdout);
+        for line in output.lines() {
+          let status = &line[0..2];
+          let path = &line[3..];
+          if status.chars().nth(0).unwrap() != ' ' {
+            println!("{}", path);
+          }
+        }
+      } 
+      false => {
+        println!("{}", String::from_utf8_lossy(&output.stderr)); 
+      }
+    }
   }
+
 
   #[test]
   fn test_unpushed_commits() {
@@ -449,33 +527,6 @@ mod tests {
       println!("{:?}", commit);
     }
   }
-
-  // #[test]
-  // fn test_commit_content() {
-  //     let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
-  //     let commit = provider.repository.head_commit().unwrap();
-  //     println!("{:?}", commit.id.to_string());
-  //     let tree = commit.tree().unwrap();
-  //     let prev_commit = commit.parent_ids().next().unwrap();
-  //     let prev_commit = provider.repository.find_commit(prev_commit).unwrap();
-  //     let prev_commit_tree = prev_commit.tree().unwrap();
-  //     let diff = provider.repository.diff_tree_to_tree(&prev_commit_tree, &tree, gix::diff::Options::default()).unwrap();
-  //     for change in diff.iter() {
-  //         match change {
-  //             Change::Addition { .. } => {}
-  //             Change::Deletion { .. } => {}
-  //             Change::Modification { id, previous_id, .. } => {
-  //                 let old_content = provider.repository.find_blob(*previous_id).unwrap();
-  //                 let new_content = provider.repository.find_blob(*id).unwrap();
-  //                 // println!("-----------------------old--------------------------------");
-  //                 // println!("{}", old_content.data.to_str().unwrap());
-  //                 // println!("------------------------new-------------------------------");
-  //                 // println!("{}", new_content.data.to_str().unwrap());
-  //             }
-  //             Change::Rewrite { .. } => {}
-  //         }
-  //     }
-  // }
 
   #[test]
   fn test_blob_diff() {
@@ -573,5 +624,13 @@ mod tests {
         println!("{:?}", contributor);
       }
     }
+  }
+
+  #[test]
+  fn open_unsafe_repo() {
+    let mut provider = GitDataProvider::new(r"E:\workSpace\Python_Project_File\wizvision3-untrust").unwrap();
+    let opts = provider.repository.open_options().clone().with(gix::sec::Trust::Full);
+    provider.repository = gix::open_opts(r"E:\workSpace\Python_Project_File\wizvision3-untrust", opts).unwrap();
+    println!("{:?}", provider.remotes());
   }
 }

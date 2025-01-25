@@ -1,5 +1,5 @@
 use std::sync::Mutex;
-use giter_utils::types::{author::Author, branch::Branch, cache::Cache, git_data_provider::GitDataProvider};
+use giter_utils::{types::{author::Author, branch::Branch, cache::Cache, git_data_provider::GitDataProvider}, util::is_git_repo};
 use giter_watcher::types::modify_watcher::ModifyWatcher;
 use tauri::Manager;
 use crate::{core::handle, types::{cache::RepoPath, error::CommandError, fs::Dir, store}, utils::{dirs, fs::{get_first_level_dirs, get_logical_driver}}};
@@ -123,7 +123,7 @@ pub fn get_db_path(db: String) -> Result<String, CommandError> {
 }
 
 #[tauri::command]
-pub fn get_drive() -> Result<Vec<Dir>, CommandError> {
+pub fn get_driver() -> Result<Vec<Dir>, CommandError> {
   let driver = get_logical_driver();
   let mut folders = vec![];
   for item in driver {
@@ -160,4 +160,9 @@ pub fn get_folders(path: String) -> Result<Vec<Dir>, CommandError> {
 #[tauri::command]
 pub fn get_separator() -> String {
   std::path::MAIN_SEPARATOR.to_string()
+}
+
+#[tauri::command]
+pub fn is_repo(path: String) -> bool {
+  is_git_repo(&path)
 }

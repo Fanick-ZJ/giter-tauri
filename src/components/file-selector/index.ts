@@ -1,6 +1,6 @@
 // 使用组件，通过函数调用的方式，将组件附着在root上
 import { ComponentPublicInstance, createVNode, nextTick, render } from 'vue'
-import FileSelector from './comp.vue'
+import FileSelector from './index.vue'
 import { FileSelectorOptions } from './types'
 
 const className = '__file__selector__container'
@@ -30,7 +30,7 @@ export const unmount = () => {
   }
 }
 
-export const useFileSelector = (options: FileSelectorOptions): (Promise<Array<string>>) => {
+export const useFileSelector = (options: FileSelectorOptions): (Promise<string>) => {
   if (OPENED) {
     throw new Error('已经有一个文件选择器在运行')
   }
