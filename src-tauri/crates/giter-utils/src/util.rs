@@ -5,9 +5,6 @@ use crate::types::commit::Commit;
 use crate::types::file::File;
 use crate::types::status::FileStatus;
 
-pub fn validate_git_repository(repository: &str) -> Result<Repository, String> {
-    Ok(Repository::open(repository).map_err(|e| e.to_string())?)
-}
 
 pub fn has_git() -> bool {
     if let Err(_) = std::process::Command::new("git").arg("--version").output() {
@@ -38,7 +35,7 @@ pub fn build_commit(commit: &Git2Commit, repo: String) -> Commit {
     )
 }
 
-pub fn change_status_to_fiel_status(change: &Delta) -> FileStatus {
+pub fn change_status_to_file_status(change: &Delta) -> FileStatus {
     match change {
         &Delta::Added => FileStatus::Added,
         &Delta::Deleted => FileStatus::Deleted,
@@ -70,7 +67,7 @@ pub fn build_file_between_tree(
                 // 文件夹特殊处理
                 let new_id = delta.new_file().id();
                 let old_id = delta.old_file().id();
-                let status = change_status_to_fiel_status(&delta.status());
+                let status = change_status_to_file_status(&delta.status());
                 let new_blob = repo.find_blob(new_id);
                 let (exist, content) = match new_blob {
                     Ok(blob) => (true, blob.content().to_vec()),

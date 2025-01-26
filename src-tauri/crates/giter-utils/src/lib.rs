@@ -1,5 +1,6 @@
 extern crate anyhow;
 extern crate git2;
+extern crate bitflags;
 extern crate imara_diff;
 extern crate log;
 extern crate serde;

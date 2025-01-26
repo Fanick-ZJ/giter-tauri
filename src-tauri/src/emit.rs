@@ -18,7 +18,7 @@ pub fn repos_modified_emit_cb() -> fn(Event) {
     #[derive(Serialize, Debug, Deserialize, Clone)]
     struct Status {
         path: String,
-        status: Vec<WorkStatus>,
+        status: WorkStatus,
     }
     move |event: Event| {
         let app = handle::Handle::global().app_handle().unwrap();
@@ -36,7 +36,7 @@ pub fn repos_modified_emit_cb() -> fn(Event) {
         for path in repo_set.iter() {
             let path = path.to_str().unwrap();
             let provider = GitDataProvider::new(path);
-            let status = provider.unwrap().file_status();
+            let status = provider.unwrap().work_status();
             if let Ok(status) = status {
                 app.emit(
                     "giter://status_changed",

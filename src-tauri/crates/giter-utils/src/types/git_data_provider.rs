@@ -1,12 +1,13 @@
-use crate::util::{change_status_to_fiel_status, validate_git_repository};
+use crate::util::change_status_to_file_status;
 use crate::util::build_commit;
-use anyhow::{Error, Result};
+use anyhow::Result;
 use git2::{BranchType, Config, ErrorCode, Oid, Repository, Revwalk, Status};
 use log::error;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fmt::Pointer;
 use std::path;
+use std::vec;
 use types::{
   author::Author, branch::Branch, commit::Commit,
   status::WorkStatus,
@@ -28,11 +29,14 @@ impl Pointer for GitDataProvider {
 }
 
 impl GitDataProvider {
-  pub fn new(repository: &str) -> Result<Self, String> {
-    let repo = validate_git_repository(repository);
+  pub fn new(repository: &str) -> Result<Self, git2::Error> {
+    let repo = Repository::open(repository);
     match repo {
       Ok(repo) => Ok(GitDataProvider { repository: repo, cache: RefCell::new(None) }),
-      Err(_) => Err("INVALID GIT REPOSITORY".to_owned()),
+      Err(err) => {
+        log::error!("{}", err);
+        Err(err)
+      },
     }
   }
 
@@ -73,24 +77,31 @@ impl GitDataProvider {
     }
     Ok(untracks)
   }
-  ///是否有修改的文件
+  ///工作空间是否有修改
   ///
-  pub fn modified_files(&self) -> Result<Vec<String>, Error> {
+  pub fn workspace_change(&self) -> Result<Vec<String>, git2::Error> {
     let status = self.repository.statuses(None);
     let mut modified: Vec<String> = Vec::new();
     match status {
       Ok(status) => {
         for item in &status {
-          if item.status() == Status::WT_MODIFIED {
+          let bits = item.status().bits();
+          let index_status =
+              Status::WT_DELETED.bits()
+              | Status::WT_MODIFIED.bits()
+              | Status::WT_NEW.bits()
+              | Status::WT_RENAMED.bits()
+              | Status::WT_TYPECHANGE.bits();
+          if bits & index_status > 0 {
             modified.push(item.path().unwrap_or("").to_string());
           }
         }
+        Ok(modified)
       } 
       Err(err) => {
-        return Err(anyhow::anyhow!(err.message().to_string()))
+        Err(err)
       }
     }
-    Ok(modified)
   }
   
   pub fn uncommitted (&self) -> Result<bool> {
@@ -98,15 +109,15 @@ impl GitDataProvider {
     match status {
       Ok(status) => {
         for item in &status {
-          match item.status() {
-           Status::INDEX_DELETED | Status::INDEX_MODIFIED 
-           | Status::INDEX_NEW | Status::INDEX_RENAMED 
-           | Status::INDEX_TYPECHANGE=> {
+          let bits = item.status().bits();
+          let index_status = 
+              Status::INDEX_DELETED.bits() 
+              | Status::INDEX_MODIFIED.bits() 
+              | Status::INDEX_NEW.bits() 
+              | Status::INDEX_RENAMED.bits() 
+              | Status::INDEX_TYPECHANGE.bits();
+          if (bits & index_status)  > 0 {
             return Ok(true);
-           }
-           _ => {
-            return Ok(false);
-           }
           }
         }
       } 
@@ -152,24 +163,49 @@ impl GitDataProvider {
     Ok(_branches)
   }
 
+  pub fn current_remote_branch(&self) -> Result<Branch> {
+    let current = self.current_branch()?;
+    let remote = self.repository.find_branch(&current.reference, BranchType::Local)?.upstream();
+    match remote {
+      Ok(remote) => {
+        let remote_name = remote.name().unwrap_or(Some("")).unwrap().to_string();
+        let reference = remote.name().unwrap_or(Some("")).unwrap().to_string();
+        Ok(Branch {
+          name: remote_name,
+          is_remote: true,
+          reference, 
+        })
+      }
+      Err(_) => {
+        Err(anyhow::anyhow!("No remote branch"))
+      }
+    }
+  }
+
+  fn current_remote_branch_inner(&self) -> Result<git2::Branch> {
+    let current = self.current_branch()?;
+    let remote = self.repository.find_branch(&current.reference, BranchType::Local)?.upstream();
+    match remote {
+      Ok(remote) => {
+        Ok(remote)
+      }
+      Err(_) => {
+        Err(anyhow::anyhow!("No remote branch"))
+      }
+    }
+    
+  }
+
   /// 是否为推送提交
   ///
   pub fn unpushed_commits(&self) -> Result<bool> {
     let repo = &self.repository;
     // 获取远程分支对象
-    let current_branch = self.current_branch()?;
-    let branch_type = if current_branch.is_remote {
-      BranchType::Remote
-    } else {
-      BranchType::Local
-    };
-    let remote_branch = match repo.find_branch(&current_branch.name, branch_type) {
-        Ok(branch) => branch,
-        Err(_) => {
-          return Err(anyhow::anyhow!("Remote branch {} not found.", current_branch.name));
-        }
-    };
-    // 获取远程分支的最新提交
+    let remote_branch = self.current_remote_branch_inner();
+    if let Err(_) = remote_branch {
+      return Ok(false); 
+    }
+    let remote_branch = remote_branch?;
     let remote_commit_id = remote_branch.get().target().unwrap();
     // 获取本地分支的最新提交
     let local_commit_id = repo.head()?.target().unwrap();
@@ -179,7 +215,7 @@ impl GitDataProvider {
     revwalk.hide(remote_commit_id)?;
     // 检查是否有未推送的提交
     for _ in revwalk {
-        return Ok(true);
+      return Ok(true);
     }
     Ok(false)
   }
@@ -195,23 +231,23 @@ impl GitDataProvider {
   }
 
   /// 获取仓库的文件状态
-  pub fn file_status(&self) -> Result<Vec<WorkStatus>> {
+  pub fn work_status(&self) -> Result<WorkStatus> {
     let path = self.repository.path().to_str().unwrap();
-    let mut statuses: Vec<WorkStatus> = Vec::new();
+    let mut statuses: WorkStatus = WorkStatus::None;
     match self.untracked_files() {
       Ok(untracks) => {
         if !untracks.is_empty() {
-          statuses.push(WorkStatus::Untracked);
+          statuses |= WorkStatus::Untracked;
         }
       }
       _ => {
         error!("No untracked files found {}", path);
       }
     }
-    match self.modified_files() {
-      Ok(modified_files) => {
-        if !modified_files.is_empty() {
-          statuses.push(WorkStatus::Modified);
+    match self.workspace_change() {
+      Ok(workspace_change) => {
+        if !workspace_change.is_empty() {
+          statuses |= WorkStatus::Modified;
         }
       }
       _ => {
@@ -220,9 +256,8 @@ impl GitDataProvider {
     }
     match self.uncommitted() {
       Ok(uncommited) => {
-        println!("uncommited: {:?}", uncommited);
         if uncommited {
-          statuses.push(WorkStatus::Uncommitted);
+          statuses |= WorkStatus::Uncommitted;
         }
       }
       Err(_) => {}
@@ -230,7 +265,7 @@ impl GitDataProvider {
     match self.unpushed_commits() {
       Ok(unpushed) => {
         if unpushed {
-          statuses.push(WorkStatus::Unpushed);
+          statuses |= WorkStatus::Unpushed;
         }
       }
       _ => {
@@ -238,7 +273,7 @@ impl GitDataProvider {
       }
     }
     if statuses.is_empty() {
-      statuses.push(WorkStatus::Ok);
+      statuses |= WorkStatus::Ok;
     }
     Ok(statuses)
   }
@@ -329,7 +364,7 @@ impl GitDataProvider {
     for delta in delta {
         let path = delta.new_file().path().unwrap().to_str().unwrap().to_string();
         let size = delta.new_file().size();
-        let status = change_status_to_fiel_status(&delta.status());
+        let status = change_status_to_file_status(&delta.status());
         let new_blob = repo.find_blob(delta.new_file().id());
         let new_id = delta.new_file().id().to_string();
         let old_id = delta.old_file().id().to_string();
@@ -438,7 +473,7 @@ mod tests {
     let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
     println!(
       "test_has_modified_files： {:?}",
-      provider.modified_files()
+      provider.workspace_change()
     );
   }
 
@@ -447,7 +482,7 @@ mod tests {
     let provider = GitDataProvider::new(r"E:\workSpace\git\test_repo").unwrap();
     println!(
       "test_modified_files： {:?}",
-      provider.modified_files().unwrap()
+      provider.workspace_change().unwrap()
     );
   }
 

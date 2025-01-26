@@ -14,7 +14,7 @@ const props = defineProps({
 })
 const store = useRepoStore()
 const status = computed(() => {
-  return store.status.get(props.repo.path)?.value || [RepoStatus.Ok]
+  return store.status.get(props.repo.path)?.value || RepoStatus.Ok
 })
 </script>
 <template>

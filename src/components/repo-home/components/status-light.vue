@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { RepoStatus } from '@/enum';
+import { parseStatus, RepoStatus } from '@/enum';
 import { NTooltip } from 'naive-ui';
 import { computed, PropType, toRaw } from 'vue';
 
@@ -9,7 +9,7 @@ defineOptions({
 
 const props = defineProps({
   status: {
-    type: Object as PropType<RepoStatus[]>,
+    type: Number as PropType<RepoStatus>,
     required: true
   }
 })
@@ -24,19 +24,18 @@ const style = computed(() => {
     [RepoStatus.Unpushed, '#f38181'],
     [RepoStatus.Ok, '#ffffffaa']
   ])
-  const status = toRaw(props.status).sort()
+  const status = parseStatus(toRaw(props.status))
   if (status.length === 0) {
     return ''
   }
-  console.log(status)
   if (status.length === 1) {
     s = map.get(status[0])!
   }
   else {
-    s = 'linear-gradient'
+    s = 'linear-gradient('
     for (let i = 0; i < status.length; i++) {
-      const start = i / (status.length - 1) * 100
-      const end = (i + 1) / (status.length - 1) * 100
+      const start = i / (status.length) * 100
+      const end = (i + 1) / (status.length) * 100
       s += ` ${map.get(status[i])} ${start}% ${end}%`
       if (i !== status.length - 1) {
         s += ','
@@ -44,7 +43,6 @@ const style = computed(() => {
     }
     s += ')'
   }
-  console.log(s)
   return{
     background: s
   }
@@ -53,7 +51,7 @@ const style = computed(() => {
 // 计算提示文本
 const tip = computed(() => {
   let s = ''
-  const status = toRaw(props.status).sort()
+  const status = parseStatus(toRaw(props.status))
   if (status.length === 0) {
     return ''
   }

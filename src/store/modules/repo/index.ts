@@ -14,15 +14,23 @@ const watch = async (path: string) => {
   })
 }
 
+const work_status = async (path: string) => {
+  const status = await invoke('work_status', { path })
+  return status as RepoStatus 
+}
+
 type RepoPath = string
 export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
   const repos = ref<Repository[]>([])
-  const status: Map<RepoPath, Ref<RepoStatus[]>> = new Map()
+  const status: Map<RepoPath, Ref<RepoStatus>> = new Map()
 
   const _init_opt = (repo: Repository) => {
     repos.value.push(repo)
     watch(repo.path)
-    status.set(repo.path, ref([]))
+    status.set(repo.path, ref(RepoStatus.Ok))
+    work_status(repo.path).then((res) => {
+      setStatus(repo.path, res) 
+    })
   }
 
   const read_repos = async () => {
@@ -53,13 +61,14 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
 
   // 监听仓库状态变化
   listen(STATUS_CHANGE, (event) => {
-    const { path, status } = event.payload as { path: string, status: RepoStatus[] }
+    const { path, status } = event.payload as { path: string, status: RepoStatus }
+    console.log('status change', path, status)
     setStatus(path, status)
   })
 
 
   // 设置仓库状态
-  const setStatus = (path: RepoPath, _status: RepoStatus[]) => {
+  const setStatus = (path: RepoPath, _status: RepoStatus) => {
     if (status.has(path)) {
       status.get(path)!.value = _status
     }

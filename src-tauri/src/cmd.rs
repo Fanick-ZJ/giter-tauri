@@ -1,5 +1,5 @@
-use std::sync::Mutex;
-use giter_utils::{types::{author::Author, branch::Branch, cache::Cache, git_data_provider::GitDataProvider}, util::is_git_repo};
+use std::{process::Command, sync::Mutex};
+use giter_utils::{types::{author::Author, branch::Branch, cache::Cache, git_data_provider::GitDataProvider, status::WorkStatus}, util::is_git_repo};
 use giter_watcher::types::modify_watcher::ModifyWatcher;
 use tauri::Manager;
 use crate::{core::handle, types::{cache::RepoPath, error::CommandError, fs::Dir, store}, utils::{dirs, fs::{get_first_level_dirs, get_logical_driver}}};
@@ -15,8 +15,11 @@ fn get_provider(
       provider.set_cache(cache);
       Ok(provider)
     }
-    Err(_) => {
-      return Err(CommandError::DataProviderBuildError(repo.to_string()));
+    Err(err) => {
+      match err.code() {
+        git2::ErrorCode::Owner => Err(CommandError::RepoHasnotOwnership(repo.to_string())),
+        _ => Err(CommandError::DataProviderBuildError(repo.to_string()))
+      }
     }
   }
 }
@@ -165,4 +168,15 @@ pub fn get_separator() -> String {
 #[tauri::command]
 pub fn is_repo(path: String) -> bool {
   is_git_repo(&path)
+}
+
+#[tauri::command]
+pub fn work_status(path: String) -> Result<WorkStatus, CommandError> {
+  let provider = get_provider(&path)?;
+  let statuses = provider.work_status();
+  if let Err(e) = statuses {
+    return Err(CommandError::GetWorkStatusError(e.to_string())); 
+  }
+  Ok(statuses.unwrap())
+
 }
