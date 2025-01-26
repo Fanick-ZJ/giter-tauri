@@ -21,7 +21,7 @@ const status = computed(() => {
   <NCard content-style="font-size: 20px">
     <div class="relative">
       <div class="absolute left-[-15px] h-full">
-        <StatusLight :status="[RepoStatus.Modified, RepoStatus.Unpushed]" />
+        <StatusLight :status="status" />
       </div>
       <NEllipsis class="flex-auto">
         {{repo.alias}}

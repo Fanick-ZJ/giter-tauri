@@ -1,9 +1,8 @@
-use std::{collections::HashMap, path::PathBuf, str::FromStr,};
-use gix::{hashtable::hash_set::HashSet, ObjectId};
+use std::{collections::{HashMap, HashSet}, path::PathBuf, str::FromStr,};
+use git2::Oid;
 use giter_utils::types::{author::Author, branch::Branch, cache::Cache as ProviderCache};
-use rusqlite::params;
 use crate::{
-  types::{cache::{AuthorCache, BranchAuthorCache, BranchName, RepoPath}, store},
+  types::{cache::{AuthorCache, BranchAuthorCache, BranchName, RepoPath}},
   utils::{db::conn_db, dirs::{cache_file, repo_default_alias}}
 };
 
@@ -36,11 +35,15 @@ impl GitCache {
         {
           (Ok(branch), Ok(authors), Ok(last_commit_id)) => {
             let authors: Vec<Author> = serde_json::from_str(&authors).unwrap();
-            let last_commit_id = ObjectId::from_str(&last_commit_id).unwrap();
-            Ok((branch, AuthorCache {
-              authors: Some(authors),
-              last_commit_id: Some(last_commit_id)
-            }))
+            if let Err(e) = Oid::from_str(&last_commit_id) {
+              log::error!(target: "app", "Failed to the app home directory: {}", e);
+              return Err(rusqlite::Error::QueryReturnedNoRows);
+            } else {
+              Ok((branch, AuthorCache {
+                authors: Some(authors),
+                last_commit_id: Some(last_commit_id)
+              }))
+            }
           },
           _ => Err(rusqlite::Error::QueryReturnedNoRows)
         }
@@ -80,7 +83,7 @@ impl GitCache {
       if select.unwrap() > 0 {
         let update = conn.execute(update_sql, [
           serde_json::to_string(&cache.authors).unwrap(),
-          cache.last_commit_id.unwrap().to_string(),
+          cache.last_commit_id.clone().unwrap(),
           repo.to_string(),
           branch.to_string()
         ]);
@@ -93,7 +96,7 @@ impl GitCache {
           repo.as_str(),
           branch.as_str(),
           serde_json::to_string(&cache.authors).unwrap().as_str(),
-          cache.last_commit_id.unwrap().to_string().as_str()
+          cache.last_commit_id.clone().unwrap().as_str()
         ]);
         if let Err(e) = insert {
           log::error!(target: "app", "Failed to the app home directory: {}", e)
@@ -107,7 +110,7 @@ impl GitCache {
   }
 
   /// 获取分支作者缓存
-  pub fn branch_authors_inner(&self, repo: RepoPath, branch: BranchName) -> Option<(Vec<Author>, ObjectId)> {
+  pub fn branch_authors_inner(&self, repo: RepoPath, branch: BranchName) -> Option<(Vec<Author>, Oid)> {
     let conn = conn_db(self.path.clone()).unwrap();
     let mut stmt = conn.prepare("select * from branch_author where path=?1 and branch=?2").unwrap();
     let caches = stmt.query_row(
@@ -115,7 +118,7 @@ impl GitCache {
         match (row.get::<_, String>(3), row.get::<_, String>(4)) {
           (Ok(authors), Ok(last_commit_id)) => {
             let authors: Vec<Author> = serde_json::from_str(&authors).unwrap();
-            let last_commit_id = ObjectId::from_str(&last_commit_id).unwrap();
+            let last_commit_id = Oid::from_str(&last_commit_id).unwrap();
             Ok((authors,last_commit_id))
           },
           _ => Err(rusqlite::Error::QueryReturnedNoRows)
@@ -164,15 +167,15 @@ impl GitCache {
 
 impl ProviderCache for GitCache {
 
-  fn branch_authors(&self, repo: &str, branch: &Branch) -> Option<(Vec<Author>, ObjectId)> {
+  fn branch_authors(&self, repo: &str, branch: &Branch) -> Option<(Vec<Author>, Oid)> {
     let author_cache = self.branch_authors_inner(repo.to_string(), branch.name.to_string());
     author_cache
   }
   
-  fn set_authors(&mut self, repo: &str, authors: &Vec<Author>, branch: &Branch, last_commit_id: &ObjectId) {
+  fn set_authors(&mut self, repo: &str, authors: &Vec<Author>, branch: &Branch, last_commit_id: &Oid) {
     let author_cache = AuthorCache {
       authors: Some(authors.clone()),
-      last_commit_id: Some(last_commit_id.clone())
+      last_commit_id: Some(last_commit_id.to_string())
     };
     let map = HashMap::from([(branch.name.clone(), author_cache)]);
     self.update_author(repo.to_string(), &map);

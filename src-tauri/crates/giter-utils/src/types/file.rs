@@ -1,4 +1,3 @@
-use gix::objs::tree::EntryKind;
 use serde::{Deserialize, Serialize};
 use types::status::FileStatus;
 
@@ -8,9 +7,8 @@ pub struct File {
     pub size: usize,
     pub status: FileStatus,
     pub object_id: String,
-    pub entry_kind: EntryKind,
     pub prev_object_id: String,
-    pub blob_exist: bool,
+    pub blob_exist: bool
 }
 
 impl File {
@@ -19,7 +17,6 @@ impl File {
         size: usize,
         status: FileStatus,
         object_id: String,
-        entry_kind: EntryKind,
         prev_object_id: String,
         blob_exist: bool,
     ) -> Self {
@@ -28,7 +25,6 @@ impl File {
             size,
             status,
             object_id,
-            entry_kind,
             prev_object_id,
             blob_exist,
         }

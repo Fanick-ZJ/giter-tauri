@@ -1,22 +1,12 @@
-use std::str::FromStr;
-
-use anyhow::{anyhow, Result};
-use gix::diff::tree_with_rewrites::Change;
-use gix::objs::tree::EntryKind;
-use gix::Repository;
-use gix::discover;
+use anyhow::Result;
+use git2::{Commit as Git2Commit, Delta, Oid, Repository};
 
 use crate::types::commit::Commit;
 use crate::types::file::File;
 use crate::types::status::FileStatus;
 
 pub fn validate_git_repository(repository: &str) -> Result<Repository, String> {
-    let git_repository = gix::open(repository);
-    if git_repository.is_err() {
-        return Err(git_repository.unwrap_err().to_string());
-    }
-    let repository = git_repository.ok().unwrap();
-    Ok(repository)
+    Ok(Repository::open(repository).map_err(|e| e.to_string())?)
 }
 
 pub fn has_git() -> bool {
@@ -26,96 +16,81 @@ pub fn has_git() -> bool {
     true
 }
 
-pub fn string_to_object_id(id: String) -> Result<gix::ObjectId> {
-    Ok(gix::ObjectId::from_str(id.as_str())?)
-}
-
-pub fn build_commit(commit: &gix::Commit) -> Commit {
-    let message = if let Some(body) = commit.message().unwrap().body() {
-        body.to_string()
+pub fn build_commit(commit: &Git2Commit, repo: String) -> Commit {
+    let message = if let Some(message) = commit.message() {
+        message.to_string() 
     } else {
-        "".to_string()
+        "".to_string() 
     };
+    let committer = commit.committer();
+    let author = commit.author();
     Commit::new(
-        commit.id.to_string(),
-        commit.author().unwrap().name.to_string(),
-        commit.author().unwrap().email.to_string(),
-        commit.committer().unwrap().name.to_string(),
-        commit.committer().unwrap().email.to_string(),
-        commit.message().unwrap().summary().to_string(),
+        commit.id().to_string(),
+        author.name().unwrap_or("").to_string(),
+        author.email().unwrap_or("").to_string(),
+        committer.name().unwrap_or("").to_string(),
+        committer.email().unwrap_or("").to_string(),
+        message.lines().next().unwrap_or("").to_string(),
         message,
-        commit.time().unwrap().seconds as i64,
+        commit.time().seconds(),
         commit.parent_ids().into_iter().count() as i64,
-        commit.repo.path().to_str().unwrap().to_string(),
+        repo
     )
 }
 
-fn change_status_to_fiel_status(change: &Change) -> FileStatus {
+pub fn change_status_to_fiel_status(change: &Delta) -> FileStatus {
     match change {
-        Change::Addition { .. } => FileStatus::Added,
-        Change::Deletion { .. } => FileStatus::Deleted,
-        Change::Modification { .. } => FileStatus::Modified,
-        Change::Rewrite { .. } => FileStatus::Renamed,
+        &Delta::Added => FileStatus::Added,
+        &Delta::Deleted => FileStatus::Deleted,
+        &Delta::Modified => FileStatus::Modified,
+        &Delta::Renamed => FileStatus::Renamed,
+        _ => FileStatus::Ok,
     }
 }
 
-pub fn get_blob_size(repo: &Repository, id: impl Into<gix::ObjectId>) -> (bool, usize) {
-    let blob = repo.find_blob(id);
+pub fn get_blob_size(repo: &Repository, id: impl Into<Oid>) -> (bool, usize) {
+    let blob = repo.find_blob(id.into());
     if let Err(_) = blob {
         return (false, 0);
     } else {
-        return (true, blob.unwrap().data.len() as usize);
+        return (true, blob.unwrap().content().len());
     }
-}
-
-/// 从change中构建file
-pub fn build_file_from_change(repo: &Repository, change: &Change) -> Result<File> {
-    if change.entry_mode().is_tree() {
-        return Err(anyhow!("It's tree!"));
-    }
-    let (prev_entry_mod, previous_id) = change.source_entry_mode_and_id();
-    let (entry_mode, id) = change.entry_mode_and_id();
-    let status = change_status_to_fiel_status(change);
-    let (exist, size) = get_blob_size(repo, id);
-    let location = change.location().to_string();
-    change.source_location();
-    let file = File::new(
-        location,
-        size,
-        status,
-        id.to_string(),
-        EntryKind::from(entry_mode),
-        previous_id.to_string(),
-        exist,
-    );
-    Ok(file)
 }
 
 pub fn build_file_between_tree(
     repo: &Repository,
-    old_tree: &gix::Tree,
-    new_tree: &gix::Tree,
+    old_tree: &git2::Tree,
+    new_tree: &git2::Tree,
 ) -> Vec<File> {
     let mut files: Vec<File> = Vec::new();
-    let diff = repo.diff_tree_to_tree(old_tree, new_tree, gix::diff::Options::default());
+    let diff = repo.diff_tree_to_tree(Some(old_tree), Some(new_tree), None);
     match diff {
-        Ok(changes) => {
-            for change in changes {
-                // println!("-----{:?}", change.location().to_string());
+        Ok(diff) => {
+            for delta in diff.deltas() {
                 // 文件夹特殊处理
-                if change.entry_mode().is_tree() {
-                    continue;
-                } else {
-                    let file = build_file_from_change(repo, &change);
-                    match file {
-                        Ok(file) => {
-                            files.push(file);
-                        }
-                        Err(_) => {
-                            println!("build file error");
-                        }
-                    }
-                }
+                let new_id = delta.new_file().id();
+                let old_id = delta.old_file().id();
+                let status = change_status_to_fiel_status(&delta.status());
+                let new_blob = repo.find_blob(new_id);
+                let (exist, content) = match new_blob {
+                    Ok(blob) => (true, blob.content().to_vec()),
+                    Err(_) => (false, Vec::new()),
+                };
+                let size = content.len();
+                let path = match delta.new_file().path() {
+                    Some(path) => path.to_str().unwrap_or("").to_string(),
+                    None => "".to_string(),
+                };
+                let file = File::new(
+                    path,
+                    size,
+                    status,
+                    new_id.to_string(),
+                    old_id.to_string(),
+                    exist
+
+                );
+                files.push(file);
             }
         }
         Err(_) => {}
@@ -125,7 +100,7 @@ pub fn build_file_between_tree(
 
 /// 判断是否是git仓库
 pub fn is_git_repo(path: &str) -> bool {
-    if let Ok(repo) = gix::open(path) {
+    if let Ok(repo) = Repository::open(path) {
         return true;
     } else {
         return false;

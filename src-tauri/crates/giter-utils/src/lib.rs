@@ -1,5 +1,5 @@
 extern crate anyhow;
-extern crate gix;
+extern crate git2;
 extern crate imara_diff;
 extern crate log;
 extern crate serde;

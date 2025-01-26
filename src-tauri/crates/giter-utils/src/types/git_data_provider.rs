@@ -1,26 +1,21 @@
-use crate::util::validate_git_repository;
-use crate::types::status::FileStatus;
-use crate::util::{build_commit, build_file_between_tree, get_blob_size};
-use anyhow::Result;
-use gix::objs::tree::EntryKind;
-use gix::revision::Walk;
-use gix::status::index_worktree::Item;
-use gix::{refs, ObjectId};
-use gix::status;
+use crate::util::{change_status_to_fiel_status, validate_git_repository};
+use crate::util::build_commit;
+use anyhow::{Error, Result};
+use git2::{BranchType, Config, ErrorCode, Oid, Repository, Revwalk, Status};
 use log::error;
 use std::cell::RefCell;
 use std::collections::HashSet;
-use std::convert::TryFrom;
 use std::fmt::Pointer;
-use std::process::Command;
+use std::path;
 use types::{
-  author::Author, branch::Branch, commit::Commit, file::File, progress::FuncProgress,
+  author::Author, branch::Branch, commit::Commit,
   status::WorkStatus,
 };
 
 use super::cache::Cache;
+use super::file::File;
 pub struct GitDataProvider {
-  pub repository: gix::Repository,
+  pub repository: Repository,
   cache: RefCell<Option<Box<dyn Cache + Send>>>
 }
 
@@ -41,170 +36,162 @@ impl GitDataProvider {
     }
   }
 
-  /// 设置不信任的仓库为信任的仓库，本身就信任的仓库不变
-  pub fn to_trust(&mut self) {
-    if self.is_trusted() {
-      let opts = self.repository.open_options().clone().with(gix::sec::Trust::Full);
-      self.repository = gix::open_opts(self.repository.path(), opts).unwrap();
+  /// 设置全局配置，将仓库设置为可信
+  pub fn set_owner(&self) -> Result<()>  {
+    if !self.has_owner() {
+      let mut config = Config::open_default().unwrap();
+      let ret = config.set_multivar("safe.directory", "$^", "E:/workSpace/Python_Project_File/sis-packages/sis.dialog").unwrap();
+      ret
     }
+    Ok(())
   }
 
   pub fn set_cache(&mut self, cache: impl Cache + Send + 'static) {
     self.cache = RefCell::new(Some(Box::new(cache)));
   }
 
-  pub fn is_dirty(&self) -> Result<bool, String> {
-    let state = self.repository.is_dirty();
-    if let Ok(state) = state {
-      return Ok(state);
-    }
-
-    Ok(false)
+  pub fn workdir(&self) -> String {
+    self.repository.workdir().unwrap().to_str().unwrap().to_string() 
   }
 
   /// 获取位追踪的文件列表
   ///
   pub fn untracked_files(&self) -> Result<Vec<String>> {
-    let fn_progress = FuncProgress::new("UntrackFiles", [0, 0, 0, 0]);
-    let ret = self.repository.status(fn_progress)?;
+    let status = self.repository.statuses(None);
     let mut untracks: Vec<String> = Vec::new();
-    for entry in ret.into_index_worktree_iter(Vec::new())?.into_iter() {
-      let item = entry?;
-      if let Item::DirectoryContents {
-        entry,
-        collapsed_directory_status: _,
-      } = item
-      {
-        untracks.push(entry.rela_path.to_string())
+    match status {
+      Ok(status) => {
+        for item in &status {
+          if item.status() == Status::WT_NEW {
+            untracks.push(item.path().unwrap_or("").to_string());
+          }
+        }
+      } 
+      Err(err) => {
+        return Err(anyhow::anyhow!(err.message().to_string()))
       }
     }
     Ok(untracks)
   }
   ///是否有修改的文件
   ///
-  pub fn has_modified_files(&self) -> Result<bool> {
-    let ret = self
-      .repository
-      .status(FuncProgress::new("HasModifiedFiles", [0, 0, 0, 0]))?;
-    let iter = ret
-      .into_index_worktree_iter(Vec::new())?
-      .into_iter();
-    for item in iter {
-      if let Ok(Item::Modification { .. }) = item {
-        return Ok(true);
+  pub fn modified_files(&self) -> Result<Vec<String>, Error> {
+    let status = self.repository.statuses(None);
+    let mut modified: Vec<String> = Vec::new();
+    match status {
+      Ok(status) => {
+        for item in &status {
+          if item.status() == Status::WT_MODIFIED {
+            modified.push(item.path().unwrap_or("").to_string());
+          }
+        }
+      } 
+      Err(err) => {
+        return Err(anyhow::anyhow!(err.message().to_string()))
+      }
+    }
+    Ok(modified)
+  }
+  
+  pub fn uncommitted (&self) -> Result<bool> {
+    let status = self.repository.statuses(None);
+    match status {
+      Ok(status) => {
+        for item in &status {
+          match item.status() {
+           Status::INDEX_DELETED | Status::INDEX_MODIFIED 
+           | Status::INDEX_NEW | Status::INDEX_RENAMED 
+           | Status::INDEX_TYPECHANGE=> {
+            return Ok(true);
+           }
+           _ => {
+            return Ok(false);
+           }
+          }
+        }
+      } 
+      Err(err) => {
+        return Err(anyhow::anyhow!(err.message().to_string()))
       }
     }
     Ok(false)
   }
-  /// 获取修改文件的列表
-  ///
-  pub fn modified_files(&self) -> Result<Vec<String>> {
-    let ret = self
-      .repository
-      .status(FuncProgress::new("ModifiedFiles", [0, 0, 0, 0]))?;
-    let iter = ret.into_index_worktree_iter(Vec::new())?.into_iter();
-    let mut modified_files: Vec<String> = Vec::new();
-    for item in iter {
-      if let Ok(Item::Modification { rela_path, .. }) = item {
-        modified_files.push(rela_path.to_string());
-      }
-    }
-    Ok(modified_files)
-  }
-  
-  pub fn uncommitted (&self) -> bool {
+
+  pub fn current_branch(&self) -> Result<Branch> {
     let repo = &self.repository;
-    let path = repo.work_dir().unwrap();
-    let output = if cfg!(target_os = "windows") {
-      Command::new("cmd")
-       .arg("/C")
-       .arg("git")
-       .arg("status")
-       .arg("-s")
-       .current_dir(path)
-       .output()
-      .expect("failed to execute process")
-    } else {
-      Command::new("sh")
-        .arg("-c")
-        .arg("git status -s")
-        .output()
-        .expect("failed to execute process")
-    };
-    match output.status.success() {
-      true => {
-        let output = String::from_utf8_lossy(&output.stdout);
-        for line in output.lines() {
-          let status = &line[0..2];
-          if status.chars().nth(0).unwrap() != ' ' {
-            return true;
-          }
-        }
+    let branches = repo.branches(None).unwrap();
+    for branch in branches {
+      let (branch, branch_type) = branch.unwrap();
+      if branch.is_head() {
+        let reference = branch.name().unwrap_or(Some("")).unwrap_or("").to_string();
+        let name = reference.split(path::MAIN_SEPARATOR).last().unwrap_or("").to_string();
+        return Ok(Branch {
+          name,
+          is_remote: branch_type == BranchType::Remote,
+          reference,
+        });
       } 
-      false => {
-        println!("{}", String::from_utf8_lossy(&output.stderr)); 
-      }
     }
-    false
+    Err(anyhow::anyhow!("No current branch"))
+  }
+
+  pub fn branches(&self) -> Result<Vec<Branch>> {
+    let repo = &self.repository;
+    let branches = repo.branches(None).unwrap();
+    let mut _branches: Vec<Branch> = Vec::new(); 
+    for branch in branches {
+      let (branch, branch_type) = branch.unwrap();
+      let reference = branch.name().unwrap_or(Some("")).unwrap_or("").to_string();
+      let name = reference.split(path::MAIN_SEPARATOR).last().unwrap_or("").to_string(); 
+      _branches.push(Branch {
+        name,
+        is_remote: branch_type == BranchType::Remote,
+        reference, 
+      })
+    }
+    Ok(_branches)
   }
 
   /// 是否为推送提交
   ///
   pub fn unpushed_commits(&self) -> Result<bool> {
     let repo = &self.repository;
-    let head_name = match repo.head_name()? {
-      Some(name) => name
-        .as_bstr()
-        .to_string()
-        .split('/')
-        .last()
-        .unwrap()
-        .to_string(),
-      None => return Ok(false), // Head分离的情况下，不存在分支信息
-    }; // 获取当前分支名字
-    let remote_names = self.remotes();
-    // 最近head指向分支最新的提交
-    let latest_commit_id = repo.head_commit()?.id;
-    // 在所有远程分支上找，是否能找到最新的本地提交，找得到的话，就说明已经提交过了，找不到就说明远程的不是最新的
-    for remote_name in remote_names {
-      let ref_string = format!("refs/remotes/{}/{}", remote_name, head_name);
-      if let Ok(full_name) = refs::FullName::try_from(ref_string) {
-        let remote_head = repo.find_reference(&full_name)?.peel_to_commit()?;
-        let found = remote_head
-          .ancestors()
-          .all()?
-          .find(|commit| commit.as_ref().unwrap().id == latest_commit_id);
-        if !found.is_some() {
-          return Ok(true);
+    // 获取远程分支对象
+    let current_branch = self.current_branch()?;
+    let branch_type = if current_branch.is_remote {
+      BranchType::Remote
+    } else {
+      BranchType::Local
+    };
+    let remote_branch = match repo.find_branch(&current_branch.name, branch_type) {
+        Ok(branch) => branch,
+        Err(_) => {
+          return Err(anyhow::anyhow!("Remote branch {} not found.", current_branch.name));
         }
-      }
+    };
+    // 获取远程分支的最新提交
+    let remote_commit_id = remote_branch.get().target().unwrap();
+    // 获取本地分支的最新提交
+    let local_commit_id = repo.head()?.target().unwrap();
+    // 比较本地分支和远程分支的提交历史
+    let mut revwalk = repo.revwalk()?;
+    revwalk.push(local_commit_id)?;
+    revwalk.hide(remote_commit_id)?;
+    // 检查是否有未推送的提交
+    for _ in revwalk {
+        return Ok(true);
     }
     Ok(false)
   }
 
   /// 获取远程仓库列表
   pub fn remotes(&self) -> Vec<String> {
-    let remote_names: Vec<String> = self.repository
-      .remote_names()
-      .into_iter()
-      .map(|name| name.to_string())
-      .collect();
+    let remote_names: Vec<String> = self.branches().unwrap_or(vec![]).iter().filter(|b| {
+      b.is_remote
+    }).map(|b| {
+      b.name.clone()
+    }).collect();
     remote_names
-  }
-
-  /// 获取分支列表
-  pub fn branches(&self) -> Result<Vec<Branch>> {
-    let platform = self.repository.references()?;
-    let local_branches = platform.local_branches()?;
-    let remote_branches = platform.remote_branches()?;
-    let mut branches: Vec<Branch> = Vec::new();
-    for branch in local_branches.chain(remote_branches).flatten() {
-      let reference = branch.name().as_bstr().to_string();
-      let is_remote = reference.starts_with("refs/remotes/");
-      let basename = reference.split('/').last().unwrap().to_string();
-      branches.push(Branch::new(basename, is_remote, reference));
-    }
-    Ok(branches)
   }
 
   /// 获取仓库的文件状态
@@ -231,12 +218,15 @@ impl GitDataProvider {
         error!("No modified files found {}", path);
       }
     }
-    // match self.uncommitted() {
-    //   true => {
-    //     statuses.push(WorkStatus::Uncommitted); 
-    //   }
-    //   false => {}
-    // }
+    match self.uncommitted() {
+      Ok(uncommited) => {
+        println!("uncommited: {:?}", uncommited);
+        if uncommited {
+          statuses.push(WorkStatus::Uncommitted);
+        }
+      }
+      Err(_) => {}
+    }
     match self.unpushed_commits() {
       Ok(unpushed) => {
         if unpushed {
@@ -263,15 +253,13 @@ impl GitDataProvider {
     Err(anyhow::anyhow!("Branch not found"))
   }
 
-  pub fn build_commits(&self, mut revwalk: Walk, count: i32) -> Result<Box<Vec<Commit>>> {
+  pub fn build_commits(&self, mut revwalk: Revwalk, count: i32) -> Result<Box<Vec<Commit>>> {
     let mut commits: Box<Vec<Commit>> = Box::new(Vec::new());
-    for _i in 0..count {
-      let commit_info = revwalk.next();
-      if let Some(commit_info) = commit_info {
-        let commit_info = commit_info?;
-        let commit = self.repository.find_commit(commit_info.id())?;
-        commits.push(*Box::new(build_commit(&commit)));
-      }
+    for (i, id) in revwalk.by_ref().take(count as usize).enumerate() {
+      let id = id?;
+      let commit = self.repository.find_commit(id)?;
+      let commit = build_commit(&commit, self.workdir());
+      commits.push(commit);
     }
     Ok(commits)
   }
@@ -279,8 +267,9 @@ impl GitDataProvider {
   /// 从当前HEAD获取所有之前的提交
   ///
   pub fn commits(&self, count: i32) -> Result<Box<Vec<Commit>>> {
-    let head_id = self.repository.head_id()?;
-    let revwalk = head_id.ancestors().all()?;
+    let head_id = self.repository.head()?.target().unwrap();
+    let mut revwalk = self.repository.revwalk()?;
+    revwalk.push(head_id)?;
     let commits = self.build_commits(revwalk, count)?;
     Ok(commits)
   }
@@ -289,22 +278,23 @@ impl GitDataProvider {
   ///
   pub fn get_commits_before(
     &self,
-    commit_id: impl Into<ObjectId>,
+    commit_id: impl Into<Oid>,
     count: i32,
   ) -> Result<Box<Vec<Commit>>> {
     let commits = self.repository.find_commit(commit_id.into())?;
-    let revwalk = commits.ancestors().all()?;
+    let mut revwalk = self.repository.revwalk()?;
+    revwalk.push(commits.id())?;
     let commits = self.build_commits(revwalk, count)?;
     Ok(commits)
   }
 
   /// 获取分支所有提交，gix中的提交对象
-  fn branch_commit_inner(&self, branch: &Branch) -> Result<gix::Commit> {
+  fn branch_commit_inner(&self, branch: &Branch) -> Result<git2::Commit> {
     let branch_reference = self.repository.find_reference(&branch.reference);
     if let Err(_) = branch_reference {
       return Err(anyhow::anyhow!("Branch not found"));
     }
-    let mut branch_reference = branch_reference?;
+    let branch_reference = branch_reference?;
     let branch_commit = branch_reference.peel_to_commit();
     if let Err(_) = branch_commit {
       return Err(anyhow::anyhow!("Branch not found"));
@@ -317,50 +307,52 @@ impl GitDataProvider {
   pub fn get_branch_commits(&self, branch: &Branch, count: i32) -> Result<Box<Vec<Commit>>> {
     // 获取分支所在的提交
     let commit = self.branch_commit_inner(branch)?;
-    let commits = commit.ancestors().all()?;
-    let commits = self.build_commits(commits, count)?;
+    let mut revwalk = self.repository.revwalk()?;
+    revwalk.push(commit.id())?;
+    let commits = self.build_commits(revwalk, count)?;
     Ok(commits)
   }
 
   /// 获取一个提交的内容
   ///
-  pub fn commit_content(&self, commit_id: impl Into<ObjectId>) -> Result<Vec<File>> {
-    let commit = self.repository.find_commit(commit_id.into());
-    if let Err(_) = commit {
-      return Err(anyhow::anyhow!("Commit not found"));
-    }
-    let commit = commit?;
-    let tree = commit.tree()?;
+  pub fn commit_content(&self, commit_id: impl Into<Oid>) -> Result<Vec<File>> {
+    let repo = &self.repository;
     let mut files: Vec<File> = Vec::new();
     // 获取父提交
-    let parent = commit.parent_ids().into_iter().next();
-    if let Some(parent) = parent {
-      let parent = self.repository.find_commit(parent)?;
-      let parent_tree = parent.tree()?;
-      let files = build_file_between_tree(&self.repository, &parent_tree, &tree);
-      return Ok(files);
-    } else {
-      let tree = self.repository.find_tree(tree.id).unwrap();
-      tree.iter().for_each(|f| {
-        let f = f.unwrap();
-        let (exist, size) = get_blob_size(&self.repository, f.id());
-        files.push(File::new(
-          f.filename().to_string(),
-          size,
-          FileStatus::Modified,
-          f.id().to_string(),
-          EntryKind::from(f.mode()),
-          "".to_string(),
-          exist,
-        ));
-      });
+    let commit = repo.find_commit(commit_id.into())?;
+    let now_tree = commit.tree()?;
+    let old_tree = commit.parent(0)?.tree()?;
+    // 对比两个树的差异
+    let diff = repo.diff_tree_to_tree(Some(&old_tree), Some(&now_tree), None)?;
+    let delta = diff.deltas();
+    // 遍历差异, 获取差异的文件
+    for delta in delta {
+        let path = delta.new_file().path().unwrap().to_str().unwrap().to_string();
+        let size = delta.new_file().size();
+        let status = change_status_to_fiel_status(&delta.status());
+        let new_blob = repo.find_blob(delta.new_file().id());
+        let new_id = delta.new_file().id().to_string();
+        let old_id = delta.old_file().id().to_string();
+        let (exist, _) = match new_blob {
+            Ok(blob) => (true, blob.content().to_vec()),
+            Err(_) => (false, Vec::new()),
+        };
+        let file = File::new(
+            path,
+            size as usize,
+            status,
+            new_id,
+            old_id,
+            exist
+        );
+        files.push(file);
     }
     Ok(files)
   }
 
   /// 获取分支的贡献者
   pub fn authors(&self, branch: &Branch) -> Result<Vec<Author>> {
-    let mut lasted_commit_id = Option::<ObjectId>::None;
+    let mut lasted_commit_id = Option::<Oid>::None;
     let mut author_set = HashSet::new();
     // 获取缓存
     let cache_value = self.authors_cache(branch);
@@ -370,18 +362,20 @@ impl GitDataProvider {
     }
     // 1. 获取分支的提交
     let branch_commit = self.branch_commit_inner(branch)?;
+    let mut revwalk = self.repository.revwalk()?;
+    revwalk.push(branch_commit.id())?;
     // 2. 获取提交的作者, 获取作者的邮箱
-    for commit in branch_commit.ancestors().all()? {
+    for commit in revwalk.by_ref().into_iter() {
       let commit = commit?;
       // 如果当前提交的id和缓存的id相同，说明之后的记录都已经缓存过了，直接退出
-      if lasted_commit_id.is_some() && commit.id == lasted_commit_id.unwrap() {
+      if lasted_commit_id.is_some() && commit == lasted_commit_id.unwrap() {
         break;
       }
-      let commit_obj = commit.object()?;
-      let author = commit_obj.author()?;
+      let commit_obj = self.repository.find_commit(commit)?;
+      let author = commit_obj.author();
       author_set.insert(Author::new(
-        author.name.to_string(),
-        author.email.to_string(),
+        author.name().unwrap().to_string(),
+        author.email().unwrap().to_string(),
       ));
     }
     let lasted_id = branch_commit.id().to_string();
@@ -392,7 +386,7 @@ impl GitDataProvider {
   }
 
   /// 获取提交者缓存
-  fn authors_cache(&self, branch: &Branch) -> Option<(Vec<Author>, ObjectId)> {
+  fn authors_cache(&self, branch: &Branch) -> Option<(Vec<Author>, Oid)> {
     if let Some(cache) = self.cache.borrow().as_ref() {
       let authors = cache.branch_authors(self.repository.path().to_str().unwrap(), branch);
       if let Some((authors, last_commit_id)) = authors {
@@ -403,15 +397,23 @@ impl GitDataProvider {
   }
   /// 设置提交者缓存
   ///
-  pub fn set_authors_cache(&self, authors: Vec<Author>, branch: &Branch, lasted_id: ObjectId) {
+  pub fn set_authors_cache(&self, authors: Vec<Author>, branch: &Branch, lasted_id: Oid) {
     if let Some(cache) = self.cache.borrow_mut().as_mut() {
       cache.set_authors(self.repository.path().to_str().unwrap(), &authors, branch, &lasted_id);
     }
   }
 
   // 当前仓库是否为可信的
-  pub fn is_trusted(&self) -> bool {
-    self.repository.git_dir_trust() == gix::sec::Trust::Full
+  pub fn has_owner(&self) -> bool {
+    match self.repository.statuses(None) {
+        Ok(_) => true,
+        Err(err) => {
+          if err.code() == ErrorCode::Owner{
+            return false;
+          }
+          true
+        },
+    }
   }
 
 }
@@ -419,19 +421,8 @@ impl GitDataProvider {
 #[cfg(test)]
 mod tests {
 
-  use std::{io::Write, ops::Index};
-
   use super::*;
-  use gix::bstr::ByteSlice;
   use std::process::Command;
-  use gix::diff::blob::intern::InternedInput;
-  use gix::diff::tree_with_rewrites::Change;
-  use imara_diff::{diff, Algorithm, UnifiedDiffBuilder};
-  #[test]
-  fn test_is_dirty() {
-    let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
-    println!("test_is_dirty: {}", provider.is_dirty().unwrap());
-  }
 
   #[test]
   fn test_untracked_files() {
@@ -446,8 +437,8 @@ mod tests {
   fn test_has_modified_files() {
     let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
     println!(
-      "test_has_modified_files： {}",
-      provider.has_modified_files().unwrap()
+      "test_has_modified_files： {:?}",
+      provider.modified_files()
     );
   }
 
@@ -529,39 +520,6 @@ mod tests {
   }
 
   #[test]
-  fn test_blob_diff() {
-    let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
-    let commit = provider.repository.head_commit().unwrap();
-    let tree = commit.tree().unwrap();
-    let prev_commit = commit.parent_ids().next().unwrap();
-    let prev_commit = provider.repository.find_commit(prev_commit).unwrap();
-    let prev_commit_tree = prev_commit.tree().unwrap();
-    let diff_tree = provider
-      .repository
-      .diff_tree_to_tree(&prev_commit_tree, &tree, gix::diff::Options::default())
-      .unwrap();
-    for change in diff_tree.iter() {
-      match change {
-        Change::Addition { .. } => {}
-        Change::Deletion { .. } => {}
-        Change::Modification {
-          id, previous_id, ..
-        } => {
-          let old_content = provider.repository.find_blob(*previous_id).unwrap();
-          let new_content = provider.repository.find_blob(*id).unwrap();
-          let input = InternedInput::new(
-            old_content.data.to_str().unwrap(),
-            new_content.data.to_str().unwrap(),
-          );
-          let alg = Algorithm::Histogram;
-          let diff = diff(alg, &input, UnifiedDiffBuilder::new(&input));
-          println!("diff {}", diff);
-        }
-        Change::Rewrite { .. } => {}
-      }
-    }
-  }
-  #[test]
   fn valid_provider() {
     let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL");
     match provider {
@@ -572,65 +530,5 @@ mod tests {
         println!("invalid_provider");
       }
     }
-  }
-
-  #[test]
-  fn test_commit_content() {
-    let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
-    let obj_id =
-      ObjectId::from_hex("6fc635a95b94c0f59236505ce8977bbc4c235f9f".as_bytes()).unwrap();
-    let commit = provider.commit_content(obj_id);
-    // println!("{:?}", &commit.unwrap().len());
-    for file in commit.unwrap() {
-      println!("{:?}, {}", file.status, file.path);
-    }
-  }
-
-  #[test]
-  fn test_get_all_commit() {
-    let provider =
-      GitDataProvider::new(r"E:\workSpace\Python_Project_File\wizvision3").unwrap();
-    let commits = provider.commits(1000000).unwrap();
-    let save_path = r"C:\Users\ZJFan\OneDrive\桌面\commit.txt";
-    let mut f = std::fs::File::create(save_path).unwrap();
-    for commit in commits.iter() {
-      // println!("{:?}", commit);
-      let obj_id = ObjectId::from_hex(commit.commit_id.as_bytes()).unwrap();
-      let files = provider.commit_content(obj_id).unwrap();
-      f.write(
-        format!(
-          "-------------------{}--------------------\n",
-          commit.commit_id
-        )
-          .as_bytes(),
-      )
-        .unwrap();
-      for file in files.iter() {
-        // println!("{:?}", file);
-        f.write(format!("{}\n", file.path).as_bytes()).unwrap();
-      }
-    }
-  }
-
-  #[test]
-  fn test_get_authors() {
-    let provider =
-        GitDataProvider::new(r"E:\workSpace\Python_Project_File\wizvision3").unwrap();
-    let branchs = provider.branches().unwrap();
-    for branch in branchs.iter() {
-      println!("{:?}", branch);
-      let authors = provider.authors(branch).unwrap();
-      for contributor in authors.iter() {
-        println!("{:?}", contributor);
-      }
-    }
-  }
-
-  #[test]
-  fn open_unsafe_repo() {
-    let mut provider = GitDataProvider::new(r"E:\workSpace\Python_Project_File\wizvision3-untrust").unwrap();
-    let opts = provider.repository.open_options().clone().with(gix::sec::Trust::Full);
-    provider.repository = gix::open_opts(r"E:\workSpace\Python_Project_File\wizvision3-untrust", opts).unwrap();
-    println!("{:?}", provider.remotes());
   }
 }

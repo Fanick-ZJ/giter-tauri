@@ -4,5 +4,4 @@ pub mod cache;
 pub mod commit;
 pub mod file;
 pub mod git_data_provider;
-pub mod progress;
 pub mod status;

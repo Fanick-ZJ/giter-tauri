@@ -16,4 +16,5 @@ pub enum FileStatus {
     Deleted,
     Modified,
     Renamed,
+    Ok,
 }

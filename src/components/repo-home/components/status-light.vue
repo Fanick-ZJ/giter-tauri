@@ -18,26 +18,33 @@ const props = defineProps({
 const style = computed(() => {
   let s = ''
   const map = new Map([
-    [RepoStatus.Modified, '#ffde7d'],
-    [RepoStatus.Untracked, '#f6416c'],
-    [RepoStatus.UnCommitted, '#f6416c'],
-    [RepoStatus.Unpushed, '#00b8a9'],
+    [RepoStatus.Modified, '#95e1d3'],
+    [RepoStatus.Untracked, '#eaffd0'],
+    [RepoStatus.Uncommitted, '#fce38a'],
+    [RepoStatus.Unpushed, '#f38181'],
     [RepoStatus.Ok, '#ffffffaa']
   ])
   const status = toRaw(props.status).sort()
   if (status.length === 0) {
     return ''
   }
-
+  console.log(status)
   if (status.length === 1) {
     s = map.get(status[0])!
   }
-  else if (status.length === 2) {
-    s = `linear-gradient(${map.get(status[0])} 0% 50%, ${map.get(status[1])} 50% 100%)`
-  }
   else {
-    s = `linear-gradient(${map.get(status[0])} 0% 33%, ${map.get(status[1])} 33% 66%, ${map.get(status[2])} 66% 100%)`
+    s = 'linear-gradient'
+    for (let i = 0; i < status.length; i++) {
+      const start = i / (status.length - 1) * 100
+      const end = (i + 1) / (status.length - 1) * 100
+      s += ` ${map.get(status[i])} ${start}% ${end}%`
+      if (i !== status.length - 1) {
+        s += ','
+      }
+    }
+    s += ')'
   }
+  console.log(s)
   return{
     background: s
   }
@@ -45,7 +52,7 @@ const style = computed(() => {
 
 // 计算提示文本
 const tip = computed(() => {
-  let s = '有'
+  let s = ''
   const status = toRaw(props.status).sort()
   if (status.length === 0) {
     return ''
@@ -53,6 +60,7 @@ const tip = computed(() => {
   const textMap = new Map([
     [RepoStatus.Modified, '修改'],
     [RepoStatus.Untracked, '新增'],
+    [RepoStatus.Uncommitted, '未提交'],
     [RepoStatus.Unpushed, '未推送的提交']
   ])
   if (status.length === 1 && status[0] == RepoStatus.Ok) {

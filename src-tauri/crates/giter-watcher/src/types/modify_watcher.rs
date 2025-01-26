@@ -47,7 +47,6 @@ impl ModifyWatcher {
             let cb_clone = Arc::clone(&cb);
             let watcher = RecommendedWatcher::new(
                 move |event: notify::Result<Event>| {
-                    println!("发生了变化");
                     cb_clone(event.unwrap());
                 },
                 config,

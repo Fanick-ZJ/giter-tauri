@@ -54,14 +54,12 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
   // 监听仓库状态变化
   listen(STATUS_CHANGE, (event) => {
     const { path, status } = event.payload as { path: string, status: RepoStatus[] }
-    console.log('listen', path, status)
     setStatus(path, status)
   })
 
 
   // 设置仓库状态
   const setStatus = (path: RepoPath, _status: RepoStatus[]) => {
-    console.log('status change', path, _status)
     if (status.has(path)) {
       status.get(path)!.value = _status
     }

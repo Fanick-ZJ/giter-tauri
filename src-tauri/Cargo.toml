@@ -21,7 +21,6 @@ members = [
 ]
 
 [workspace.dependencies]
-gix = { version = "0.70.0", default-features = false }
 log = "0.4.22"
 parking_lot = "0.12.3"
 tauri = { version = "2", features = [] }
@@ -43,7 +42,7 @@ log = "0.4.22"
 log4rs = "1"
 anyhow = "1.0"
 chrono = "0.4"
-gix = { workspace = true, features = ["blob-diff", "max-performance", "serde"] }
+git2 = "0.20.0"
 rusqlite = { version = "0.32.0", features = ["bundled"] }
 parking_lot = "0.12.3"
 

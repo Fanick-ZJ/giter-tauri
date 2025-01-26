@@ -7,7 +7,7 @@ export enum SetupStoreId {
 export enum RepoStatus {
   Modified = 'Modified',
   Untracked = 'Untracked',
-  UnCommitted = 'UnCommitted',
+  Uncommitted = 'Uncommitted',
   Unpushed = 'Unpushed',
   Ok = 'Ok',
 }
