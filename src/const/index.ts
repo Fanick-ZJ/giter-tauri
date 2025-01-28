@@ -1,4 +1,4 @@
-import { get_separator } from "@/utils/command";
+import { getSeparator } from "@/utils/command";
 
-export const SEPERATOR = await get_separator() as string
+export const SEPERATOR = await getSeparator() as string
 

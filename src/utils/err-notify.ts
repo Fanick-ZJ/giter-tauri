@@ -1,12 +1,10 @@
-import { createNofication } from "@/components/repo-home/components/notification";
-import { SET_OWNERSHIP } from "@/const/command";
 import { useNotificationStore } from "@/store/modules/notification";
 import { NotificationBody, NotificationLevel, NotificationType } from "@/store/modules/notification/type";
 import { Error } from "@/types";
-import { invoke } from "@tauri-apps/api/core";
 import { useNotification } from "naive-ui";
+import { setOwnership } from "./command";
 
-const RepoOwnershipError = (err: Error): NotificationBody => {
+const RepoOwnershipError = (err: Error, okCb?: () => void): NotificationBody => {
   const key = `${NotificationType.Owner}:${err.data}`
   return {
     title: '仓库所有权错误',
@@ -15,14 +13,14 @@ const RepoOwnershipError = (err: Error): NotificationBody => {
     key: key as NotificationBody['key'],
     cb: {
       name: '获取所有权',
-      cb: () => {
+      cb: (): Promise<boolean | void> => {
         const store = useNotificationStore()
         store.remove(key)
-        return invoke(SET_OWNERSHIP, { path: err.data })
+        return setOwnership(err.data)
         .then(() => {
+          okCb && okCb()
          return true 
-        })
-        .catch((e) => {
+        }).catch((e) => {
           cmdErrNotify(e)
         })
       }
@@ -30,10 +28,10 @@ const RepoOwnershipError = (err: Error): NotificationBody => {
   }
 }
 
-export const cmdErrNotify = (err: Error, immediatly=false) => {
+export const cmdErrNotify = (err: Error, okCb?: () => void, immediatly=false) => {
   let notify = undefined;
   if (err.type === 'RepoHasnotOwnership') {
-    notify = RepoOwnershipError(err)
+    notify = RepoOwnershipError(err, okCb)
   }
   if (notify != undefined) {
    const store = useNotificationStore()

@@ -8,6 +8,7 @@ import { Icon } from "@iconify/vue";
 import { NButton, NDropdown, NBadge, NFlex } from 'naive-ui'
 import { computed } from "vue";
 import { createNofication } from "./notification";
+import { isRepo } from "@/utils/command";
 defineOptions({
   name: 'HomePageHeaders'
 })
@@ -15,8 +16,12 @@ const repoStore = useRepoStore()
 const notifStore = useNotificationStore()
 
 const add = () => {
-  useFileSelector({directory: true}).then((path) => {
+  useFileSelector({directory: true}).then(async (path) => {
     if (path === undefined) return
+    if (! await isRepo(path)) {
+      window.$message.error('请选择仓库目录')
+      return
+    }
     useFileInfoDialog({path, mode: 'add'}).then((repo: Repository) => {
       repoStore.add(repo)
     })

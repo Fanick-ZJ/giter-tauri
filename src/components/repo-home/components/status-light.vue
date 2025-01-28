@@ -22,7 +22,7 @@ const style = computed(() => {
     [RepoStatus.Untracked,  '#eaffd0'],
     [RepoStatus.Uncommitted,'#fce38a'],
     [RepoStatus.Unpushed,   '#f38181'],
-    [RepoStatus.Ok,         '#ffffffaa']
+    [RepoStatus.Ok,         '#ffffff00']
   ])
   const status = parseStatus(toRaw(props.status))
   if (status.length === 0) {

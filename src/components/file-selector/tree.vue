@@ -2,11 +2,9 @@
 import { NTree, TreeOption, NSpace, TreeInst } from 'naive-ui';
 import { h, onMounted, PropType, ref, useTemplateRef } from 'vue';
 import { Folder, SelectFilter, T_Dir } from './types';
-import { invoke } from '@tauri-apps/api/core';
 import { Icon } from '@iconify/vue/dist/iconify.js';
 import { SEPERATOR } from '@/const';
-import { GET_FOLDERS } from '@/const/command';
-import { get_driver, get_folders } from '@/utils/command';
+import { getDriver, getFolders } from '@/utils/command';
 
 defineOptions({
   name: 'FileTree'
@@ -42,7 +40,7 @@ const treeRef = useTemplateRef<TreeInst>('treeRef')
 let selected: string = ''
 
 const getDrive = () => {
-  get_driver().then((res) => {
+  getDriver().then((res) => {
     options.value = (res as [T_Dir]).map((dir) => {
       return {
         path: dir.path,
@@ -110,7 +108,7 @@ const handleLoad = async (option: TreeOption | Folder) => {
   // 官方文档写的不是很好，如果children不赋值的话，会一直重新调用这个函数
   option.children = [];
   return new Promise((resolve) => {
-    get_folders(option.path as string).then((res) => {
+    getFolders(option.path as string).then((res) => {
       (res as Folder[]).forEach((dir) => {
         if (props.filter && !props.filter(dir.path)) return
         option.children?.push({

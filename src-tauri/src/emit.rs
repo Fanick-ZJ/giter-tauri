@@ -36,6 +36,9 @@ pub fn repos_modified_emit_cb() -> fn(Event) {
         for path in repo_set.iter() {
             let path = path.to_str().unwrap();
             let provider = GitDataProvider::new(path);
+            if provider.is_err() {
+                continue;
+            }
             let status = provider.unwrap().work_status();
             if let Ok(status) = status {
                 app.emit(

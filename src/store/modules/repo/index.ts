@@ -1,7 +1,7 @@
 import { STATUS_CHANGE } from "@/const/listen";
 import { RepoStatus, SetupStoreId } from "@/enum";
 import { Repository } from "@/types";
-import { add_watch, work_status } from "@/utils/command";
+import { addWatch, isRepo, workStatus } from "@/utils/command";
 import { cmdErrNotify } from "@/utils/err-notify";
 import { get_store_db } from "@/utils/storage";
 import { listen } from "@tauri-apps/api/event";
@@ -9,27 +9,57 @@ import { defineStore } from "pinia";
 import { Ref, ref } from "vue";
 
 type RepoPath = string
+type ValidRepository = Repository & { valid: boolean }
 export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
-  const repos = ref<Repository[]>([])
+  const repos = ref<ValidRepository[]>([])
   const status: Map<RepoPath, Ref<RepoStatus>> = new Map()
-  const _init_opt = (repo: Repository) => {
-    repos.value.push(repo)
-    add_watch(repo.path)
-    status.set(repo.path, ref(RepoStatus.Ok))
-    work_status(repo.path).then((res) => {
-      setStatus(repo.path, res) 
-    }).catch((err) => {
-      cmdErrNotify(err)
+
+  const _init_opt = (repo: ValidRepository) => {
+    isRepo(repo.path).then(is => {
+      repos.value.push(repo)
+      if (!is){
+        repo.valid = false
+        return
+      } 
+      addWatch(repo.path)
+      status.set(repo.path, ref(RepoStatus.Ok))
+      workStatus(repo.path).then((res) => {
+        setStatus(repo.path, res) 
+      }).catch((err) => {
+        cmdErrNotify(err, () => workStatus(repo.path))
+      })
     })
+  }
+
+  const repoSort = (a: Repository, b: Repository) => {
+    // 按 top 升序排序
+    if (a.top < b.top) return -1;
+    if (a.top > b.top) return 1;
+  
+    // 如果 top 相同，则按 order 升序排序
+    if (a.order < b.order) return -1;
+    if (a.order > b.order) return 1;
+  
+    // 如果 top 和 order 都相同，则按 alias 升序排序
+    if (a.alias < b.alias) return -1;
+    if (a.alias > b.alias) return 1;
+  
+    // 如果所有属性都相同，返回 0
+    return 0;
   }
 
   const read_repos = async () => {
     const db = get_store_db()
     db.then(db => {
-      db.select<[Repository]>('SELECT * FROM repository').then((res) => {
+      db.select<[Repository]>('SELECT * FROM repository order by top, `order`, alias').then((res) => {
         for (let i = 0; i < res.length; i++) {
           const repo = res[i];
-          _init_opt(repo)
+          Object.assign(repo, {
+            valid: true,
+          })
+          // @ts-ignore
+          repos.value.push(repo)
+          _init_opt(repos.value.at(i)!)
         }
       })
     })
@@ -39,12 +69,16 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
   const save_repo = async (repo: Repository) => {
     const db = await get_store_db()
     return db.execute('INSERT INTO repository (path, alias, has_watch, `order`, top) VALUES (?, ?, ?, ?, ?)', 
-      [repo.path, repo.alias, repo.hasWatch, repo.order, repo.top])
+      [repo.path, repo.alias, Number(repo.hasWatch), repo.order, Number(repo.top)])
   }
 
   // 添加仓库
   const add = (repo: Repository) => {
     save_repo(repo).then(() => {
+      Object.assign(repo, {
+        valid: true,
+      })
+      // @ts-ignore
       _init_opt(repo)
     })
   }

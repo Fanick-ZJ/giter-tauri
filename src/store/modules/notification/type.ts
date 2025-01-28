@@ -16,7 +16,7 @@ type KeyType = `${typeof NotificationType[keyof typeof NotificationType]}:${stri
 // 消息回调,返回boolean表示是否关闭消息
 export type MessageCb = {
   name: string,
-  cb: (...args: any[]) => boolean | undefined,
+  cb: (...args: any[]) => Promise<boolean | void> | boolean | undefined,
 }
 
 export type NotificationBody = {

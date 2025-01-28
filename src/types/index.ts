@@ -1,10 +1,10 @@
 import { CommandError } from "@/enum/error"
 
 export type Repository = {
-  id: number,
-  path: string,
-  alias: string,
-  hasWatch: boolean,
+  id: number
+  path: string
+  alias: string
+  hasWatch: boolean
   order: number
   top: boolean
 }
