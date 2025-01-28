@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NLayout, useMessage } from 'naive-ui';
+import { NLayout, useMessage, useNotification } from 'naive-ui';
 import RepoHome from './repo-home/index.vue'
 
 defineOptions({
@@ -8,6 +8,7 @@ defineOptions({
 
 // 在window上挂在一个message对象实例，方便使用
 window.$message = useMessage()
+window.$notification = useNotification()
 
 </script>
 <template>

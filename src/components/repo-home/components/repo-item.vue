@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Repository } from '@/types/store';
+import { Repository } from '@/types';
 import { NCard, NEllipsis } from 'naive-ui';
 import { computed, PropType } from 'vue';
 import StatusLight from './status-light.vue';

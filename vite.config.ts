@@ -1,13 +1,12 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import path from 'path'
-
-// @ts-expect-error process is a nodejs global
+import vueJsx from '@vitejs/plugin-vue-jsx'
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vitejs.dev/config/
 export default defineConfig(async () => ({
-  plugins: [vue()],
+  plugins: [vue(), vueJsx()],
   resolve: {
     alias: {
       '@': path.resolve('./src'),

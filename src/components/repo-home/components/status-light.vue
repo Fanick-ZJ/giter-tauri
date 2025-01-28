@@ -18,11 +18,11 @@ const props = defineProps({
 const style = computed(() => {
   let s = ''
   const map = new Map([
-    [RepoStatus.Modified, '#95e1d3'],
-    [RepoStatus.Untracked, '#eaffd0'],
-    [RepoStatus.Uncommitted, '#fce38a'],
-    [RepoStatus.Unpushed, '#f38181'],
-    [RepoStatus.Ok, '#ffffffaa']
+    [RepoStatus.Modified,   '#95e1d3'],
+    [RepoStatus.Untracked,  '#eaffd0'],
+    [RepoStatus.Uncommitted,'#fce38a'],
+    [RepoStatus.Unpushed,   '#f38181'],
+    [RepoStatus.Ok,         '#ffffffaa']
   ])
   const status = parseStatus(toRaw(props.status))
   if (status.length === 0) {
@@ -56,10 +56,10 @@ const tip = computed(() => {
     return ''
   }
   const textMap = new Map([
-    [RepoStatus.Modified, '修改'],
-    [RepoStatus.Untracked, '新增'],
-    [RepoStatus.Uncommitted, '未提交'],
-    [RepoStatus.Unpushed, '未推送的提交']
+    [RepoStatus.Modified,   '修改'],
+    [RepoStatus.Untracked,  '新增'],
+    [RepoStatus.Uncommitted,'未提交'],
+    [RepoStatus.Unpushed,   '未推送的提交']
   ])
   if (status.length === 1 && status[0] == RepoStatus.Ok) {
     return undefined

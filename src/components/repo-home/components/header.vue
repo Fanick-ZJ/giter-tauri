@@ -2,35 +2,61 @@
 import { useFileSelector } from "@/components/file-selector";
 import { useFileInfoDialog } from "@/components/info-dialog";
 import { useRepoStore } from "@/store/modules/repo";
-import { Repository } from "@/types/store";
+import { useNotificationStore } from "@/store/modules/notification";
+import { Repository } from "@/types";
 import { Icon } from "@iconify/vue";
-import { NButton } from 'naive-ui'
+import { NButton, NDropdown, NBadge, NFlex } from 'naive-ui'
+import { computed } from "vue";
+import { createNofication } from "./notification";
 defineOptions({
   name: 'HomePageHeaders'
 })
-const store = useRepoStore()
+const repoStore = useRepoStore()
+const notifStore = useNotificationStore()
+
 const add = () => {
   useFileSelector({directory: true}).then((path) => {
     if (path === undefined) return
     useFileInfoDialog({path, mode: 'add'}).then((repo: Repository) => {
-      store.add(repo)
+      repoStore.add(repo)
     })
+  })
+}
+
+const notifShow = computed(() => {
+  return notifStore.notifications.length > 0
+})
+
+const notifSize = computed(() => {
+  return notifStore.notifications.length
+})
+
+const showMsg = () => {
+  notifStore.notifications.forEach((notif) => {
+    createNofication(notif)
   })
 }
 </script>
 
 <template>
   <div class="flex pb-[5px] items-center">
-    <div class="flex-1 font-bold ] text-lg">
+    <div class="flex-1 font-bold text-lg">
       仓库
     </div>
-    <div class="w-[30px">
+    <NFlex justify="end" class="w-[80px]">
       <NButton quaternary circle @click="add">
-      <template #icon>
-        <Icon icon="lets-icons:add-duotone" width="30" height="30" color="gray"/>
-      </template>
-    </NButton>
-    </div>
+        <template #icon>
+          <Icon icon="lets-icons:add-duotone" width="30" height="30" color="gray"/>
+        </template>
+      </NButton>
+      <NDropdown v-if="notifShow" trigger="hover">
+        <NButton quaternary circle @click="showMsg">
+          <NBadge :value="notifSize" :max="99">
+            <Icon icon="lets-icons:message-alt-duotone" width="24" height="24"  color="gray"/>
+          </NBadge>
+        </NButton>
+      </NDropdown>
+    </NFlex>
   </div>
 </template>
 

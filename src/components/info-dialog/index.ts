@@ -2,7 +2,7 @@
 import { ComponentPublicInstance, createVNode, nextTick, render } from 'vue'
 import RepoInfoDialog from './index.vue'
 import { RepoInfoProps } from './types'
-import { Repository } from '@/types/store'
+import { Repository } from '@/types'
 
 const className = '__repo_info_dialog__container'
 

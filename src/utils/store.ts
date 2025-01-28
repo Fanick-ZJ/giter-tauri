@@ -1,4 +1,4 @@
-import { Repository } from "@/types/store"
+import { Repository } from "@/types"
 import { get_store_db } from "./storage"
 
 // 根据id获取仓库

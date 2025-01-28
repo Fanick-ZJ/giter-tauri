@@ -4,6 +4,7 @@ import { onMounted, PropType, ref, toRaw, useTemplateRef } from 'vue';
 import RepoInfoEditForm from './form.vue';
 import { invoke } from '@tauri-apps/api/core';
 import { IS_REPO } from '@/const/command';
+import { get_folders } from '@/utils/command';
 defineOptions({
   name: 'RepoHome'
 })
@@ -30,7 +31,7 @@ const formRef = useTemplateRef<typeof RepoInfoEditForm>('formRef')
 const __show = ref<Boolean>(false)
 
 onMounted(() => {
-  invoke(IS_REPO, {path: props.path}).then((res) => {
+  get_folders(props.path).then((res) => {
     if (!res) {
       window.$message.error('当前指定路径不是Git仓库') 
       close()

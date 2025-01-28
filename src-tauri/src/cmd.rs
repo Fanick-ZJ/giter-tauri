@@ -1,5 +1,5 @@
 use std::{process::Command, sync::Mutex};
-use giter_utils::{types::{author::Author, branch::Branch, cache::Cache, git_data_provider::GitDataProvider, status::WorkStatus}, util::is_git_repo};
+use giter_utils::{types::{author::Author, branch::Branch, cache::Cache, git_data_provider::GitDataProvider, status::WorkStatus}, util::{is_git_repo, set_owner}};
 use giter_watcher::types::modify_watcher::ModifyWatcher;
 use tauri::Manager;
 use crate::{core::handle, types::{cache::RepoPath, error::CommandError, fs::Dir, store}, utils::{dirs, fs::{get_first_level_dirs, get_logical_driver}}};
@@ -178,5 +178,20 @@ pub fn work_status(path: String) -> Result<WorkStatus, CommandError> {
     return Err(CommandError::GetWorkStatusError(e.to_string())); 
   }
   Ok(statuses.unwrap())
+}
 
+#[tauri::command]
+pub fn set_repo_ownership(path: String) -> Result<bool, CommandError> {
+  let provider = get_provider(&path);
+  match provider {
+    Ok(_) => Ok(true),
+    Err(_) => {
+      match set_owner(&path) {
+          Ok(_) => Ok(true),
+          Err(err) => {
+            Err(CommandError::SetRepoOwnershipError(err.message().to_string()))
+          },
+      }
+    },
+  }
 }

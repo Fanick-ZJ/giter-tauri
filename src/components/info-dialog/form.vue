@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Repository } from '@/types/store';
+import { Repository } from '@/types';
 import { getRepositoryById } from '@/utils/store';
 import { getDirName } from '@/utils/tool';
 import { NForm, NInput, NFormItem, NSwitch, useMessage, NInputNumber } from 'naive-ui';

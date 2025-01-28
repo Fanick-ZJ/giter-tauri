@@ -5,7 +5,8 @@ import { Folder, SelectFilter, T_Dir } from './types';
 import { invoke } from '@tauri-apps/api/core';
 import { Icon } from '@iconify/vue/dist/iconify.js';
 import { SEPERATOR } from '@/const';
-import { GET_DRIVER, GET_FOLDERS } from '@/const/command';
+import { GET_FOLDERS } from '@/const/command';
+import { get_driver, get_folders } from '@/utils/command';
 
 defineOptions({
   name: 'FileTree'
@@ -41,7 +42,7 @@ const treeRef = useTemplateRef<TreeInst>('treeRef')
 let selected: string = ''
 
 const getDrive = () => {
-  invoke(GET_DRIVER).then((res) => {
+  get_driver().then((res) => {
     options.value = (res as [T_Dir]).map((dir) => {
       return {
         path: dir.path,
@@ -109,9 +110,7 @@ const handleLoad = async (option: TreeOption | Folder) => {
   // 官方文档写的不是很好，如果children不赋值的话，会一直重新调用这个函数
   option.children = [];
   return new Promise((resolve) => {
-    invoke(GET_FOLDERS, {
-      path: option.path,
-    }).then((res) => {
+    get_folders(option.path as string).then((res) => {
       (res as Folder[]).forEach((dir) => {
         if (props.filter && !props.filter(dir.path)) return
         option.children?.push({

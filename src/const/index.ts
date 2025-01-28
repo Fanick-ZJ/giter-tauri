@@ -1,5 +1,4 @@
-import { invoke } from "@tauri-apps/api/core"
-import { GET_SEPARATOR } from "./command"
+import { get_separator } from "@/utils/command";
 
-export const SEPERATOR = await invoke(GET_SEPARATOR, {}) as string
+export const SEPERATOR = await get_separator() as string
 

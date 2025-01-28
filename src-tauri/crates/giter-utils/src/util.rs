@@ -1,5 +1,5 @@
 use anyhow::Result;
-use git2::{Commit as Git2Commit, Delta, Oid, Repository};
+use git2::{Commit as Git2Commit, Config, Delta, Oid, Repository};
 
 use crate::types::commit::Commit;
 use crate::types::file::File;
@@ -101,5 +101,37 @@ pub fn is_git_repo(path: &str) -> bool {
         return true;
     } else {
         return false;
+    }
+}
+
+pub fn has_owner(path: &str) -> Result<bool, git2::Error> {
+    match Repository::open(path) {
+        Ok(_) => Ok(true),
+        Err(err) => {
+            if err.code() == git2::ErrorCode::Owner {
+                return Ok(false);
+            } else {
+                Err(err)
+            }
+        },
+    }
+}
+
+/// 设置全局配置，将仓库设置为可信
+pub fn set_owner(path: &str) -> Result<bool, git2::Error>  {
+    match has_owner(&path) {
+        Ok(ret) => {
+            if !ret {
+                let path = path.replace("\\", "/");
+                let mut config = Config::open_default().unwrap();
+                let ret = config.set_multivar("safe.directory", "$^", &path);
+                if ret.is_err() {
+                    return Err(ret.err().unwrap()); 
+                }
+                return Ok(true);
+            }
+            Ok(true)
+        },
+        Err(_) => todo!(),
     }
 }

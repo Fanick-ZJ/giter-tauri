@@ -1,0 +1,16 @@
+export enum CommandError {
+  RepositoryHasWatched = 'REPOSITORY_HAS_WATCHED',
+  AddWatcherError = 'AddWatcherError',
+  AddRepositoryStoreError = 'AddRepositoryStoreError',
+  InvalidRepository = 'InvalidRepository',
+  RepoHasnotOwnership = 'RepoHasnotOwnership',
+  FindAuthorsError = 'FindAuthorsError',
+  DataProviderBuildError = 'DataProviderBuildError',
+  BranchNotFound = 'BranchNotFound',
+  BranchesFindError = 'BranchesFindError',
+  GetAuthorError = 'GetAuthorError',
+  DbNotFound = 'DbNotFound',
+  GetFoldersError = 'GetFoldersError',
+  GetWorkStatusError = 'GetWorkStatusError',
+  SetRepoOwnershipError = 'SetRepoOwnershipError',
+}

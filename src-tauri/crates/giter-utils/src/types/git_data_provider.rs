@@ -40,16 +40,6 @@ impl GitDataProvider {
     }
   }
 
-  /// 设置全局配置，将仓库设置为可信
-  pub fn set_owner(&self) -> Result<()>  {
-    if !self.has_owner() {
-      let mut config = Config::open_default().unwrap();
-      let ret = config.set_multivar("safe.directory", "$^", "E:/workSpace/Python_Project_File/sis-packages/sis.dialog").unwrap();
-      ret
-    }
-    Ok(())
-  }
-
   pub fn set_cache(&mut self, cache: impl Cache + Send + 'static) {
     self.cache = RefCell::new(Some(Box::new(cache)));
   }
@@ -437,20 +427,6 @@ impl GitDataProvider {
       cache.set_authors(self.repository.path().to_str().unwrap(), &authors, branch, &lasted_id);
     }
   }
-
-  // 当前仓库是否为可信的
-  pub fn has_owner(&self) -> bool {
-    match self.repository.statuses(None) {
-        Ok(_) => true,
-        Err(err) => {
-          if err.code() == ErrorCode::Owner{
-            return false;
-          }
-          true
-        },
-    }
-  }
-
 }
 
 #[cfg(test)]

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NDialogProvider, NMessageProvider,  } from 'naive-ui';
+import { NDialogProvider, NMessageProvider, NNotificationProvider } from 'naive-ui';
 
 defineOptions({
   name: 'AppProvider'
@@ -7,8 +7,10 @@ defineOptions({
 </script>
 <template>
 <NDialogProvider>
-  <NMessageProvider>
+  <NNotificationProvider>
+    <NMessageProvider>
     <slot></slot>
   </NMessageProvider>
+  </NNotificationProvider>
 </NDialogProvider>
 </template>

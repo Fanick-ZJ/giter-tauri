@@ -1,35 +1,25 @@
-import { ADD_WATCH } from "@/const/command";
 import { STATUS_CHANGE } from "@/const/listen";
 import { RepoStatus, SetupStoreId } from "@/enum";
-import { Repository } from "@/types/store";
+import { Repository } from "@/types";
+import { add_watch, work_status } from "@/utils/command";
+import { cmdErrNotify } from "@/utils/err-notify";
 import { get_store_db } from "@/utils/storage";
-import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { defineStore } from "pinia";
 import { Ref, ref } from "vue";
-
-const watch = async (path: string) => {
-  invoke(ADD_WATCH, { path }).then(() => {
-    console.log('add watch', path)
-  })
-}
-
-const work_status = async (path: string) => {
-  const status = await invoke('work_status', { path })
-  return status as RepoStatus 
-}
 
 type RepoPath = string
 export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
   const repos = ref<Repository[]>([])
   const status: Map<RepoPath, Ref<RepoStatus>> = new Map()
-
   const _init_opt = (repo: Repository) => {
     repos.value.push(repo)
-    watch(repo.path)
+    add_watch(repo.path)
     status.set(repo.path, ref(RepoStatus.Ok))
     work_status(repo.path).then((res) => {
       setStatus(repo.path, res) 
+    }).catch((err) => {
+      cmdErrNotify(err)
     })
   }
 

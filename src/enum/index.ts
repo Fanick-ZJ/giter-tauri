@@ -1,7 +1,8 @@
 export enum SetupStoreId {
   App = 'app-store',
   Theme = 'theme-store',
-  Repo = 'repo-store'
+  Repo = 'repo-store',
+  Notification = 'notify-store',
 }
 
 export const RepoStatus = {
