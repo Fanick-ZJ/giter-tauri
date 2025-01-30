@@ -1,6 +1,5 @@
-import { ADD_WATCH, GET_DRIVER, GET_FOLDERS, GET_SEPARATOR, IS_REPO, SET_OWNERSHIP, WORK_STATUS } from "@/const/command";
+import { ADD_WATCH, GET_DRIVER, GET_FOLDERS, GET_SEPARATOR, IS_REPO, REMOVE_WATCH, SET_OWNERSHIP, WORK_STATUS } from "@/const/command";
 import { RepoStatus } from "@/enum";
-import { CommandError } from "@/enum/error";
 import { invoke } from "@tauri-apps/api/core";
 
 export const addWatch = async (path: string) => {
@@ -30,4 +29,8 @@ export const workStatus = async (path: string) => {
 
 export const setOwnership = async (path: string) => {
   return await invoke(SET_OWNERSHIP, { path }) 
+}
+
+export const removeWatch = async (path: string) => {
+  return await invoke(REMOVE_WATCH , { repo: path })
 }

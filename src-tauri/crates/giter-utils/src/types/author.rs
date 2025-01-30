@@ -1,5 +1,5 @@
-use std::hash::Hash;
 use serde::{Deserialize, Serialize};
+use std::hash::Hash;
 
 #[derive(Deserialize, Serialize, Hash, Debug, PartialEq, Clone)]
 pub struct Author {

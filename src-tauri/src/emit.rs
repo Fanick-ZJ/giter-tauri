@@ -1,8 +1,5 @@
 use crate::core::handle;
-use giter_utils::types::{
-    git_data_provider::GitDataProvider,
-    status::WorkStatus,
-};
+use giter_utils::types::{git_data_provider::GitDataProvider, status::WorkStatus};
 use giter_watcher::types::modify_watcher::ModifyWatcher;
 use notify::Event;
 use serde::{Deserialize, Serialize};
@@ -47,7 +44,8 @@ pub fn repos_modified_emit_cb() -> fn(Event) {
                         path: path.to_string(),
                         status,
                     },
-                ).expect("TODO: panic message");
+                )
+                .expect("TODO: panic message");
             } else {
                 log::error!("status: {:?}", status);
             }

@@ -1,9 +1,9 @@
 use crate::core::handle;
 use crate::emit::repos_modified_emit_cb;
 use crate::utils::init;
+use anyhow::Result;
 use giter_watcher::types::modify_watcher::ModifyWatcher;
 use std::sync::Mutex;
-use anyhow::Result;
 use tauri::{App, Manager};
 
 pub async fn resolve_setup(app: &mut App) -> Result<()> {

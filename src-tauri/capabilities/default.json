@@ -17,6 +17,7 @@
     "core:window:allow-internal-toggle-maximize",
     "sql:allow-execute",
     "sql:default",
-    "store:default"
+    "store:default",
+    "shell:allow-open"
   ]
 }

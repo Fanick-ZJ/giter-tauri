@@ -5,7 +5,6 @@ use tauri::AppHandle;
 
 use super::{cache::GitCache, store::GitStore};
 
-
 // 全局唯一实例
 static HANDLE: OnceCell<Handle> = OnceCell::new();
 #[derive(Debug, Default, Clone)]
@@ -13,12 +12,11 @@ pub struct Handle {
     pub app_handle: Arc<RwLock<Option<AppHandle>>>,
     pub cache: Arc<RwLock<Option<GitCache>>>,
     pub store: Arc<RwLock<Option<GitStore>>>,
-    pub is_exiting: Arc<RwLock<bool>>
+    pub is_exiting: Arc<RwLock<bool>>,
 }
 
 impl Handle {
     pub fn global() -> &'static Handle {
-
         HANDLE.get_or_init(|| Handle {
             app_handle: Arc::new(RwLock::new(None)),
             cache: Arc::new(RwLock::new(None)),
@@ -38,7 +36,6 @@ impl Handle {
         let mut store = self.store.write();
         *store = Some(GitStore::new());
     }
-
 
     pub fn app_handle(&self) -> Option<AppHandle> {
         self.app_handle.read().clone()

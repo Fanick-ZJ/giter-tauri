@@ -1,11 +1,11 @@
 extern crate anyhow;
-extern crate git2;
 extern crate bitflags;
+extern crate git2;
+extern crate gix_discover;
 extern crate imara_diff;
 extern crate log;
-extern crate serde;
-extern crate gix_discover;
 extern crate parking_lot;
+extern crate serde;
 
 pub mod types;
 pub mod util;

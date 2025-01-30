@@ -1,8 +1,8 @@
+use crate::make_serializable;
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
-use crate::make_serializable;
 
-make_serializable!{
+make_serializable! {
     #[derive(Deserialize, Debug)]
     pub enum CommandError {
         RepositoryHasWatched(String),   // 仓库已经被监听
@@ -19,5 +19,6 @@ make_serializable!{
         GetFoldersError(String),        // 获取文件夹失败
         GetWorkStatusError(String),     // 获取工作状态失败
         SetRepoOwnershipError(String),  // 设置仓库所有权失败
+        RemoveWatcherError(String),     // 移除监听失败
     }
 }

@@ -9,8 +9,8 @@ pub type BranchName = String;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AuthorCache {
-  pub authors: Option<Vec<Author>>,
-  pub last_commit_id: Option<String>
+    pub authors: Option<Vec<Author>>,
+    pub last_commit_id: Option<String>,
 }
 
 pub type BranchAuthorCache = HashMap<BranchName, AuthorCache>;

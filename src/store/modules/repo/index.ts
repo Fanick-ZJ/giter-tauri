@@ -1,26 +1,29 @@
 import { STATUS_CHANGE } from "@/const/listen";
 import { RepoStatus, SetupStoreId } from "@/enum";
 import { Repository } from "@/types";
-import { addWatch, isRepo, workStatus } from "@/utils/command";
+import { addWatch, isRepo, removeWatch, workStatus } from "@/utils/command";
 import { cmdErrNotify } from "@/utils/err-notify";
 import { get_store_db } from "@/utils/storage";
+import { readRepos, removeRepo, saveRepo, updateRepo } from "@/utils/store";
 import { listen } from "@tauri-apps/api/event";
 import { defineStore } from "pinia";
 import { Ref, ref } from "vue";
 
 type RepoPath = string
-type ValidRepository = Repository & { valid: boolean }
+export type ValidRepository = Repository & { valid: boolean }
 export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
   const repos = ref<ValidRepository[]>([])
   const status: Map<RepoPath, Ref<RepoStatus>> = new Map()
 
   const _init_opt = (repo: ValidRepository) => {
     isRepo(repo.path).then(is => {
-      repos.value.push(repo)
       if (!is){
         repo.valid = false
         return
-      } 
+      }
+      if (!repo.hasWatch) {
+        return
+      }
       addWatch(repo.path)
       status.set(repo.path, ref(RepoStatus.Ok))
       workStatus(repo.path).then((res) => {
@@ -29,12 +32,16 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
         cmdErrNotify(err, () => workStatus(repo.path))
       })
     })
+    .then(() => {
+      repos.value.push(repo)
+      repos.value.sort(repoSort) 
+    })
   }
 
   const repoSort = (a: Repository, b: Repository) => {
-    // 按 top 升序排序
-    if (a.top < b.top) return -1;
-    if (a.top > b.top) return 1;
+    // 按 top 降序
+    if (a.top < b.top) return 1;
+    if (a.top > b.top) return -1;
   
     // 如果 top 相同，则按 order 升序排序
     if (a.order < b.order) return -1;
@@ -48,33 +55,26 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
     return 0;
   }
 
-  const read_repos = async () => {
-    const db = get_store_db()
-    db.then(db => {
-      db.select<[Repository]>('SELECT * FROM repository order by top, `order`, alias').then((res) => {
-        for (let i = 0; i < res.length; i++) {
-          const repo = res[i];
-          Object.assign(repo, {
-            valid: true,
-          })
-          // @ts-ignore
-          repos.value.push(repo)
-          _init_opt(repos.value.at(i)!)
-        }
-      })
+  const init_repo = async () => {
+    readRepos().then((res: string | any[]) => {
+      for (let i = 0; i < res.length; i++) {
+        const repo = res[i];
+        repo.hasWatch = !!repo.hasWatch
+        repo.top = !!repo.top
+        Object.assign(repo, {
+          valid: true,
+        })
+        _init_opt(repo as ValidRepository)
+      }
     })
   }
-  read_repos()
+  // 读取仓库信息
+  init_repo()
 
-  const save_repo = async (repo: Repository) => {
-    const db = await get_store_db()
-    return db.execute('INSERT INTO repository (path, alias, has_watch, `order`, top) VALUES (?, ?, ?, ?, ?)', 
-      [repo.path, repo.alias, Number(repo.hasWatch), repo.order, Number(repo.top)])
-  }
 
   // 添加仓库
   const add = (repo: Repository) => {
-    save_repo(repo).then(() => {
+    saveRepo(repo).then(() => {
       Object.assign(repo, {
         valid: true,
       })
@@ -97,9 +97,37 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
       status.get(path)!.value = _status
     }
   }
+
+  // 更新仓库信息
+  const update = async (repo: Repository) => {
+    updateRepo(repo)
+    const index = repos.value.findIndex((r) => r.id === repo.id)
+    if (index == -1) return
+    const _repo = repos.value[index]
+    const is = await isRepo(repo.path) as boolean
+    _repo.valid = is
+    Object.assign(repos.value[index], repo)
+    repos.value.sort(repoSort)
+  }
+
+  const getRepoByPath = (path: RepoPath) => {
+    return repos.value.find((repo) => repo.path === path) 
+  }
+
+  const remove = (repo: ValidRepository) => {
+    removeRepo(repo.id)
+    removeWatch(repo.path)
+    const index = repos.value.findIndex((r) => r.id === repo.id)
+    if (index == -1) return
+    repos.value.splice(index, 1)
+  }
+
   return {
     repos,
     add,
     status,
+    update,
+    getRepoByPath,
+    remove
   }
 })

@@ -1,4 +1,10 @@
-use crate::{core::handle, types::{cache::RepoPath, fs::{Catalog, Dir, File}}};
+use crate::{
+    core::handle,
+    types::{
+        cache::RepoPath,
+        fs::{Catalog, Dir, File},
+    },
+};
 use anyhow::Result;
 use std::path::PathBuf;
 use tauri::Manager;
@@ -8,7 +14,6 @@ static DOT_GIT: &str = ".git";
 pub static APP_ID: &str = "giter";
 
 pub fn app_home_dir() -> Result<PathBuf> {
-
     let app_handle = handle::Handle::global().app_handle().unwrap();
     match app_handle.path().data_dir() {
         Ok(dir) => Ok(dir.join(APP_ID)),
@@ -47,7 +52,14 @@ pub fn is_dot_git_dir(dir: &RepoPath) -> bool {
 pub fn repo_default_alias(repo: &RepoPath) -> String {
     let _repo = PathBuf::from(repo);
     if is_dot_git_dir(repo) {
-        _repo.parent().unwrap().file_name().unwrap().to_str().unwrap().to_string()
+        _repo
+            .parent()
+            .unwrap()
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string()
     } else {
         _repo.file_name().unwrap().to_str().unwrap().to_string()
     }

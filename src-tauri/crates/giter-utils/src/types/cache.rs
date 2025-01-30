@@ -1,6 +1,6 @@
+use crate::types::branch::Branch;
 use git2::Oid;
 use types::author::Author;
-use crate::types::branch::Branch;
 
 pub trait Cache {
     fn authors(&self, repo: &str) -> Option<Vec<Author>>;
@@ -10,7 +10,13 @@ pub trait Cache {
     fn branch_authors(&self, repo: &str, branch: &Branch) -> Option<(Vec<Author>, Oid)>;
 
     /// 设置commit的作者
-    fn set_authors(&mut self, repo: &str, authors: &Vec<Author>, branch: &Branch, last_commit_id: &Oid);
+    fn set_authors(
+        &mut self,
+        repo: &str,
+        authors: &Vec<Author>,
+        branch: &Branch,
+        last_commit_id: &Oid,
+    );
 
     fn clear(&mut self, repo: &str);
 

@@ -8,7 +8,7 @@ pub struct File {
     pub status: FileStatus,
     pub object_id: String,
     pub prev_object_id: String,
-    pub blob_exist: bool
+    pub blob_exist: bool,
 }
 
 impl File {

@@ -3,8 +3,7 @@ import { Repository } from '@/types';
 import { getRepositoryById } from '@/utils/store';
 import { getDirName } from '@/utils/tool';
 import { NForm, NInput, NFormItem, NSwitch, useMessage, NInputNumber } from 'naive-ui';
-import path from 'path';
-import { computed, onMounted, PropType, ref, watch } from 'vue';
+import { computed, onMounted, PropType, ref } from 'vue';
 
 defineOptions({
   name: 'RepoInfoEditForm'
@@ -55,7 +54,7 @@ onMounted(async () => {
         path: props.path,
         alias: '',
         top: false,
-        hasWatch: false,
+        hasWatch: true,
         order: 0
       }
     } else {
@@ -112,7 +111,7 @@ defineExpose({
     <NFormItem label="置顶" path="top">
       <NSwitch v-model:value="model.top" :disabled="!editable"/>
     </NFormItem>
-    <NFormItem label="实时状态" path="has_watch">
+    <NFormItem label="实时状态" path="hasWatch">
       <NSwitch v-model:value="model.hasWatch" :disabled="!editable"/>
     </NFormItem>
     <NFormItem label="顺序" path="order">

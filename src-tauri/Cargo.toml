@@ -53,3 +53,4 @@ tauri-plugin-sql = { version = "2.2.0", features = ["sqlite"] }
 
 giter-utils = { path = "crates/giter-utils", version = "0.0.1"}
 giter-watcher = { path = "crates/giter-watcher", version = "0.0.1"}
+tauri-plugin-shell = "2"

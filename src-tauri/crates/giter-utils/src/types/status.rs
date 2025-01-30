@@ -1,6 +1,5 @@
-use serde::{Deserialize, Serialize};
 use bitflags::bitflags;
-
+use serde::{Deserialize, Serialize};
 
 bitflags! {
   /// 工作状态，是否修改，是否未提交，是否未推送，是否正常
@@ -20,16 +19,17 @@ bitflags! {
 impl Serialize for WorkStatus {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer {
+        S: serde::Serializer,
+    {
         serializer.serialize_u32(self.bits())
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum FileStatus {
-  Added,
-  Deleted,
-  Modified,
-  Renamed,
-  Ok,
+    Added,
+    Deleted,
+    Modified,
+    Renamed,
+    Ok,
 }

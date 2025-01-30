@@ -1,7 +1,7 @@
 use notify::{Config, Event, RecommendedWatcher, Watcher};
 use parking_lot::RwLock;
 use std::path::PathBuf;
-use std::sync:: Arc;
+use std::sync::Arc;
 use std::time::Duration;
 
 pub struct ModifyWatcher {
@@ -67,5 +67,16 @@ impl ModifyWatcher {
         }
         self.repos.write().push(path.clone());
         self.watch(&path);
+    }
+
+    pub fn remove_watch(&mut self, p: impl Into<PathBuf>) {
+        let path = p.into();
+        if !self.repos.read().contains(&path) {
+            return;
+        }
+        self.repos.write().retain(|x| x != &path);
+        if self.watcher.is_some() {
+            self.watcher.as_mut().unwrap().unwatch(&path).unwrap();
+        }
     }
 }

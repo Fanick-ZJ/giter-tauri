@@ -5,7 +5,6 @@ use crate::types::commit::Commit;
 use crate::types::file::File;
 use crate::types::status::FileStatus;
 
-
 pub fn has_git() -> bool {
     if let Err(_) = std::process::Command::new("git").arg("--version").output() {
         return false; // git 命令运行失败，说明没有安装 git
@@ -15,9 +14,9 @@ pub fn has_git() -> bool {
 
 pub fn build_commit(commit: &Git2Commit, repo: String) -> Commit {
     let message = if let Some(message) = commit.message() {
-        message.to_string() 
+        message.to_string()
     } else {
-        "".to_string() 
+        "".to_string()
     };
     let committer = commit.committer();
     let author = commit.author();
@@ -31,7 +30,7 @@ pub fn build_commit(commit: &Git2Commit, repo: String) -> Commit {
         message,
         commit.time().seconds(),
         commit.parent_ids().into_iter().count() as i64,
-        repo
+        repo,
     )
 }
 
@@ -84,8 +83,7 @@ pub fn build_file_between_tree(
                     status,
                     new_id.to_string(),
                     old_id.to_string(),
-                    exist
-
+                    exist,
                 );
                 files.push(file);
             }
@@ -113,12 +111,12 @@ pub fn has_owner(path: &str) -> Result<bool, git2::Error> {
             } else {
                 Err(err)
             }
-        },
+        }
     }
 }
 
 /// 设置全局配置，将仓库设置为可信
-pub fn set_owner(path: &str) -> Result<bool, git2::Error>  {
+pub fn set_owner(path: &str) -> Result<bool, git2::Error> {
     match has_owner(&path) {
         Ok(ret) => {
             if !ret {
@@ -126,12 +124,12 @@ pub fn set_owner(path: &str) -> Result<bool, git2::Error>  {
                 let mut config = Config::open_default().unwrap();
                 let ret = config.set_multivar("safe.directory", "$^", &path);
                 if ret.is_err() {
-                    return Err(ret.err().unwrap()); 
+                    return Err(ret.err().unwrap());
                 }
                 return Ok(true);
             }
             Ok(true)
-        },
+        }
         Err(_) => todo!(),
     }
 }
