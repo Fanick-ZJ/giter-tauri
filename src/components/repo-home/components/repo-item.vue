@@ -21,10 +21,12 @@ const status = computed(() => {
   return store.status.get(props.repo.path)?.value || RepoStatus.Ok
 })
 
-const click = () => {
+const validTip = () => {
   if (!props.repo.valid) {
     window.$message.warning('无效仓库')
+    return false
   }
+  return true
 }
 
 const mouseHover = ref(false)
@@ -36,9 +38,13 @@ const _viewExtend = inject(viewExtend)
 const router = useRouter()
 
 const toCommit = () => {
+  if (!validTip()) return
   router.push({
-    path: '/commit'
-  }) 
+    name: 'commit',
+    params: {
+      id: props.repo.id
+    } 
+  })
   _viewExtend!()
 }
 </script>
@@ -48,8 +54,7 @@ const toCommit = () => {
     :class="repo.valid ? '' : 'bg-diagonal-stripes bg-repeat bg-stripes shadow-lg'"
     content-style="font-size: 20px"
     :data-repo="repo.path"
-    class="overflow-hidden"
-    @click="click">
+    class="overflow-hidden">
     <div class="relative">
       <div class="absolute right-[-18px] top-2" v-if="repo.top">
         <NPopover>
@@ -78,7 +83,7 @@ const toCommit = () => {
             ease-in flex flex-col items-center justify-center"
         :class="mouseHover ? 'right-[calc(var(--n-padding-left)*-1)]' : 'right-[calc(var(--n-padding-left)*-3)]'"
         @mouseleave="onLeave">
-        <div @click='toCommit'><Icon icon="iconoir:git-fork" width="24" height="24" /></div>
+        <div @click.stop='toCommit'><Icon icon="iconoir:git-fork" width="24" height="24" /></div>
         <div><Icon icon="uil:statistics" width="24" height="24" /></div>
       </Glassmorphism>
     </div>

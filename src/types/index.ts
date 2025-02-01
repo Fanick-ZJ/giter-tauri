@@ -16,6 +16,25 @@ export type Error = {
   data: string
 }
 
+export type Branch = {
+ name: string,
+ isRemote: boolean
+ reference: string 
+}
+
+export type Commit = {
+  commitId: string,
+  authorName: string,
+  authorEmail: string,
+  committerName: string,
+  committerEmail: string,
+  title: string,
+  message: string,
+  datetime: number,
+  parent_count: number,
+  repo: string
+}
+
 declare global {
   interface Window {
     $message: MessageApiInjection;

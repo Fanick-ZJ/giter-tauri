@@ -8,7 +8,8 @@ export const router = createRouter({
       component: () => import("@/views/home/index.vue") 
     },
     {
-      path: "/commit",
+      name: "commit",
+      path: "/commit/:id",
       component: () => import("@/views/commit/index.vue")
     }
   ]

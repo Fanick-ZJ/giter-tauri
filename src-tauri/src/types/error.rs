@@ -20,5 +20,7 @@ make_serializable! {
         GetWorkStatusError(String),     // 获取工作状态失败
         SetRepoOwnershipError(String),  // 设置仓库所有权失败
         RemoveWatcherError(String),     // 移除监听失败
+        GetBranchCommitsError(String),  // 获取提交失败
+        GetCurrentBranchError(String),  // 获取当前分支失败
     }
 }

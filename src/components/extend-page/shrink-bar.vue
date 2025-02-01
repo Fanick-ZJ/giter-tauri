@@ -13,7 +13,7 @@ const emit = defineEmits(['shrink']);
   <NFloatButton
     class="group-hover:opacity-100 opacity-0 
           transition-opacity duration-300 
-          ease-in-out"
+          ease-in-out z-50"
     @click="() => emit('shrink')">
     <NIcon>
       <Icon icon="weui:back-filled" width="12" height="24" />

@@ -287,8 +287,8 @@ impl GitDataProvider {
         Err(anyhow::anyhow!("Branch not found"))
     }
 
-    pub fn build_commits(&self, mut revwalk: Revwalk, count: i32) -> Result<Box<Vec<Commit>>> {
-        let mut commits: Box<Vec<Commit>> = Box::new(Vec::new());
+    pub fn build_commits(&self, revwalk: &mut Revwalk, count: i32) -> Result<Vec<Commit>> {
+        let mut commits: Vec<Commit> = Vec::new();
         for (i, id) in revwalk.by_ref().take(count as usize).enumerate() {
             let id = id?;
             let commit = self.repository.find_commit(id)?;
@@ -300,11 +300,11 @@ impl GitDataProvider {
 
     /// 从当前HEAD获取所有之前的提交
     ///
-    pub fn commits(&self, count: i32) -> Result<Box<Vec<Commit>>> {
+    pub fn commits(&self, count: i32) -> Result<Vec<Commit>> {
         let head_id = self.repository.head()?.target().unwrap();
         let mut revwalk = self.repository.revwalk()?;
         revwalk.push(head_id)?;
-        let commits = self.build_commits(revwalk, count)?;
+        let commits = self.build_commits(&mut revwalk, count)?;
         Ok(commits)
     }
 
@@ -314,36 +314,41 @@ impl GitDataProvider {
         &self,
         commit_id: impl Into<Oid>,
         count: i32,
-    ) -> Result<Box<Vec<Commit>>> {
+    ) -> Result<Vec<Commit>> {
         let commits = self.repository.find_commit(commit_id.into())?;
         let mut revwalk = self.repository.revwalk()?;
         revwalk.push(commits.id())?;
-        let commits = self.build_commits(revwalk, count)?;
+        let commits = self.build_commits(&mut revwalk, count)?;
         Ok(commits)
     }
 
-    /// 获取分支所有提交，gix中的提交对象
+    /// 获取分支所有提交，git2中的提交对象
     fn branch_commit_inner(&self, branch: &Branch) -> Result<git2::Commit> {
-        let branch_reference = self.repository.find_reference(&branch.reference);
+        let b_type = if branch.is_remote {
+            BranchType::Remote
+        } else {
+            BranchType::Local
+        };
+        let branch_reference = self.repository.find_branch(&branch.reference, b_type);
         if let Err(_) = branch_reference {
             return Err(anyhow::anyhow!("Branch not found"));
         }
         let branch_reference = branch_reference?;
-        let branch_commit = branch_reference.peel_to_commit();
+        let branch_commit = branch_reference.get().peel_to_commit();
         if let Err(_) = branch_commit {
             return Err(anyhow::anyhow!("Branch not found"));
         }
         Ok(branch_commit?)
     }
 
-    /// 获取分支的提交
+    /// 获取分支的提交，返回提交对象和此分支的提交总数
     ///
-    pub fn get_branch_commits(&self, branch: &Branch, count: i32) -> Result<Box<Vec<Commit>>> {
+    pub fn get_branch_commits(&self, branch: &Branch, count: i32) -> Result<Vec<Commit>> {
         // 获取分支所在的提交
         let commit = self.branch_commit_inner(branch)?;
         let mut revwalk = self.repository.revwalk()?;
         revwalk.push(commit.id())?;
-        let commits = self.build_commits(revwalk, count)?;
+        let commits = self.build_commits(&mut revwalk, count)?;
         Ok(commits)
     }
 

@@ -8,8 +8,7 @@ use crate::{
 };
 use giter_utils::{
     types::{
-        author::Author, branch::Branch, cache::Cache, git_data_provider::GitDataProvider,
-        status::WorkStatus,
+        author::Author, branch::Branch, cache::Cache, commit::Commit, git_data_provider::GitDataProvider, status::WorkStatus
     },
     util::{is_git_repo, set_owner},
 };
@@ -60,27 +59,6 @@ pub fn remove_watch(repo: RepoPath) -> Result<(), CommandError> {
     }
 }
 
-#[tauri::command]
-pub fn add_repo(
-    path: String,
-    alias: Option<String>,
-    has_watch: Option<bool>,
-    order: Option<i32>,
-    top: Option<bool>,
-) -> Result<store::Repository, CommandError> {
-    let handle = handle::Handle::global();
-    let store = handle.store().unwrap();
-    let repo = store.add_repo(path, alias, has_watch, order, top);
-    match repo {
-        Ok(repo) => {
-            if repo.has_watch {
-                watch(repo.path.clone())?;
-            }
-            Ok(repo)
-        }
-        Err(e) => Err(CommandError::AddRepositoryStoreError(e.to_string())),
-    }
-}
 
 #[tauri::command]
 pub fn repos() -> Result<Vec<store::Repository>, CommandError> {
@@ -93,12 +71,12 @@ pub fn repos() -> Result<Vec<store::Repository>, CommandError> {
 }
 
 #[tauri::command]
-pub fn add_watch(path: String) -> Result<(), CommandError> {
-    watch(path)
+pub fn add_watch(repo: RepoPath) -> Result<(), CommandError> {
+    watch(repo)
 }
 
 #[tauri::command]
-pub fn authors(repo: String, branch: Branch) -> Result<Vec<Author>, CommandError> {
+pub fn authors(repo: RepoPath, branch: Branch) -> Result<Vec<Author>, CommandError> {
     let provider = get_provider(&repo)?;
     let authors = provider.authors(&branch);
     if let Err(_) = authors {
@@ -111,7 +89,7 @@ pub fn authors(repo: String, branch: Branch) -> Result<Vec<Author>, CommandError
 }
 
 #[tauri::command]
-pub fn branches(repo: String) -> Result<Vec<Branch>, CommandError> {
+pub fn branches(repo: RepoPath) -> Result<Vec<Branch>, CommandError> {
     let provider = get_provider(&repo)?;
     let branches = provider.branches();
     if let Err(e) = branches {
@@ -121,7 +99,7 @@ pub fn branches(repo: String) -> Result<Vec<Branch>, CommandError> {
 }
 
 #[tauri::command]
-pub fn clear_cache(repo: String) {
+pub fn clear_cache(repo: RepoPath) {
     let mut cache = handle::Handle::global().cache().unwrap();
     cache.clear(&repo);
 }
@@ -183,13 +161,13 @@ pub fn get_separator() -> String {
 }
 
 #[tauri::command]
-pub fn is_repo(path: String) -> bool {
-    is_git_repo(&path)
+pub fn is_repo(repo: RepoPath) -> bool {
+    is_git_repo(&repo)
 }
 
 #[tauri::command]
-pub fn work_status(path: String) -> Result<WorkStatus, CommandError> {
-    let provider = get_provider(&path)?;
+pub fn work_status(repo: RepoPath) -> Result<WorkStatus, CommandError> {
+    let provider = get_provider(&repo)?;
     let statuses = provider.work_status();
     if let Err(e) = statuses {
         return Err(CommandError::GetWorkStatusError(e.to_string()));
@@ -198,15 +176,35 @@ pub fn work_status(path: String) -> Result<WorkStatus, CommandError> {
 }
 
 #[tauri::command]
-pub fn set_repo_ownership(path: String) -> Result<bool, CommandError> {
-    let provider = get_provider(&path);
+pub fn set_repo_ownership(repo: RepoPath) -> Result<bool, CommandError> {
+    let provider = get_provider(&repo);
     match provider {
         Ok(_) => Ok(true),
-        Err(_) => match set_owner(&path) {
+        Err(_) => match set_owner(&repo) {
             Ok(_) => Ok(true),
             Err(err) => Err(CommandError::SetRepoOwnershipError(
                 err.message().to_string(),
             )),
         },
     }
+}
+
+#[tauri::command]
+pub fn branch_commits(repo: RepoPath, branch: Branch, count: i32) -> Result<Vec<Commit>, CommandError> {
+    let provider = get_provider(&repo)?;
+    let commits = provider.get_branch_commits(&branch, count);
+    if let Err(e) = commits {
+        return Err(CommandError::GetBranchCommitsError(e.to_string()));
+    }
+    Ok(commits.unwrap())
+}
+
+#[tauri::command]
+pub fn current_branch(repo: RepoPath) -> Result<Branch, CommandError> {
+    let provider = get_provider(&repo)?;
+    let branch = provider.current_branch();
+    if let Err(e) = branch {
+        return Err(CommandError::GetCurrentBranchError(e.to_string()));
+    }
+    Ok(branch.unwrap())
 }

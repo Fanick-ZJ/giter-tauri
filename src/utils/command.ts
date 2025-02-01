@@ -1,9 +1,11 @@
-import { ADD_WATCH, GET_DRIVER, GET_FOLDERS, GET_SEPARATOR, IS_REPO, REMOVE_WATCH, SET_OWNERSHIP, WORK_STATUS } from "@/const/command";
+import { ADD_WATCH, GET_BRANCHES, GET_COMMITS, GET_CURRENT_BRANCH, GET_DRIVER, GET_FOLDERS, GET_SEPARATOR, IS_REPO, REMOVE_WATCH, SET_OWNERSHIP, WORK_STATUS } from "@/const/command";
 import { RepoStatus } from "@/enum";
+import { Branch, Commit } from "@/types";
 import { invoke } from "@tauri-apps/api/core";
 
-export const addWatch = async (path: string) => {
-  return await invoke(ADD_WATCH, { path });
+type RepoPath = string
+export const addWatch = async (repo: RepoPath) => {
+  return await invoke(ADD_WATCH, { repo });
 }
 
 export const getDriver = async () => {
@@ -18,19 +20,32 @@ export const getFolders = async (path: string) => {
   return await invoke(GET_FOLDERS, { path });
 }
 
-export const isRepo = async (path: string) => {
-  return await invoke(IS_REPO, { path });
+export const isRepo = async (repo: RepoPath) => {
+  return await invoke(IS_REPO, { repo });
 }
 
-export const workStatus = async (path: string) => {
-  const status = await invoke(WORK_STATUS, { path })
+export const workStatus = async (repo: RepoPath) => {
+  const status = await invoke(WORK_STATUS, { repo })
   return status as RepoStatus 
 }
 
-export const setOwnership = async (path: string) => {
-  return await invoke(SET_OWNERSHIP, { path }) 
+export const setOwnership = async (repo: RepoPath) => {
+  return await invoke(SET_OWNERSHIP, { repo }) 
 }
 
-export const removeWatch = async (path: string) => {
-  return await invoke(REMOVE_WATCH , { repo: path })
+export const removeWatch = async (repo: RepoPath) => {
+  return await invoke(REMOVE_WATCH , { repo })
+}
+
+export const getBranches = async (repo: RepoPath) => {
+  const branches = await invoke<Branch[]>(GET_BRANCHES, { repo })
+  return branches
+}
+
+export const getCurrentBranch = async (repo: RepoPath) : Promise<Branch> => {
+  return await invoke<Branch>(GET_CURRENT_BRANCH, { repo })
+}
+
+export const getBranchCommits = async (repo: RepoPath, branch: Branch, count: Number) => {
+  return await invoke<Commit[]>(GET_COMMITS, { repo, branch, count }) 
 }

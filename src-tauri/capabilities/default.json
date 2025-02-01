@@ -13,6 +13,7 @@
     "core:window:allow-minimize",
     "core:window:allow-set-size",
     "core:window:allow-close",
+    "core:window:allow-set-min-size",
     "core:window:allow-toggle-maximize",
     "core:window:allow-internal-toggle-maximize",
     "sql:allow-execute",

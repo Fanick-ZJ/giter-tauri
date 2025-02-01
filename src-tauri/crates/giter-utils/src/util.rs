@@ -28,7 +28,7 @@ pub fn build_commit(commit: &Git2Commit, repo: String) -> Commit {
         committer.email().unwrap_or("").to_string(),
         message.lines().next().unwrap_or("").to_string(),
         message,
-        commit.time().seconds(),
+        commit.time().seconds() * 1000,
         commit.parent_ids().into_iter().count() as i64,
         repo,
     )

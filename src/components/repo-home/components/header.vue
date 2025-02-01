@@ -44,7 +44,7 @@ const showMsg = () => {
 </script>
 
 <template>
-  <div class="flex pb-[5px] items-center">
+  <div class="flex">
     <div class="flex-1 font-bold text-lg">
       仓库
     </div>

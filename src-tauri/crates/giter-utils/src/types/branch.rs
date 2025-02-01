@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 ///
 type Reference = String;
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Branch {
     pub name: String,
     pub is_remote: bool,

@@ -6,6 +6,7 @@ import { cmdErrNotify } from "@/utils/err-notify";
 import { get_store_db } from "@/utils/storage";
 import { readRepos, removeRepo, saveRepo, updateRepo } from "@/utils/store";
 import { listen } from "@tauri-apps/api/event";
+import { QueryResult } from "@tauri-apps/plugin-sql";
 import { defineStore } from "pinia";
 import { Ref, ref } from "vue";
 
@@ -74,7 +75,8 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
 
   // 添加仓库
   const add = (repo: Repository) => {
-    saveRepo(repo).then(() => {
+    saveRepo(repo).then((res: QueryResult) => {
+      repo.id = res.lastInsertId as number
       Object.assign(repo, {
         valid: true,
       })
@@ -110,6 +112,10 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
     repos.value.sort(repoSort)
   }
 
+  const getRepoById = (id: number) => {
+    return repos.value.find((repo) => repo.id === id) 
+  }
+
   const getRepoByPath = (path: RepoPath) => {
     return repos.value.find((repo) => repo.path === path) 
   }
@@ -128,6 +134,7 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
     status,
     update,
     getRepoByPath,
+    getRepoById,
     remove
   }
 })

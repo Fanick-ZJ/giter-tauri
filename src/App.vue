@@ -2,9 +2,10 @@
 import { useThemeStore } from '@/store/modules/theme';
 import { NConfigProvider,
         darkTheme,
-        NFlex
+        NFlex,
+        zhCN
       } from 'naive-ui';
-import { computed, nextTick, onMounted, provide, ref, useTemplateRef, watch } from 'vue';
+import { computed, nextTick, onMounted, provide, ref, StyleHTMLAttributes, StyleValue, useTemplateRef, watch } from 'vue';
 import AppProvider from './components/common/app-provider.vue';
 import RepoHome from '@/components/repo-home/index.vue'
 import { viewExtend, viewShrink } from './types/key';
@@ -23,40 +24,41 @@ onMounted(() => {
   }) 
 })
 
-const homPageRef = useTemplateRef('homeRef')
 
-const _isExtend = ref(false)
+const isExtend = ref(false)
+const homeStyle = ref<StyleValue>()
 const viewToExtend = async () => {
-  if (_isExtend.value) return
-  _isExtend.value = true
+  if (isExtend.value) return
+  isExtend.value = true
+  const homeWidth = homeRef.value?.$el.clientWidth
+  homeStyle.value = {
+    maxWidth: isExtend.value? homeWidth + 'px' : '100%'
+  } 
   await nextTick()
-  const width = homeRef.value?.$el.clientWidth
-  getCurrentWindow().setSize(new LogicalSize(width! + 300, 700))
+  const curWind = getCurrentWindow()
+  const {width, height} = await curWind.innerSize()
+  curWind.setSize(new LogicalSize(width + 550, height))
 }
 
 const viewToShrink = () => {
-  _isExtend.value = false
+  isExtend.value = false
   const width = homeRef.value?.$el.clientWidth
-  getCurrentWindow().setSize(new LogicalSize(width!, 700))
+  const height = homeRef.value?.$el.clientHeight
+  
+  getCurrentWindow().setSize(new LogicalSize(width!, height!))
 }
 
 provide(viewExtend, viewToExtend)
 provide(viewShrink, viewToShrink)
 
-const homeStyle = computed(() => {
-  const width = homeRef.value?.$el.clientWidth
-  return {
-    width: _isExtend.value? width + 'px' : '100%'
-  } 
-})
 </script>
 
 <template>
-  <NConfigProvider :theme="naviDarkTheme">
+  <NConfigProvider :theme="naviDarkTheme" :locale="zhCN">
     <AppProvider>
-      <NFlex>
+      <NFlex :wrap="false">
         <RepoHome ref="homeRef" :style="homeStyle"/>
-        <div class="flex-1" v-show="_isExtend">
+        <div class="flex-1" v-show="isExtend">
           <ExtendPage/>
         </div>
       </NFlex>

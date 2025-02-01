@@ -14,11 +14,8 @@ window.$notification = useNotification()
 </script>
 
 <template>
-<div class="h-screen relative">
-  <NLayout 
-  class="h-screen" 
-  content-style="padding: 10px"
-  position="absolute"
+<NLayout
+  class="h-screen p-[10px]"
   :native-scrollbar="false">
   <NLayoutHeader class="mb-[5px] h-[35px]" bordered >
     <HomePageHeaders/>
@@ -26,12 +23,10 @@ window.$notification = useNotification()
   <NLayout 
     position="absolute"
     style="top: 45px"
-    content-style="padding: 10px"
     :native-scrollbar="false">
     <RepoList />
   </NLayout>
 </NLayout>
-</div>
 </template>
 
 <style lang="scss" scoped>
