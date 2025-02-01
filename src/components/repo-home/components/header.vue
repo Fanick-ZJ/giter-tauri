@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { useFileSelector } from "@/components/file-selector";
-import { useFileInfoDialog } from "@/components/info-dialog";
+import { useFileSelector } from "@/components/common/file-selector";
+import { useFileInfoDialog } from "@/components/common/info-dialog";
 import { useRepoStore } from "@/store/modules/repo";
 import { useNotificationStore } from "@/store/modules/notification";
 import { Repository } from "@/types";

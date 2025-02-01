@@ -4,7 +4,7 @@ import RepoItem from './repo-item.vue'
 import { NFlex, NDropdown } from 'naive-ui';
 import { nextTick, ref } from 'vue';
 import { upToRepoItem } from '../util';
-import { useFileInfoDialog } from '@/components/info-dialog';
+import { useFileInfoDialog } from '@/components/common/info-dialog';
 import { openFileManager } from '@/utils/tool';
 
 defineOptions({

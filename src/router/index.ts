@@ -1,9 +1,15 @@
-import { MessageApiInjection } from "naive-ui/es/message/src/MessageProvider";
-import { NotificationApiInjection } from "naive-ui/es/notification/src/NotificationProvider";
+import { createMemoryHistory, createRouter } from "vue-router";
 
-declare global {
-  interface Window {
-    $message: MessageApiInjection;
-    $notification: NotificationApiInjection;
-  }
-}
+export const router = createRouter({
+  history: createMemoryHistory(),
+  routes: [
+    {
+      path: "/",
+      component: () => import("@/views/home/index.vue") 
+    },
+    {
+      path: "/commit",
+      component: () => import("@/views/commit/index.vue")
+    }
+  ]
+})

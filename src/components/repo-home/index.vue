@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NLayout, NLayoutHeader } from 'naive-ui';
+import { NLayout, NLayoutHeader, useMessage, useNotification } from 'naive-ui';
 
 import RepoList from './components/repo-list.vue'
 import HomePageHeaders from './components/header.vue'
@@ -8,6 +8,9 @@ defineOptions({
   name: 'RepoHome'
 })
 
+// 在window上挂在一个message对象实例，方便使用
+window.$message = useMessage()
+window.$notification = useNotification()
 </script>
 
 <template>
