@@ -7,7 +7,7 @@ import LayoutPage from '@/components/common/layout-page/index.vue'
 import { getAuthors, getBranchCommits, getBranches, getCurrentBranch } from '@/utils/command';
 import { Author, Branch, Commit, Repository } from '@/types';
 import CommitItem from './commit-item.vue'
-import { NFlex, NPagination, NButton, NIcon } from 'naive-ui';
+import { NFlex, NPagination, NButton, NIcon, NSelect } from 'naive-ui';
 import { Model } from './type';
 import FilterForm from './filter-form.vue'
 
@@ -27,10 +27,15 @@ const init = async () => {
   let path = repo.value!.path
   branches.value = await getBranches(path)
   curBranch.value = await getCurrentBranch(path)
-  getBranchCommits(path, curBranch.value, 1 << 31).then((res) => {
+  getCommits()
+  authors.value = await getAuthors(repo.value!.path, curBranch.value)
+}
+
+const getCommits = async () => {
+  let path = repo.value!.path
+  getBranchCommits(path, curBranch.value!, 1 << 31).then((res) => {
     commits.value = res
   })
-  authors.value = await getAuthors(repo.value!.path, curBranch.value)
 }
 
 // 监听路由变化，重新获取数据
@@ -52,12 +57,14 @@ watch(()=> route.path, () => {
   }
 }, {immediate: true})
 
+// 筛选模型
 const filterModel = ref<Model>({
   author: null,
   content: null,
   timeRange: null
 })
 
+// 提交记录总数
 const total = computed(() => {
   return filtedList.value.length 
 })
@@ -77,9 +84,39 @@ const filtedList = computed(() => {
     return commit.datetime >= filterModel.value.timeRange[0] && commit.datetime <= filterModel.value.timeRange[1]
   })
 })
+
 const hasFilter = computed(() => {
   return filterModel.value.author !== null || filterModel.value.content !== null || filterModel.value.timeRange !== null 
 })
+
+const selectedBranch = computed({
+  get() {
+    return curBranch.value!.reference
+  },
+  set(val) {
+    let branch = selectBranch(val)
+    if (branch) {
+      curBranch.value = branch
+      getCommits()
+    }
+  }
+})
+const branchOptions = computed(() => {
+  return branches.value.map((branch) => {
+    return {
+      label: branch.name,
+      value: branch.reference
+    }
+  }) 
+})
+
+const selectBranch = (reference: string) => {
+  let branch = branches.value.find((branch) => {
+    return branch.reference === reference 
+  })
+  return branch
+}
+
 const showFilter = ref(false)
 const toggleFilter = () => {
   showFilter.value = !showFilter.value
@@ -88,11 +125,15 @@ const toggleFilter = () => {
 <template>
   <LayoutPage title="提交记录" :subtitle="repo?.alias">
     <template #header-extra>
-      <NButton  :dashed='hasFilter' @click="toggleFilter">
-        <NIcon>
-          <Icon icon="mdi:filter-outline" width="100" height="100" />
-        </NIcon>
-      </NButton>
+      <div class="flex gap-x-[10px]">
+        <NSelect v-model:value="selectedBranch" clearable :options="branchOptions" placeholder="选择分支" class="w-[200px]">
+        </NSelect>
+        <NButton :dashed='hasFilter' @click="toggleFilter">
+          <NIcon>
+            <Icon icon="mdi:filter-outline" width="100" height="100" />
+          </NIcon>
+        </NButton>
+      </div>
     </template>
     <template #filter-form>
       <FilterForm v-if="showFilter" :author-list="authors" v-bind:model-value="filterModel"></FilterForm>
