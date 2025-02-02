@@ -91,7 +91,11 @@ const hasFilter = computed(() => {
 
 const selectedBranch = computed({
   get() {
-    return curBranch.value!.reference
+    if (curBranch.value) {
+      return curBranch.value.reference
+    } else {
+     return '' 
+    }
   },
   set(val) {
     let branch = selectBranch(val)
