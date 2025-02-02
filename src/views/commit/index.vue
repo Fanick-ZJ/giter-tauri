@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { useRepoStore } from '@/store/modules/repo';
-import { computed, nextTick, onBeforeMount, ref, watch } from 'vue';
-import { onBeforeRouteUpdate, useRoute } from 'vue-router';
-
+import { computed, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
+import { Icon } from '@iconify/vue'
 import LayoutPage from '@/components/common/layout-page/index.vue'
-import { getBranchCommits, getBranches, getCurrentBranch } from '@/utils/command';
-import { Branch, Commit, Repository } from '@/types';
+import { getAuthors, getBranchCommits, getBranches, getCurrentBranch } from '@/utils/command';
+import { Author, Branch, Commit, Repository } from '@/types';
 import CommitItem from './commit-item.vue'
-import { NFlex, NPagination } from 'naive-ui';
+import { NFlex, NPagination, NButton, NIcon } from 'naive-ui';
+import { Model } from './type';
+import FilterForm from './filter-form.vue'
 
 const route = useRoute()
 const repoStore = useRepoStore()
@@ -19,7 +21,7 @@ const pageSize = ref(10)
 // 获取分支列表
 const branches = ref<Branch[]>([])
 const curBranch = ref<Branch>()
-const total = ref(0)
+const authors = ref<Author[]>([])
 const commits = ref<Commit[]>([])
 const init = async () => {
   let path = repo.value!.path
@@ -27,31 +29,81 @@ const init = async () => {
   curBranch.value = await getCurrentBranch(path)
   getBranchCommits(path, curBranch.value, 1 << 31).then((res) => {
     commits.value = res
-    console.log(res)
-    total.value = commits.value.length
   })
+  authors.value = await getAuthors(repo.value!.path, curBranch.value)
 }
 
+// 监听路由变化，重新获取数据
 watch(()=> route.path, () => {
   if (route.path.startsWith('/commit')) {
     id.value = parseInt(route.params.id as string)
     repo.value = repoStore.getRepoById(id.value)
     init().catch((err) => {
       window.$message.error(err) 
+    }).then(() => {
+      // 重置分页,筛选刷新
+     page.value = 1 
+     filterModel.value = {
+       author: null,
+       content: null,
+       timeRange: null
+     }
     })
   }
 }, {immediate: true})
 
+const filterModel = ref<Model>({
+  author: null,
+  content: null,
+  timeRange: null
+})
 
+const total = computed(() => {
+  return filtedList.value.length 
+})
+
+const filtedList = computed(() => {
+  return commits.value.filter((commit) => {
+    if (filterModel.value.author !== null) {
+      return commit.authorName === filterModel.value.author 
+    }
+    return true
+  }).filter((commit) => {
+    return commit.message.includes(filterModel.value.content || '') 
+  }).filter((commit) => {
+    if (filterModel.value.timeRange === null) {
+      return true 
+    }
+    return commit.datetime >= filterModel.value.timeRange[0] && commit.datetime <= filterModel.value.timeRange[1]
+  })
+})
+const hasFilter = computed(() => {
+  return filterModel.value.author !== null || filterModel.value.content !== null || filterModel.value.timeRange !== null 
+})
+const showFilter = ref(false)
+const toggleFilter = () => {
+  showFilter.value = !showFilter.value
+}
 </script>
 <template>
   <LayoutPage title="提交记录" :subtitle="repo?.alias">
+    <template #header-extra>
+      <NButton  :dashed='hasFilter' @click="toggleFilter">
+        <NIcon>
+          <Icon icon="mdi:filter-outline" width="100" height="100" />
+        </NIcon>
+      </NButton>
+    </template>
+    <template #filter-form>
+      <FilterForm v-if="showFilter" :author-list="authors" v-bind:model-value="filterModel"></FilterForm>
+    </template>
     <NFlex>
-      <template v-for="c in commits.splice((page - 1) * pageSize, page * pageSize)">
+      <template v-for="c in filtedList.slice((page - 1) * pageSize, page * pageSize)">
         <CommitItem :commit="c"/>
       </template>
     </NFlex>
     <template #footer>
+      <NFlex justify="center">
         <NPagination 
           :item-count="total" 
           v-model:page="page"
@@ -59,6 +111,7 @@ watch(()=> route.path, () => {
           :page-sizes="[10, 20, 30]"
           show-size-picker>
         </NPagination>
+      </NFlex>
     </template>
   </LayoutPage>
 </template>

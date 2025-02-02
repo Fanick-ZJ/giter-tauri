@@ -80,7 +80,8 @@ const toCommit = () => {
             absolute right-[calc(var(--n-padding-left)*-1)]
             top-[-20px] h-[75px] 
             w-[30px] duration-300
-            ease-in flex flex-col items-center justify-center"
+            ease-in flex flex-col items-center justify-center
+            z-[2]"
         :class="mouseHover ? 'right-[calc(var(--n-padding-left)*-1)]' : 'right-[calc(var(--n-padding-left)*-3)]'"
         @mouseleave="onLeave">
         <div @click.stop='toCommit'><Icon icon="iconoir:git-fork" width="24" height="24" /></div>

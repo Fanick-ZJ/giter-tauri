@@ -1,6 +1,6 @@
-import { ADD_WATCH, GET_BRANCHES, GET_COMMITS, GET_CURRENT_BRANCH, GET_DRIVER, GET_FOLDERS, GET_SEPARATOR, IS_REPO, REMOVE_WATCH, SET_OWNERSHIP, WORK_STATUS } from "@/const/command";
+import { ADD_WATCH, GET_AUTHORS, GET_BRANCHES, GET_COMMITS, GET_CURRENT_BRANCH, GET_DRIVER, GET_FOLDERS, GET_SEPARATOR, IS_REPO, REMOVE_WATCH, SET_OWNERSHIP, WORK_STATUS } from "@/const/command";
 import { RepoStatus } from "@/enum";
-import { Branch, Commit } from "@/types";
+import { Author, Branch, Commit } from "@/types";
 import { invoke } from "@tauri-apps/api/core";
 
 type RepoPath = string
@@ -48,4 +48,8 @@ export const getCurrentBranch = async (repo: RepoPath) : Promise<Branch> => {
 
 export const getBranchCommits = async (repo: RepoPath, branch: Branch, count: Number) => {
   return await invoke<Commit[]>(GET_COMMITS, { repo, branch, count }) 
+}
+
+export const getAuthors = async (repo: RepoPath, branch: Branch) => {
+  return await invoke<Author[]>(GET_AUTHORS, { repo, branch }) 
 }

@@ -32,7 +32,8 @@ const viewToExtend = async () => {
   isExtend.value = true
   const homeWidth = homeRef.value?.$el.clientWidth
   homeStyle.value = {
-    maxWidth: isExtend.value? homeWidth + 'px' : '100%'
+    maxWidth: isExtend.value? homeWidth + 'px' : '100%',
+    minWidth: isExtend.value? homeWidth + 'px' : ''
   } 
   await nextTick()
   const curWind = getCurrentWindow()

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Commit } from '@/types';
 import dayjs from 'dayjs';
-import { NCard } from 'naive-ui';
+import { NCard, NEllipsis } from 'naive-ui';
 import { PropType } from 'vue';
 const props = defineProps({
   commit: {
@@ -12,7 +12,10 @@ const props = defineProps({
 </script>
 
 <template>
-  <NCard :title="commit.title">
+  <NCard hoverable>
+    <template #header>
+      {{commit.title}}
+    </template>
     <template #header-extra>
       <span class="text-sm text-gray-500">
         {{commit.authorName}}

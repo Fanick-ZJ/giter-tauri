@@ -16,6 +16,11 @@ export type Error = {
   data: string
 }
 
+export type Author = {
+  name: string,
+  email: string 
+}
+
 export type Branch = {
  name: string,
  isRemote: boolean

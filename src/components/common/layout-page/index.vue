@@ -34,9 +34,17 @@ const contentStyle = computed(() => {
 </script>
 <template>
   <div class="h-screen flex flex-col gap-[5px]" ref="pageRef" :style="{padding: `${padding}px`}">
-    <div class="flex h-[35px]">
-      <span class="font-bold text-lg inline-block">{{title}}</span>
-      <span class="inline-block ml-5 align-bottom text-gray-500 text-base/8">{{subtitle}}</span>
+    <div class="flex h-[35px] justify-between">
+      <div>
+        <span class="font-bold text-lg/8 inline-block">{{title}}</span>
+        <span class="inline-block ml-5 align-bottom text-gray-500 text-base/8">{{subtitle}}</span>
+      </div>
+      <div>
+        <slot name="header-extra"/>
+      </div>
+    </div>
+    <div>
+      <slot name="filter-form"/>
     </div>
     <NLayout :style="contentStyle" :native-scrollbar="false">
       <slot/>
