@@ -12,7 +12,7 @@ const props = defineProps({
 </script>
 
 <template>
-  <NCard hoverable>
+  <NCard hoverable :data-commit-id="commit.commitId">
     <template #header>
       {{commit.title}}
     </template>

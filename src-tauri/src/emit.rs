@@ -4,7 +4,6 @@ use giter_watcher::types::modify_watcher::ModifyWatcher;
 use notify::Event;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_set::HashSet;
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{Emitter, Manager};
@@ -12,7 +11,7 @@ use tauri::{Emitter, Manager};
 /// 仓库监控到文件修改后执行的回调函数
 ///
 pub fn repos_modified_emit_cb() -> fn(Event) {
-    #[derive(Serialize, Debug, Deserialize, Clone)]
+    #[derive(Serialize, Debug, Clone)]
     struct Status {
         path: String,
         status: WorkStatus,

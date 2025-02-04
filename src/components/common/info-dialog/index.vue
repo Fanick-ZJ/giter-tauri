@@ -79,7 +79,7 @@ defineExpose({
 <template>
   <div v-if="__show" 
     class="w-screen h-screen bg-slate-400/50
-    flex items-center justify-center fixed top-0 left-0">
+    flex items-center justify-center fixed top-0 left-0 z-[3]">
     <div class="w-[280px]">
       <NCard title="添加/修改仓库信息" size="small" closable @close="close">
         <RepoInfoEditForm ref="formRef" v-bind="{...props}"/>

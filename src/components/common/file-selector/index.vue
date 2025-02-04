@@ -81,7 +81,7 @@ defineExpose({
 <template>
   <div v-if="__show" 
     class="w-screen h-screen bg-slate-400/50
-    flex items-center justify-center fixed top-0 left-0">
+    flex items-center justify-center fixed top-0 left-0 z-[3]">
     <div class="w-[280px]">
       <NCard title="选择文件" size="small" closable @close="close">
         <NInput placeholder="请输入文件路径" type="text" size="tiny" clearable :value="selected"/>

@@ -6,9 +6,10 @@ use crate::{
         fs::{get_first_level_dirs, get_logical_driver},
     },
 };
+use git2::Oid;
 use giter_utils::{
     types::{
-        author::Author, branch::Branch, cache::Cache, commit::Commit, git_data_provider::GitDataProvider, status::WorkStatus
+        author::Author, branch::Branch, cache::Cache, commit::Commit, diff::ContentDiff, file::File, git_data_provider::GitDataProvider, status::WorkStatus
     },
     util::{is_git_repo, set_owner},
 };
@@ -207,4 +208,39 @@ pub fn current_branch(repo: RepoPath) -> Result<Branch, CommandError> {
         return Err(CommandError::GetCurrentBranchError(e.to_string()));
     }
     Ok(branch.unwrap())
+}
+
+#[tauri::command]
+pub fn commit_content (repo: RepoPath, cid: String) -> Result<Vec<File>, CommandError> {
+    let provider = get_provider(&repo)?;
+    let oid = Oid::from_str(&cid);
+    if let Err(e) = oid {
+        return Err(CommandError::ConvertOidError(cid));
+    }
+    let commit_id = oid.unwrap();
+    let content = provider.commit_content(commit_id);
+    if let Err(e) = content {
+        return Err(CommandError::GetCommitContentError(e.to_string()));
+    }
+    Ok(content.unwrap())
+}
+
+#[tauri::command]
+pub fn file_diff(repo: RepoPath, old: String, new: String) -> Result<ContentDiff, CommandError> {
+    let provider = get_provider(&repo)?;
+    let old_id = Oid::from_str(&old);
+    if let Err(e) = old_id {
+        return Err(CommandError::ConvertOidError(old));
+    }
+    let old = old_id.unwrap();
+    let new_id = Oid::from_str(&new);
+    if let Err(e) = new_id {
+        return Err(CommandError::ConvertOidError(new));
+    }
+    let new = new_id.unwrap();
+    let diff = provider.get_file_content_diff(old, new);
+    if let Err(e) = diff {
+        return Err(CommandError::GetFileDiffError(e.to_string()));
+    }
+    Ok(diff.unwrap())
 }

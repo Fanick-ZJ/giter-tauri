@@ -1,3 +1,4 @@
+import { FileStatus } from "@/enum";
 import { CommandError } from "@/enum/error"
 import { MessageApiInjection } from "naive-ui/es/message/src/MessageProvider";
 import { NotificationApiInjection } from "naive-ui/es/notification/src/NotificationProvider";
@@ -38,6 +39,39 @@ export type Commit = {
   datetime: number,
   parent_count: number,
   repo: string
+}
+
+
+export type File = {
+  path: string
+  type: string
+  size: number
+  status: FileStatus
+  objectId: string
+  prevObjectId: string
+  blobExist: boolean
+}
+
+export type Diff = {
+  oldPath: string
+  newPath: string
+  status: FileStatus 
+}
+
+export type DiffOpt = {
+  op: 'equal' | 'replace' | 'insert' | 'delete',
+  old_index: number,
+  old_len: number,
+  new_index: number,
+  new_len: number,
+  len: number
+}
+
+export type DiffContent = {
+  oldContent: string,
+  newContent: string,
+  ops: DiffOpt[],
+  display: string
 }
 
 declare global {

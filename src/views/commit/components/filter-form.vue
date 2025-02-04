@@ -2,7 +2,7 @@
 import { Author } from '@/types';
 import { NForm, NSelect, NInput, NFormItem, NDatePicker, NButton } from 'naive-ui';
 import { computed, PropType } from 'vue';
-import { Model } from './type';
+import { Model } from '../type';
 
 const model = defineModel<Model>({
   default: {

@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { useRepoStore } from '@/store/modules/repo';
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { Icon } from '@iconify/vue'
 import LayoutPage from '@/components/common/layout-page/index.vue'
 import { getAuthors, getBranchCommits, getBranches, getCurrentBranch } from '@/utils/command';
 import { Author, Branch, Commit, Repository } from '@/types';
-import CommitItem from './commit-item.vue'
-import { NFlex, NPagination, NButton, NIcon, NSelect } from 'naive-ui';
+import CommitItem from './components/commit-item.vue'
+import { NFlex, NPagination, NButton, NIcon, NSelect, NDropdown } from 'naive-ui';
 import { Model } from './type';
-import FilterForm from './filter-form.vue'
+import FilterForm from './components/filter-form.vue'
+import { useContextMenu } from './hook';
 
 const route = useRoute()
 const repoStore = useRepoStore()
@@ -125,6 +126,16 @@ const showFilter = ref(false)
 const toggleFilter = () => {
   showFilter.value = !showFilter.value
 }
+
+const { 
+  menuX,
+  menuY,
+  showMenu,
+  handleContextMenu,
+  menuCloseOutside,
+  handleSelect,
+  options} = useContextMenu()
+
 </script>
 <template>
   <LayoutPage title="提交记录" :subtitle="repo?.alias">
@@ -142,7 +153,7 @@ const toggleFilter = () => {
     <template #filter-form>
       <FilterForm v-if="showFilter" :author-list="authors" v-bind:model-value="filterModel"></FilterForm>
     </template>
-    <NFlex>
+    <NFlex @contextmenu="handleContextMenu" :data-repo="repo?.path">
       <template v-for="c in filtedList.slice((page - 1) * pageSize, page * pageSize)">
         <CommitItem :commit="c"/>
       </template>
@@ -159,6 +170,16 @@ const toggleFilter = () => {
       </NFlex>
     </template>
   </LayoutPage>
+  <NDropdown 
+    placement="bottom-start"
+    trigger="manual"
+    :x="menuX"
+    :y="menuY"
+    :show="showMenu"
+    :options="options"
+    @clickoutside="menuCloseOutside"
+    @select="handleSelect">
+  </NDropdown>
 </template>
 
 

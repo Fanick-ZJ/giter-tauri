@@ -6,7 +6,7 @@ mod utils;
 
 use crate::utils::resolve;
 use cmd::{
-    add_watch, authors, branches, clear_all_cache, clear_cache, current_branch, branch_commits, get_db_path, get_driver, get_folders, get_separator, is_repo, remove_watch, repos, set_repo_ownership, work_status
+    add_watch, authors, branch_commits, branches, clear_all_cache, clear_cache, commit_content, current_branch, file_diff, get_db_path, get_driver, get_folders, get_separator, is_repo, remove_watch, repos, set_repo_ownership, work_status
 };
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -46,6 +46,8 @@ pub fn run() {
             remove_watch,
             branch_commits,
             current_branch,
+            commit_content,
+            file_diff,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -3,7 +3,7 @@ import { useRepoStore, ValidRepository } from '@/store/modules/repo';
 import RepoItem from './repo-item.vue'
 import { NFlex, NDropdown } from 'naive-ui';
 import { nextTick, ref } from 'vue';
-import { upToRepoItem } from '../util';
+import { upToDataElement } from '../util';
 import { useFileInfoDialog } from '@/components/common/info-dialog';
 import { openFileManager } from '@/utils/tool';
 
@@ -34,7 +34,7 @@ const contextSelectItem = ref<ValidRepository | undefined>()
 const showContext = ref(false)
 const handleContextMenu = (e: MouseEvent) => {
   e.preventDefault()
-  const repoEle = upToRepoItem(e.target as HTMLElement)
+  const repoEle = upToDataElement(e.target as HTMLElement, 'data-repo')
   if (!repoEle) return
   const path = repoEle!.getAttribute('data-repo')
   contextSelectItem.value = repoStore.getRepoByPath(path!)

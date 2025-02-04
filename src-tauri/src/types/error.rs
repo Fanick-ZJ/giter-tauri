@@ -22,5 +22,8 @@ make_serializable! {
         RemoveWatcherError(String),     // 移除监听失败
         GetBranchCommitsError(String),  // 获取提交失败
         GetCurrentBranchError(String),  // 获取当前分支失败
+        ConvertOidError(String),        // 转换OID失败
+        GetCommitContentError(String),  // 获取提交内容失败
+        GetFileDiffError(String),       // 获取文件差异失败
     }
 }

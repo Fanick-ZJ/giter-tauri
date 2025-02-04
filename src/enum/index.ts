@@ -13,6 +13,14 @@ export const RepoStatus = {
   Unpushed: 1 << 5,
 } as const;
 
+export enum FileStatus {
+  Added = 'Added',
+  Deleted = 'Deleted',
+  Modified = 'Modified',
+  Renamed = 'Renamed',
+  Ok = 'Ok',
+}
+
 export type RepoStatus = typeof RepoStatus[keyof typeof RepoStatus];
 
 export const hasFlag = (status: RepoStatus, flag: RepoStatus) => {

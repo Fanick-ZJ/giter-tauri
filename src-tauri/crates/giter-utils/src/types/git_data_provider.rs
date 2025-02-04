@@ -1,17 +1,23 @@
 use crate::util::build_commit;
 use crate::util::change_status_to_file_status;
 use anyhow::Result;
+use git2::TreeWalkMode;
 use git2::{BranchType, Config, ErrorCode, Oid, Repository, Revwalk, Status};
 use log::error;
+use similar::DiffOp;
+use similar::TextDiff;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fmt::Pointer;
 use std::path;
+use std::path::Path;
 use std::vec;
 use types::{author::Author, branch::Branch, commit::Commit, status::WorkStatus};
 
 use super::cache::Cache;
+use super::diff::ContentDiff;
 use super::file::File;
+use super::status::FileStatus;
 pub struct GitDataProvider {
     pub repository: Repository,
     cache: RefCell<Option<Box<dyn Cache + Send>>>,
@@ -352,20 +358,46 @@ impl GitDataProvider {
         Ok(commits)
     }
 
+    fn tree_walk(&self, tree: &git2::Tree) -> Result<Vec<File>> {
+        let mut files: Vec<File> = Vec::new();
+        let _ = tree.walk(TreeWalkMode::PostOrder, |root, entry| {
+            let path = Path::new(root);
+            let path = path.join(entry.name().unwrap()).to_str().unwrap().to_string();
+            let blob = self.repository.find_blob(entry.id());
+            if blob.is_err() {
+                files.push(File::new(path, 0, FileStatus::Added, "0".repeat(20), "0".repeat(20), false));
+            } else {
+                let blob = blob.unwrap();
+                let size = blob.size();
+                let status = FileStatus::Added;
+                let object_id = entry.id().to_string();
+                files.push(File::new(path, size, status, object_id, "0".repeat(20), true));
+            }
+            1
+        });
+        Ok(files)
+    }
+
     /// 获取一个提交的内容
     ///
     pub fn commit_content(&self, commit_id: impl Into<Oid>) -> Result<Vec<File>> {
         let repo = &self.repository;
-        let mut files: Vec<File> = Vec::new();
         // 获取父提交
         let commit = repo.find_commit(commit_id.into())?;
         let now_tree = commit.tree()?;
-        let old_tree = commit.parent(0)?.tree()?;
+        let old_tree = commit.parents().next();
+        // 当没找到父提交时，说明是第一个提交，单独处理
+        if old_tree.is_none() {
+            let files = self.tree_walk(&now_tree)?;
+            return Ok(files);
+        }
+        let old_tree = old_tree.unwrap().tree()?;
+        let mut files: Vec<File> = Vec::new();
         // 对比两个树的差异
         let diff = repo.diff_tree_to_tree(Some(&old_tree), Some(&now_tree), None)?;
-        let delta = diff.deltas();
+        let deltas = diff.deltas();
         // 遍历差异, 获取差异的文件
-        for delta in delta {
+        for delta in deltas {
             let path = delta
                 .new_file()
                 .path()
@@ -386,6 +418,58 @@ impl GitDataProvider {
             files.push(file);
         }
         Ok(files)
+    }
+
+    /// 根据oid获取文件内容
+    /// oid: 提交id
+    pub fn get_file_content(&self, oid: impl Into<Oid>) -> Result<String> {
+        let oid = oid.into();
+        let blob = self.repository.find_blob(oid);
+        if blob.is_err() {
+            return Err(anyhow::anyhow!("Blob not found"));
+        }
+        let blob = blob.unwrap();
+        Ok(String::from_utf8(blob.content().to_vec())?)
+    }
+
+    /// 获取文件的差异
+    /// old: 旧的文件内容
+    /// new: 新的文件内容
+    ///
+    pub fn get_file_diff(&self, old: impl Into<Oid>, new: impl Into<Oid>) -> Result<(Vec<DiffOp>, String)> {
+        let old = old.into();
+        let new = new.into();
+        let old_blob = self.repository.find_blob(old);
+        let new_blob = self.repository.find_blob(new);
+        if old_blob.is_err() {
+            return Err(anyhow::anyhow!("Old blob not found"));
+        }
+        if new_blob.is_err() {
+            return Err(anyhow::anyhow!("New blob not found"));
+        }
+        let old_blob = old_blob.unwrap();
+        let new_blob = new_blob.unwrap();
+        let old_content = String::from_utf8(old_blob.content().to_vec())?;
+        let new_content = String::from_utf8(new_blob.content().to_vec())?;
+        let diff = TextDiff::from_lines(&old_content, &new_content);
+        let diff_display = diff.unified_diff().to_string();
+        Ok((diff.ops().iter().map(|op| op.clone()).collect(), diff_display))
+    }
+
+    /// 获取文件内容、差异
+    /// 
+    pub fn get_file_content_diff(&self, old: impl Into<Oid>, new: impl Into<Oid>) -> Result<ContentDiff> {
+        let old = old.into();
+        let new = new.into();
+        let old_blob = self.get_file_content(old)?;
+        let new_blob = self.get_file_content(new)?;
+        let diff = self.get_file_diff(old, new)?;
+        Ok(ContentDiff {
+            old: old_blob,
+            new: new_blob,
+            ops: diff.0,
+            display: diff.1
+        })
     }
 
     /// 获取分支的贡献者
@@ -449,6 +533,8 @@ impl GitDataProvider {
 
 #[cfg(test)]
 mod tests {
+
+    use similar::{ChangeTag, TextDiff};
 
     use super::*;
     use std::process::Command;
@@ -558,5 +644,16 @@ mod tests {
                 println!("invalid_provider");
             }
         }
+    }
+
+    #[test]
+    fn test_diff() {
+        let diff = TextDiff::from_lines(
+            "Hello World\nThis is the second line.\nMoar and more",
+            "Hallo Welt\nThis is the second line.\nThis is the third.\nMoar and more",
+        );
+        diff.ops().iter().for_each(| f | {
+            println!("----{:?}", f);
+        });
     }
 }
