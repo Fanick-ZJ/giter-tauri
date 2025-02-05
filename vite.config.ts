@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import path from 'path'
 import vueJsx from '@vitejs/plugin-vue-jsx'
-import monacoEditorPlugin from 'vite-plugin-monaco-editor';
+import monacoEditorPlugin from 'vite-plugin-monaco-editor-esm';
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vitejs.dev/config/
@@ -10,10 +10,7 @@ export default defineConfig(async () => ({
   plugins: [
     vue(), 
     vueJsx(),
-    monacoEditorPlugin({
-      languageWorkers: ['json', 'typescript', 'css', 'html', 'editorWorkerService'],
-      publicPath: '/monaco-editor/',
-    }),
+    monacoEditorPlugin(),
   ],
   build: {
     target: ['edge90', 'chrome90', 'firefox90', 'safari15'],

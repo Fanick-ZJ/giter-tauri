@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeMount, onMounted, StyleValue, useTemplateRe
 import { File } from '@/types';
 
 import { ref } from 'vue';
-import { NCard, NInfiniteScroll } from 'naive-ui';
+import { NCard, NFlex, NLayout } from 'naive-ui';
 import { commitContent, fileDiff } from '@/utils/command';
 import { useElementSize } from '@vueuse/core';
 import DiffDetailComponent from './diff-detail-item.vue';
@@ -25,14 +25,9 @@ const props = defineProps({
 })
 
 const commitFiles = ref<File[]>()
-const showedFiles = ref<File[]>([])
 
 onMounted(async () => {
   commitFiles.value = await commitContent(props.repo, props.commitId)
-  
-  // 先展示到滚动条出现为止
-  await nextTick()
-  showedFiles.value = commitFiles.value.slice(0, 10)
 
 })
 
@@ -60,19 +55,6 @@ defineExpose({
   show,
   close
 })
-
-const handleLoad = () => {
-  if (loading.value || noMore.value) return
-  loading.value = true
-  setTimeout(() => {
-    loading.value = false
-    if (showedFiles.value.length >= commitFiles.value!.length) {
-      noMore.value = true
-      return
-    }
-    showedFiles.value = commitFiles.value!.slice(0, showedFiles.value.length + 10)
-  }, 1000)
-}
 
 const loading = ref<Boolean>(false)
 const noMore = ref<Boolean>(false)
@@ -105,11 +87,13 @@ const isScroll = () => {
     left-0 z-[3]">
     <NCard title="提交详情" class="w-[80%] h-[80%]" closable @close="close">
       <div class="h-full relative" ref="containerRef">
-        <NInfiniteScroll class="absolute" :style="containerStyle" :distance="20" @load="handleLoad">
-          <template v-for="item in commitFiles" :key="item.objectId">
-            <DiffDetailComponent :repo="repo" :file="item" />
-          </template>
-        </NInfiniteScroll>
+        <NLayout class="absolute w-full" :style="containerStyle" :native-scrollbar="false">
+          <NFlex>
+            <template v-for="item in commitFiles" :key="item.objectId">
+              <DiffDetailComponent :repo="repo" :file="item" />
+            </template>
+          </NFlex>
+        </NLayout>
       </div>
     </NCard>
   </div>

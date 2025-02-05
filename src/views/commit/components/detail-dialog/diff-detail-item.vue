@@ -22,13 +22,23 @@ const props = defineProps({
 })
 
 const diffContent = ref<DiffContent>()
+let addedLines: number[] = []
+let deletedLines: number[] = []
+let diffDetailLines: number[] = []
+let decorations: monaco.editor.IEditorDecorationsCollection
 const success = ref<Boolean>(false)
 onMounted(() => {
   fileDiff(props.repo, props.file.prevObjectId, props.file.objectId).then(async res => {
+    diffDetailLines = findDiffInfoLine(res.display)
+    const lines = splitModifLines(res.display)
+    addedLines = lines.added
+    deletedLines = lines.deleted
+    res.display = lines.content
     diffContent.value = res
-    success.value = true 
+    success.value = true
     await nextTick()
-    initEditor();
+    initEditor()
+    decorations = applyEditorStyle()
   }).catch(err => {
     console.error(err)
     success.value = false
@@ -98,9 +108,79 @@ const initEditor = () => {
     alwaysConsumeMouseWheel: false, // 允许滚动事件冒泡
   },
   readOnly: true,
+	contextmenu: false,
   });
   updateEditorHeight()
 };
+
+// 找到diff信息行
+const findDiffInfoLine = (content: String) => {
+  const reg = /^@@ -(\d*),(\d*) \+(\d*),(\d*) @@$/
+  const n = []
+  const lines = content.split('\n')
+  for (let i = 0 ; i < lines.length; i++) {
+    if (lines[i].search(reg) >= 0) {
+      n.push(i)
+    }
+  }
+  return n
+}
+
+// 找到修改行和去除修改行的符号
+const splitModifLines = (content: String) => {
+  const added: number[] = []
+  const deleted: number[] = []
+  const c = content.split('\n').map((line, index) => {
+    if (line[0] == '+' || line[0] == '-') {
+      if (line[0] == '+') {
+        added.push(index) 
+      }
+      if (line[0] == '-') {
+        deleted.push(index) 
+      }
+      return line.slice(1)
+    }
+    return line.slice(1)
+  }).join('\n')
+  return {
+    added,
+    deleted,
+    content: c
+  }
+}
+const applyEditorStyle = () => {
+  const addedDecorations: monaco.editor.IModelDeltaDecoration[] = addedLines.map((lineNumber: number) => {
+    return {
+      range: new monaco.Range(lineNumber + 1, 1, lineNumber + 1, 1),
+      options: {
+        isWholeLine: true,
+        className: 'added-line',
+      }
+    }
+  });
+  const deletedDecorations: monaco.editor.IModelDeltaDecoration[] = deletedLines.map((lineNumber: number) => {
+    return {
+      range: new monaco.Range(lineNumber + 1, 1, lineNumber + 1, 1),
+      options: {
+        isWholeLine: true,
+        className: 'deleted-line', 
+      } 
+    }
+  })
+  const diffDetailDecorations: monaco.editor.IModelDeltaDecoration[] = diffDetailLines.map((lineNumber: number) => {
+    return {
+      range: new monaco.Range(lineNumber + 1, 1, lineNumber + 1, 1),
+      options: {
+        isWholeLine: true,
+        className: 'diff-detail-line',
+      } 
+    } 
+  })
+  const decorations = editor.createDecorationsCollection([...addedDecorations,
+                                                          ...deletedDecorations, 
+                                                          ...diffDetailDecorations]);
+  return decorations
+}
 </script>
 
 <template>
@@ -111,7 +191,7 @@ const initEditor = () => {
       </div>
     </template>
     <template #header-extra>
-      <div class="flex gap-1 item-center">
+      <div class="flex gap-1 items-center">
         <div class="text-green-400">
           {{ + added  }}
         </div>
@@ -129,6 +209,14 @@ const initEditor = () => {
 </template>
 
 
-<style scoped>
-
+<style>
+.added-line {
+  background: #abfac8;
+}
+.deleted-line {
+  background: #faa3a3;
+}
+.diff-detail-line {
+  background: #93d1f5;
+}
 </style>
