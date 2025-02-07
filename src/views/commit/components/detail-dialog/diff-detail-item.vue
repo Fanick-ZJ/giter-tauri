@@ -28,9 +28,9 @@ let diffDetailLines: Ref<number[]> = ref([])
 let decorations: monaco.editor.IEditorDecorationsCollection
 const success = ref<Boolean>(false)
 const loaded = ref<Boolean>(false)
-onMounted(() => {
-  // TODO: 判断是否为二进制文件
-  // TODO: 移除、新增数量判断
+
+// 暴露给外部调用，动态加载，避免拥堵
+const load = async () => {
   if (props.file.isBinary) {
     success.value = false
     loaded.value = true
@@ -91,8 +91,8 @@ onMounted(() => {
     }).finally(() => {
       loaded.value = true
     })
-  }
-})
+  }	
+}
 
 
 const modifRatiStyle = computed(() => {
@@ -100,6 +100,10 @@ const modifRatiStyle = computed(() => {
   return {
     background: `linear-gradient(to right, #4ade80 ${a * 100}%, #f87171 ${a * 100}%)`,
   }
+})
+
+defineExpose({
+  load
 })
 
 const editorContainer = ref<HTMLElement>();
@@ -222,7 +226,7 @@ const applyEditorStyle = () => {
 </script>
 
 <template>
-  <NCard :header-style="{ position: 'sticky', top: '0', background: 'white', zIndex: 3 }">
+  <NCard :header-style="{ position: 'sticky', top: '-1px', background: 'white', zIndex: 3 }">
     <template #header>
       <div>
         {{ file.path }}

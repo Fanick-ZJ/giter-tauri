@@ -26,11 +26,34 @@ const props = defineProps({
 
 const commitFiles = ref<File[]>()
 
+// 懒加载, 滚动到可视区域再加载, 避免卡顿
+const diffDetailRefs = ref<InstanceType<typeof DiffDetailComponent>[]>([])
+const loadedDefails = ref<Element[]>([])
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      if (loadedDefails.value.includes(entry.target)) return
+      const index = diffDetailRefs.value.findIndex(item => item.$el === entry.target)
+      diffDetailRefs.value[index].load()
+      loadedDefails.value.push(entry.target)
+    }
+  })
+})
+
 onMounted(async () => {
   commitFiles.value = await commitContent(props.repo, props.commitId)
   // 设置滚动条的z-index,在layout上设置了style无效
   containerRef.value!.querySelector('.n-scrollbar-rail')!.setAttribute('style', 'z-index: 4')
+  await nextTick()
+  diffDetailRefs.value.forEach(item => {
+    observer.observe(item.$el) 
+  })
+})
 
+onBeforeMount(() => {
+  diffDetailRefs.value.forEach(item => {
+    observer.observe(item.$el)
+  }) 
 })
 
 const __show = ref<Boolean>(false)
@@ -90,7 +113,7 @@ watch(size.height, async () => {
           :native-scrollbar="false">
           <NFlex>
             <template v-for="item in commitFiles" :key="item.objectId">
-              <DiffDetailComponent :repo="repo" :file="item" />
+              <DiffDetailComponent ref="diffDetailRefs" :repo="repo" :file="item" />
             </template>
           </NFlex>
         </NLayout>
