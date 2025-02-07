@@ -10,6 +10,8 @@ pub struct File {
     pub object_id: String,
     pub prev_object_id: String,
     pub blob_exist: bool,
+    pub is_binary: bool,
+    pub old_is_binary: bool,
 }
 
 impl File {
@@ -20,6 +22,8 @@ impl File {
         object_id: String,
         prev_object_id: String,
         blob_exist: bool,
+        is_binary: bool,
+        old_is_binary: bool,
     ) -> Self {
         Self {
             path,
@@ -28,6 +32,8 @@ impl File {
             object_id,
             prev_object_id,
             blob_exist,
+            is_binary,
+            old_is_binary,
         }
     }
 }

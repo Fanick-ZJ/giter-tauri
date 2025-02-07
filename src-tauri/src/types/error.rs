@@ -25,5 +25,6 @@ make_serializable! {
         ConvertOidError(String),        // 转换OID失败
         GetCommitContentError(String),  // 获取提交内容失败
         GetFileDiffError(String),       // 获取文件差异失败
+        GetFileContentError(String),    // 获取文件内容失败
     }
 }

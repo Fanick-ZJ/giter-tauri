@@ -50,6 +50,8 @@ export type File = {
   objectId: string
   prevObjectId: string
   blobExist: boolean
+  isBinary: boolean
+  oldIsBinary: boolean
 }
 
 export type Diff = {

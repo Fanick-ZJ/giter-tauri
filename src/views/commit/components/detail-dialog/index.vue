@@ -28,6 +28,8 @@ const commitFiles = ref<File[]>()
 
 onMounted(async () => {
   commitFiles.value = await commitContent(props.repo, props.commitId)
+  // 设置滚动条的z-index,在layout上设置了style无效
+  containerRef.value!.querySelector('.n-scrollbar-rail')!.setAttribute('style', 'z-index: 4')
 
 })
 
@@ -70,12 +72,7 @@ watch(size.height, async () => {
   } 
 })
 
-// 判断滚动条是否出现滚动条
-const isScroll = () => {
-  const container = containerRef.value
-  if (!container) return false
-  return container.querySelector('.n-scrollbar-rail:not(.n-scrollbar-rail--disabled)')
-}
+
 </script>
 
 <template>
@@ -87,7 +84,10 @@ const isScroll = () => {
     left-0 z-[3]">
     <NCard title="提交详情" class="w-[80%] h-[80%]" closable @close="close">
       <div class="h-full relative" ref="containerRef">
-        <NLayout class="absolute w-full" :style="containerStyle" :native-scrollbar="false">
+        <NLayout 
+          class="absolute w-full"
+          :style="containerStyle" 
+          :native-scrollbar="false">
           <NFlex>
             <template v-for="item in commitFiles" :key="item.objectId">
               <DiffDetailComponent :repo="repo" :file="item" />
@@ -101,5 +101,4 @@ const isScroll = () => {
 
 
 <style scoped>
-
 </style>

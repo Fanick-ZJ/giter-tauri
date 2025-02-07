@@ -1,4 +1,4 @@
-import { ADD_WATCH, COMMIT_CONTENT, FILE_DIFF, GET_AUTHORS, GET_BRANCHES, GET_COMMITS, GET_CURRENT_BRANCH, GET_DRIVER, GET_FOLDERS, GET_SEPARATOR, IS_REPO, REMOVE_WATCH, SET_OWNERSHIP, WORK_STATUS } from "@/const/command";
+import { ADD_WATCH, BLOB_CONTENT, COMMIT_CONTENT, FILE_DIFF, GET_AUTHORS, GET_BRANCHES, GET_COMMITS, GET_CURRENT_BRANCH, GET_DRIVER, GET_FOLDERS, GET_SEPARATOR, IS_REPO, REMOVE_WATCH, SET_OWNERSHIP, WORK_STATUS } from "@/const/command";
 import { RepoStatus } from "@/enum";
 import { Author, Branch, Commit, DiffContent, File } from "@/types";
 import { invoke } from "@tauri-apps/api/core";
@@ -60,4 +60,8 @@ export const commitContent = async (repo: RepoPath, cid: string) => {
 
 export const fileDiff = async (repo: RepoPath, old_id: string, new_id: string) => {
   return await invoke<DiffContent>(FILE_DIFF, { repo, old: old_id, 'new': new_id })
+}
+
+export const getBlobContent = async (repo: RepoPath, cid: string) => {
+  return await invoke<number[]>(BLOB_CONTENT, { repo, cid })
 }

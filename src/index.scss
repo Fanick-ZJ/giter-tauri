@@ -1,3 +1,14 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+
+.added-line {
+  background: #abfac8;
+}
+.deleted-line {
+  background: #faa3a3;
+}
+.diff-detail-line {
+  background: #93d1f5;
+}

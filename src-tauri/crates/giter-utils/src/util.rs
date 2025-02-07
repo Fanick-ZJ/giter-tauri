@@ -77,6 +77,8 @@ pub fn build_file_between_tree(
                     Some(path) => path.to_str().unwrap_or("").to_string(),
                     None => "".to_string(),
                 };
+                let is_binary = delta.new_file().is_binary();
+                let old_is_binary = delta.old_file().is_binary();
                 let file = File::new(
                     path,
                     size,
@@ -84,6 +86,8 @@ pub fn build_file_between_tree(
                     new_id.to_string(),
                     old_id.to_string(),
                     exist,
+                    is_binary,
+                    old_is_binary,
                 );
                 files.push(file);
             }

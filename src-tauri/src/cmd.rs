@@ -244,3 +244,18 @@ pub fn file_diff(repo: RepoPath, old: String, new: String) -> Result<ContentDiff
     }
     Ok(diff.unwrap())
 }
+
+#[tauri::command]
+pub fn blob_content(repo: RepoPath, cid: String) -> Result<Vec<u8>, CommandError> {
+    let provider = get_provider(&repo)?;
+    let oid = Oid::from_str(&cid);
+    if let Err(e) = oid {
+        return Err(CommandError::ConvertOidError(cid));
+    }
+    let commit_id = oid.unwrap();
+    let content = provider.get_blob_content(commit_id);
+    if let Err(e) = content {
+        return Err(CommandError::GetFileContentError(e.to_string()));
+    }
+    Ok(content.unwrap())
+}

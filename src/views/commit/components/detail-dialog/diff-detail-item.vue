@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, PropType, ref } from 'vue';
+import { computed, nextTick, onMounted, PropType, Ref, ref } from 'vue';
 import { DiffContent, File } from '@/types';
 import { NCard } from 'naive-ui';
 import * as monaco from 'monaco-editor';
 import { getMonacoLanguage } from '@/utils/tool';
-import { fileDiff } from '@/utils/command';
+import { fileDiff, getBlobContent } from '@/utils/command';
 
 defineOptions({
   name: 'DiffDetailComponent' 
@@ -22,44 +22,81 @@ const props = defineProps({
 })
 
 const diffContent = ref<DiffContent>()
-let addedLines: number[] = []
-let deletedLines: number[] = []
-let diffDetailLines: number[] = []
+let addedLines: Ref<number[]> = ref([])
+let deletedLines: Ref<number[]> = ref([])
+let diffDetailLines: Ref<number[]> = ref([])
 let decorations: monaco.editor.IEditorDecorationsCollection
 const success = ref<Boolean>(false)
+const loaded = ref<Boolean>(false)
 onMounted(() => {
-  fileDiff(props.repo, props.file.prevObjectId, props.file.objectId).then(async res => {
-    diffDetailLines = findDiffInfoLine(res.display)
-    const lines = splitModifLines(res.display)
-    addedLines = lines.added
-    deletedLines = lines.deleted
-    res.display = lines.content
-    diffContent.value = res
-    success.value = true
-    await nextTick()
-    initEditor()
-    decorations = applyEditorStyle()
-  }).catch(err => {
-    console.error(err)
+  // TODO: 判断是否为二进制文件
+  // TODO: 移除、新增数量判断
+  if (props.file.isBinary) {
     success.value = false
-  })
+    loaded.value = true
+    return
+  }
+  if (props.file.status === 'Added') {
+    getBlobContent(props.repo, props.file.objectId).then(async res => {
+      // 将u8数组转换为字符串
+      const view = new Uint8Array(res);
+      for (let i = 0; i < res.length; i++) {
+        view[i] = res[i];
+      }
+      const decoder = new TextDecoder('utf-8');
+      const str = decoder.decode(view)
+      success.value = true
+      addedLines.value = str.split('\n').map((_, i) => i)
+      
+      await nextTick()
+      initEditor(str)
+      decorations = applyEditorStyle()
+      loaded.value = true
+    })
+  }
+  else if (props.file.status === 'Deleted') {
+    getBlobContent(props.repo, props.file.prevObjectId).then(async res => {
+      // 将u8数组转换为字符串
+      const view = new Uint8Array(res);
+      const decoder = new TextDecoder('utf-8');
+      const str = decoder.decode(view)
+      success.value = true
+      deletedLines.value = str.split('\n').map((_, i) => i)
+
+      await nextTick()
+      initEditor(str)
+      decorations = applyEditorStyle()
+    }).catch(err => {
+      console.error(err)
+      success.value = false
+    }).finally(() => {
+      loaded.value = true
+    })
+  }
+  else {
+    fileDiff(props.repo, props.file.prevObjectId, props.file.objectId).then(async res => {
+      diffDetailLines.value = findDiffInfoLine(res.display)
+      const lines = splitModifLines(res.display)
+      addedLines.value = lines.added
+      deletedLines.value = lines.deleted
+      res.display = lines.content
+      diffContent.value = res
+      success.value = true
+      await nextTick()
+      initEditor(diffContent.value.display)
+      decorations = applyEditorStyle()
+    }).catch(err => {
+      console.error(err)
+      success.value = false
+    }).finally(() => {
+      loaded.value = true
+    })
+  }
 })
 
-const added = computed(() => {
- return diffContent.value?.ops.reduce((acc, opt) => {
-  if (opt.op == 'insert' || opt.op == 'replace') return acc + opt.new_len
-  return acc
- }, 0) || 0
-})
-const deleted = computed(() => {
-  return diffContent.value?.ops.reduce((acc, opt) => {
-    if (opt.op == 'delete' || opt.op =='replace') return acc + opt.old_len
-    return acc
-   }, 0) || 0
-})
 
 const modifRatiStyle = computed(() => {
-  const a = added.value / (added.value + deleted.value)
+  const a = addedLines.value.length / (addedLines.value.length + deletedLines.value.length)
   return {
     background: `linear-gradient(to right, #4ade80 ${a * 100}%, #f87171 ${a * 100}%)`,
   }
@@ -91,10 +128,10 @@ const updateEditorHeight = () => {
   editor.layout(); // 重新布局
 }
 
-const initEditor = () => {
+const initEditor = (content: string) => {
   if (!editorContainer.value) return;
   editor = monaco.editor.create(editorContainer.value, {
-    value: diffContent.value?.display || '',
+    value: content,
     language: getMonacoLanguage(props.file.path),
     minimap: {
       enabled: false,
@@ -109,6 +146,7 @@ const initEditor = () => {
   },
   readOnly: true,
 	contextmenu: false,
+  lineNumbers: 'off'
   });
   updateEditorHeight()
 };
@@ -149,7 +187,7 @@ const splitModifLines = (content: String) => {
   }
 }
 const applyEditorStyle = () => {
-  const addedDecorations: monaco.editor.IModelDeltaDecoration[] = addedLines.map((lineNumber: number) => {
+  const addedDecorations: monaco.editor.IModelDeltaDecoration[] = addedLines.value.map((lineNumber: number) => {
     return {
       range: new monaco.Range(lineNumber + 1, 1, lineNumber + 1, 1),
       options: {
@@ -158,7 +196,7 @@ const applyEditorStyle = () => {
       }
     }
   });
-  const deletedDecorations: monaco.editor.IModelDeltaDecoration[] = deletedLines.map((lineNumber: number) => {
+  const deletedDecorations: monaco.editor.IModelDeltaDecoration[] = deletedLines.value.map((lineNumber: number) => {
     return {
       range: new monaco.Range(lineNumber + 1, 1, lineNumber + 1, 1),
       options: {
@@ -167,7 +205,7 @@ const applyEditorStyle = () => {
       } 
     }
   })
-  const diffDetailDecorations: monaco.editor.IModelDeltaDecoration[] = diffDetailLines.map((lineNumber: number) => {
+  const diffDetailDecorations: monaco.editor.IModelDeltaDecoration[] = diffDetailLines.value.map((lineNumber: number) => {
     return {
       range: new monaco.Range(lineNumber + 1, 1, lineNumber + 1, 1),
       options: {
@@ -184,7 +222,7 @@ const applyEditorStyle = () => {
 </script>
 
 <template>
-  <NCard>
+  <NCard :header-style="{ position: 'sticky', top: '0', background: 'white', zIndex: 3 }">
     <template #header>
       <div>
         {{ file.path }}
@@ -193,10 +231,10 @@ const applyEditorStyle = () => {
     <template #header-extra>
       <div class="flex gap-1 items-center">
         <div class="text-green-400">
-          {{ + added  }}
+          {{ + addedLines.length  }}
         </div>
         <div class="text-red-400">
-          {{ + deleted  }}
+          {{ + deletedLines.length  }}
         </div>
         <div class="h-[10px] w-[30px]" :style="modifRatiStyle"></div>
       </div>
@@ -209,14 +247,5 @@ const applyEditorStyle = () => {
 </template>
 
 
-<style>
-.added-line {
-  background: #abfac8;
-}
-.deleted-line {
-  background: #faa3a3;
-}
-.diff-detail-line {
-  background: #93d1f5;
-}
+<style scoped>
 </style>

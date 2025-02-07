@@ -365,13 +365,14 @@ impl GitDataProvider {
             let path = path.join(entry.name().unwrap()).to_str().unwrap().to_string();
             let blob = self.repository.find_blob(entry.id());
             if blob.is_err() {
-                files.push(File::new(path, 0, FileStatus::Added, "0".repeat(20), "0".repeat(20), false));
+                files.push(File::new(path, 0, FileStatus::Added, "0".repeat(20), "0".repeat(20), false, false, false));
             } else {
                 let blob = blob.unwrap();
                 let size = blob.size();
                 let status = FileStatus::Added;
                 let object_id = entry.id().to_string();
-                files.push(File::new(path, size, status, object_id, "0".repeat(20), true));
+                let is_binary = blob.is_binary();
+                files.push(File::new(path, size, status, object_id, "0".repeat(20), true, is_binary, false));
             }
             1
         });
@@ -405,6 +406,8 @@ impl GitDataProvider {
                 .to_str()
                 .unwrap()
                 .to_string();
+            let is_binary = delta.new_file().is_binary();
+            let old_is_binary = delta.old_file().is_binary();
             let size = delta.new_file().size();
             let status = change_status_to_file_status(&delta.status());
             let new_blob = repo.find_blob(delta.new_file().id());
@@ -414,7 +417,7 @@ impl GitDataProvider {
                 Ok(blob) => (true, blob.content().to_vec()),
                 Err(_) => (false, Vec::new()),
             };
-            let file = File::new(path, size as usize, status, new_id, old_id, exist);
+            let file = File::new(path, size as usize, status, new_id, old_id, exist, is_binary, old_is_binary);
             files.push(file);
         }
         Ok(files)
@@ -422,14 +425,14 @@ impl GitDataProvider {
 
     /// 根据oid获取文件内容
     /// oid: 提交id
-    pub fn get_file_content(&self, oid: impl Into<Oid>) -> Result<String> {
+    pub fn get_blob_content(&self, oid: impl Into<Oid>) -> Result<Vec<u8>> {
         let oid = oid.into();
         let blob = self.repository.find_blob(oid);
         if blob.is_err() {
             return Err(anyhow::anyhow!("Blob not found"));
         }
         let blob = blob.unwrap();
-        Ok(String::from_utf8(blob.content().to_vec())?)
+        Ok(blob.content().to_vec())
     }
 
     /// 获取文件的差异
@@ -461,12 +464,12 @@ impl GitDataProvider {
     pub fn get_file_content_diff(&self, old: impl Into<Oid>, new: impl Into<Oid>) -> Result<ContentDiff> {
         let old = old.into();
         let new = new.into();
-        let old_blob = self.get_file_content(old)?;
-        let new_blob = self.get_file_content(new)?;
+        let old_blob = self.get_blob_content(old)?;
+        let new_blob = self.get_blob_content(new)?;
         let diff = self.get_file_diff(old, new)?;
         Ok(ContentDiff {
-            old: old_blob,
-            new: new_blob,
+            old: String::from_utf8(old_blob)?,
+            new: String::from_utf8(new_blob)?,
             ops: diff.0,
             display: diff.1
         })
