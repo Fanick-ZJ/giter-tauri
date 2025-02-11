@@ -37,7 +37,7 @@ export type Commit = {
   title: string,
   message: string,
   datetime: number,
-  parent_count: number,
+  parents: string[],
   repo: string
 }
 

@@ -1,3 +1,5 @@
+use std::io::Read;
+
 use anyhow::Result;
 use git2::{Commit as Git2Commit, Config, Delta, Oid, Repository};
 
@@ -12,7 +14,7 @@ pub fn has_git() -> bool {
     true
 }
 
-pub fn build_commit(commit: &Git2Commit, repo: String) -> Commit {
+pub fn build_commit(commit: &Git2Commit, repo: &Repository) -> Commit {
     let message = if let Some(message) = commit.message() {
         message.to_string()
     } else {
@@ -20,6 +22,11 @@ pub fn build_commit(commit: &Git2Commit, repo: String) -> Commit {
     };
     let committer = commit.committer();
     let author = commit.author();
+    let mut parents = commit.parent_ids().into_iter().collect::<Vec<Oid>>();
+    parents.sort_by(|a, b| {
+        repo.find_commit(*b).unwrap().time().seconds().cmp(&repo.find_commit(*a).unwrap().time().seconds())
+    });
+    let path = repo.workdir().unwrap().to_str().unwrap().to_string();
     Commit::new(
         commit.id().to_string(),
         author.name().unwrap_or("").to_string(),
@@ -29,8 +36,8 @@ pub fn build_commit(commit: &Git2Commit, repo: String) -> Commit {
         message.lines().next().unwrap_or("").to_string(),
         message,
         commit.time().seconds() * 1000,
-        commit.parent_ids().into_iter().count() as i64,
-        repo,
+        parents,
+        path,
     )
 }
 
@@ -136,4 +143,35 @@ pub fn set_owner(path: &str) -> Result<bool, git2::Error> {
         }
         Err(_) => todo!(),
     }
+}
+
+
+// 判断文件是否为二进制文件
+/// 返回 `Ok(true)` 表示是二进制文件，`Ok(false)` 表示是文本文件
+pub fn is_binary_file(path: &str) -> std::io::Result<bool> {
+    // 打开文件
+    let mut file = std::fs::File::open(path)?;
+    
+    // 读取前 1024 字节用于检测（可根据需要调整）
+    let mut buffer = [0; 1024];
+    let bytes_read = file.read(&mut buffer)?;
+    let content = &buffer[..bytes_read];
+
+    // 空字节检查
+    if content.contains(&0x00) {
+        return Ok(true);
+    }
+
+    // 统计不可打印的 ASCII 字符数量
+    let non_printable_count = content.iter().filter(|&&byte| {
+        // 允许的字符：制表符（\t）、换行（\n）、回车（\r）以及可打印 ASCII
+        !(byte == 0x09 || 
+          byte == 0x0A || 
+          byte == 0x0D || 
+          (byte >= 0x20 && byte <= 0x7E))
+    }).count();
+
+    // 如果不可打印字符超过 5%，视为二进制文件
+    let threshold = content.len() / 20; // 5%
+    Ok(non_printable_count > threshold)
 }

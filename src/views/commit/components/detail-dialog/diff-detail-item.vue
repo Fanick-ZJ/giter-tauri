@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, PropType, Ref, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, PropType, Ref, ref } from 'vue';
 import { DiffContent, File } from '@/types';
+import { Icon } from '@iconify/vue';
 import { NCard } from 'naive-ui';
 import * as monaco from 'monaco-editor';
 import { getMonacoLanguage } from '@/utils/tool';
@@ -25,15 +26,14 @@ const diffContent = ref<DiffContent>()
 let addedLines: Ref<number[]> = ref([])
 let deletedLines: Ref<number[]> = ref([])
 let diffDetailLines: Ref<number[]> = ref([])
-let decorations: monaco.editor.IEditorDecorationsCollection
 const success = ref<Boolean>(false)
-const loaded = ref<Boolean>(false)
+const loading = ref<Boolean>(true)
 
 // 暴露给外部调用，动态加载，避免拥堵
 const load = async () => {
   if (props.file.isBinary) {
     success.value = false
-    loaded.value = true
+    loading.value = false
     return
   }
   if (props.file.status === 'Added') {
@@ -50,8 +50,8 @@ const load = async () => {
       
       await nextTick()
       initEditor(str)
-      decorations = applyEditorStyle()
-      loaded.value = true
+      applyEditorStyle()
+      loading.value = false
     })
   }
   else if (props.file.status === 'Deleted') {
@@ -65,12 +65,12 @@ const load = async () => {
 
       await nextTick()
       initEditor(str)
-      decorations = applyEditorStyle()
+      applyEditorStyle()
     }).catch(err => {
       console.error(err)
       success.value = false
     }).finally(() => {
-      loaded.value = true
+      loading.value = false
     })
   }
   else {
@@ -84,12 +84,12 @@ const load = async () => {
       success.value = true
       await nextTick()
       initEditor(diffContent.value.display)
-      decorations = applyEditorStyle()
+      applyEditorStyle()
     }).catch(err => {
       console.error(err)
       success.value = false
     }).finally(() => {
-      loaded.value = true
+      loading.value = false
     })
   }	
 }
@@ -113,7 +113,6 @@ function calculateEditorHeight() {
   const lineHeight = editor.getOption(monaco.editor.EditorOption.lineHeight);
   const lineCount = editor.getModel()!.getLineCount();
   const scrollBeyondLastLine = editor.getOption(monaco.editor.EditorOption.scrollBeyondLastLine);
-  const scrollHeight = editor.getDomNode()!.scrollHeight;
 
   // 如果滚动条超出最后一行，调整高度
   if (scrollBeyondLastLine) {
@@ -131,6 +130,10 @@ const updateEditorHeight = () => {
   editor.getDomNode()!.style.height = `${height}px`; // 设置高度
   editor.layout(); // 重新布局
 }
+
+onBeforeUnmount(() => {
+  editor && editor.dispose();	
+})
 
 const initEditor = (content: string) => {
   if (!editorContainer.value) return;
@@ -243,8 +246,11 @@ const applyEditorStyle = () => {
         <div class="h-[10px] w-[30px]" :style="modifRatiStyle"></div>
       </div>
     </template>
+    <div v-if="loading" class="w-full h-full flex justify-center items-center">
+      <Icon icon="eos-icons:bubble-loading" width="24" height="24" />
+    </div>
     <div v-if="success" ref="editorContainer"></div>
-    <div v-else>
+    <div v-if="!loading && !success">
       加载失败
     </div>
   </NCard>

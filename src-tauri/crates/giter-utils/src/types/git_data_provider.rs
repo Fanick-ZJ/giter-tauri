@@ -1,8 +1,9 @@
 use crate::util::build_commit;
 use crate::util::change_status_to_file_status;
+use crate::util::is_binary_file;
 use anyhow::Result;
 use git2::TreeWalkMode;
-use git2::{BranchType, Config, ErrorCode, Oid, Repository, Revwalk, Status};
+use git2::{BranchType, Oid, Repository, Revwalk, Status};
 use log::error;
 use similar::DiffOp;
 use similar::TextDiff;
@@ -11,12 +12,14 @@ use std::collections::HashSet;
 use std::fmt::Pointer;
 use std::path;
 use std::path::Path;
+use std::path::PathBuf;
 use std::vec;
 use types::{author::Author, branch::Branch, commit::Commit, status::WorkStatus};
 
 use super::cache::Cache;
 use super::diff::ContentDiff;
 use super::file::File;
+use super::file::UntrackedFile;
 use super::status::FileStatus;
 pub struct GitDataProvider {
     pub repository: Repository,
@@ -53,25 +56,36 @@ impl GitDataProvider {
         self.cache = RefCell::new(Some(Box::new(cache)));
     }
 
-    pub fn workdir(&self) -> String {
-        self.repository
-            .workdir()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string()
+    pub fn workdir(&self) -> &Path {
+        self.repository.workdir().unwrap()
+    }
+
+    fn blob_path<T: AsRef<Path>>(&self, path: T) -> Result<PathBuf> {
+        let path = path.as_ref();
+        let path = self.workdir().join(path);
+        Ok(path)
+    }
+
+    fn blob_size_by_path<T: AsRef<Path>>(&self, path: T) -> Result<u64> {
+        let path = self.blob_path(path)?;
+        let metadata = path.metadata()?;
+        Ok(metadata.len())
     }
 
     /// 获取位追踪的文件列表
     ///
-    pub fn untracked_files(&self) -> Result<Vec<String>> {
+    pub fn untracked_files(&self) -> Result<Vec<UntrackedFile>> {
         let status = self.repository.statuses(None);
-        let mut untracks: Vec<String> = Vec::new();
+        let mut untracks: Vec<UntrackedFile> = Vec::new();
         match status {
             Ok(status) => {
                 for item in &status {
                     if item.status() == Status::WT_NEW {
-                        untracks.push(item.path().unwrap_or("").to_string());
+                        let path = item.path().unwrap();
+                        let size = self.blob_size_by_path(path)? as usize;
+                        let is_binary = is_binary_file(path)?;
+                        let untracked_file = UntrackedFile::new(path, size, is_binary);
+                        untracks.push(untracked_file);
                     }
                 }
             }
@@ -79,6 +93,7 @@ impl GitDataProvider {
         }
         Ok(untracks)
     }
+
     ///工作空间是否有修改
     ///
     pub fn workspace_change(&self) -> Result<Vec<String>, git2::Error> {
@@ -86,13 +101,13 @@ impl GitDataProvider {
         let mut modified: Vec<String> = Vec::new();
         match status {
             Ok(status) => {
+                let index_status = Status::WT_DELETED.bits()
+                    | Status::WT_MODIFIED.bits()
+                    | Status::WT_NEW.bits()
+                    | Status::WT_RENAMED.bits()
+                    | Status::WT_TYPECHANGE.bits();
                 for item in &status {
                     let bits = item.status().bits();
-                    let index_status = Status::WT_DELETED.bits()
-                        | Status::WT_MODIFIED.bits()
-                        | Status::WT_NEW.bits()
-                        | Status::WT_RENAMED.bits()
-                        | Status::WT_TYPECHANGE.bits();
                     if bits & index_status > 0 {
                         modified.push(item.path().unwrap_or("").to_string());
                     }
@@ -298,7 +313,7 @@ impl GitDataProvider {
         for (i, id) in revwalk.by_ref().take(count as usize).enumerate() {
             let id = id?;
             let commit = self.repository.find_commit(id)?;
-            let commit = build_commit(&commit, self.workdir());
+            let commit = build_commit(&commit, &self.repository);
             commits.push(commit);
         }
         Ok(commits)
@@ -379,6 +394,12 @@ impl GitDataProvider {
         Ok(files)
     }
 
+    pub fn get_commit (&self, commit_id: impl Into<Oid>) -> Result<Commit> {
+        let commit = self.repository.find_commit(commit_id.into())?;
+        let commit = build_commit(&commit, &self.repository);
+        Ok(commit)
+    }
+
     /// 获取一个提交的内容
     ///
     pub fn commit_content(&self, commit_id: impl Into<Oid>) -> Result<Vec<File>> {
@@ -455,7 +476,7 @@ impl GitDataProvider {
         let old_content = String::from_utf8(old_blob.content().to_vec())?;
         let new_content = String::from_utf8(new_blob.content().to_vec())?;
         let diff = TextDiff::from_lines(&old_content, &new_content);
-        let diff_display = diff.unified_diff().to_string();
+        let diff_display = diff.unified_diff().missing_newline_hint(false).to_string();
         Ok((diff.ops().iter().map(|op| op.clone()).collect(), diff_display))
     }
 

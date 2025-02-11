@@ -26,5 +26,6 @@ make_serializable! {
         GetCommitContentError(String),  // 获取提交内容失败
         GetFileDiffError(String),       // 获取文件差异失败
         GetFileContentError(String),    // 获取文件内容失败
+        GetCommitError(String),         // 获取提交失败
     }
 }

@@ -1,5 +1,5 @@
 import { upToDataElement } from "@/components/repo-home/util"
-import { commitContent } from "@/utils/command"
+import { commitContent, getBranchCommits } from "@/utils/command"
 import { nextTick, ref } from "vue"
 import { useCommitDetailDialog } from "./components/detail-dialog"
 
@@ -13,10 +13,6 @@ export const useContextMenu = () => {
     {
       key: 'detail',
       label: '详情'
-    },
-    {
-      key: 'commit-graph',
-      label: '提交图' 
     }
   ]
   const handleContextMenu = (e: MouseEvent) => {
@@ -45,9 +41,6 @@ export const useContextMenu = () => {
         commitId,
         repo: repo.value
       })
-    }
-    if (key === 'commit-graph') {
-      console.log('commit-graph') 
     }
     showMenu.value = false
   }

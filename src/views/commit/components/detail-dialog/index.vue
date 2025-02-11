@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeMount, onMounted, StyleValue, useTemplateRef, watch } from 'vue';
-import { File } from '@/types';
+import { computed, nextTick, onBeforeMount, onBeforeUnmount, onMounted, onUnmounted, StyleValue, useTemplateRef, watch } from 'vue';
+import { Commit, File } from '@/types';
 
 import { ref } from 'vue';
-import { NCard, NFlex, NLayout } from 'naive-ui';
-import { commitContent, fileDiff } from '@/utils/command';
+import { NCard, NFlex, NLayout, NTag } from 'naive-ui';
+import { commitContent, fileDiff, getCommit } from '@/utils/command';
 import { useElementSize } from '@vueuse/core';
 import DiffDetailComponent from './diff-detail-item.vue';
 
@@ -25,22 +25,22 @@ const props = defineProps({
 })
 
 const commitFiles = ref<File[]>()
+const commit = ref<Commit>()
 
 // 懒加载, 滚动到可视区域再加载, 避免卡顿
 const diffDetailRefs = ref<InstanceType<typeof DiffDetailComponent>[]>([])
-const loadedDefails = ref<Element[]>([])
 const observer = new IntersectionObserver(entries => {
   entries.forEach(entry => {
     if (entry.isIntersecting) {
-      if (loadedDefails.value.includes(entry.target)) return
       const index = diffDetailRefs.value.findIndex(item => item.$el === entry.target)
       diffDetailRefs.value[index].load()
-      loadedDefails.value.push(entry.target)
+      observer.unobserve(entry.target)
     }
   })
 })
 
 onMounted(async () => {
+  commit.value = await getCommit(props.repo, props.commitId)
   commitFiles.value = await commitContent(props.repo, props.commitId)
   // 设置滚动条的z-index,在layout上设置了style无效
   containerRef.value!.querySelector('.n-scrollbar-rail')!.setAttribute('style', 'z-index: 4')
@@ -50,10 +50,11 @@ onMounted(async () => {
   })
 })
 
-onBeforeMount(() => {
+onBeforeUnmount(() => {
   diffDetailRefs.value.forEach(item => {
     observer.observe(item.$el)
   }) 
+  observer.disconnect()
 })
 
 const __show = ref<Boolean>(false)
@@ -81,9 +82,6 @@ defineExpose({
   close
 })
 
-const loading = ref<Boolean>(false)
-const noMore = ref<Boolean>(false)
-
 // 为了滚动框高度自适应
 const containerRef = ref<HTMLElement>()
 const size = useElementSize(containerRef)
@@ -106,6 +104,30 @@ watch(size.height, async () => {
     fixed top-0 
     left-0 z-[3]">
     <NCard title="提交详情" class="w-[80%] h-[80%]" closable @close="close">
+      <template #header-extra>
+        <div class="flex gap-3">
+          <div class="flex items-center">
+            <span class="font-medium text-gray-600">
+              父节点
+            </span>
+            <div class="flex gap-1">
+              <template v-for="item in commit?.parents">
+                <NTag :type="'info'" class="ml-2">
+                  {{item.slice(0, 7)}}
+                </NTag>
+              </template>
+            </div>
+          </div>
+          <div class="flex items-center">
+            <span class="font-medium text-gray-600">
+              当前节点
+            </span>
+            <NTag :type="'success'" class="ml-2">
+              {{commit?.commitId.slice(0, 7)}}
+            </NTag>
+          </div>
+        </div>
+      </template>
       <div class="h-full relative" ref="containerRef">
         <NLayout 
           class="absolute w-full"

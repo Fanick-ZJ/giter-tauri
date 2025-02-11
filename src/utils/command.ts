@@ -1,4 +1,4 @@
-import { ADD_WATCH, BLOB_CONTENT, COMMIT_CONTENT, FILE_DIFF, GET_AUTHORS, GET_BRANCHES, GET_COMMITS, GET_CURRENT_BRANCH, GET_DRIVER, GET_FOLDERS, GET_SEPARATOR, IS_REPO, REMOVE_WATCH, SET_OWNERSHIP, WORK_STATUS } from "@/const/command";
+import { ADD_WATCH, BLOB_CONTENT, COMMIT_CONTENT, FILE_DIFF, GET_AUTHORS, GET_BRANCHES, GET_COMMIT, GET_BRANCH_COMMITS, GET_CURRENT_BRANCH, GET_DRIVER, GET_FOLDERS, GET_SEPARATOR, IS_REPO, REMOVE_WATCH, SET_OWNERSHIP, WORK_STATUS } from "@/const/command";
 import { RepoStatus } from "@/enum";
 import { Author, Branch, Commit, DiffContent, File } from "@/types";
 import { invoke } from "@tauri-apps/api/core";
@@ -47,7 +47,7 @@ export const getCurrentBranch = async (repo: RepoPath) : Promise<Branch> => {
 }
 
 export const getBranchCommits = async (repo: RepoPath, branch: Branch, count: Number) => {
-  return await invoke<Commit[]>(GET_COMMITS, { repo, branch, count }) 
+  return await invoke<Commit[]>(GET_BRANCH_COMMITS, { repo, branch, count }) 
 }
 
 export const getAuthors = async (repo: RepoPath, branch: Branch) => {
@@ -56,6 +56,10 @@ export const getAuthors = async (repo: RepoPath, branch: Branch) => {
 
 export const commitContent = async (repo: RepoPath, cid: string) => {
   return await invoke<File[]>(COMMIT_CONTENT, { repo, cid })
+}
+
+export const getCommit = async (repo: RepoPath, cid: string) => {
+  return await invoke<Commit>(GET_COMMIT, { repo, cid})
 }
 
 export const fileDiff = async (repo: RepoPath, old_id: string, new_id: string) => {

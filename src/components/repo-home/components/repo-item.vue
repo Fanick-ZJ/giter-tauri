@@ -47,6 +47,11 @@ const toCommit = () => {
   })
   _viewExtend!()
 }
+
+const toGraph = async () => {
+
+}
+
 </script>
 <template>
   <!-- 若仓库为无效仓库，就添加斜线标志 -->
@@ -84,8 +89,8 @@ const toCommit = () => {
             z-[2]"
         :class="mouseHover ? 'right-[calc(var(--n-padding-left)*-1)]' : 'right-[calc(var(--n-padding-left)*-3)]'"
         @mouseleave="onLeave">
-        <div @click.stop='toCommit'><Icon icon="iconoir:git-fork" width="24" height="24" /></div>
-        <div><Icon icon="uil:statistics" width="24" height="24" /></div>
+        <div @click.stop='toCommit'><Icon icon="fluent:book-24-regular" width="24" height="24" /></div>
+        <div @click.stop='toGraph'><Icon icon="cil:graph" width="24" height="24" /></div>
       </Glassmorphism>
     </div>
   </NCard>

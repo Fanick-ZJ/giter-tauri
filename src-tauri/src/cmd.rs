@@ -259,3 +259,18 @@ pub fn blob_content(repo: RepoPath, cid: String) -> Result<Vec<u8>, CommandError
     }
     Ok(content.unwrap())
 }
+
+#[tauri::command]
+pub fn get_commit(repo: RepoPath, cid: String) -> Result<Commit, CommandError> {
+    let provider = get_provider(&repo)?;
+    let oid = Oid::from_str(&cid);
+    if let Err(e) = oid {
+        return Err(CommandError::ConvertOidError(cid));
+    }
+    let commit_id = oid.unwrap();
+    let commit = provider.get_commit(commit_id);
+    if let Err(e) = commit {
+        return Err(CommandError::GetCommitError(e.to_string()));
+    }
+    Ok(commit.unwrap())
+}
