@@ -9,6 +9,7 @@ import Glassmorphism from '@/components/common/glassmorphism.vue';
 import StatusLight from './status-light.vue';
 import { viewExtend } from '@/types/key';
 import { useRouter } from 'vue-router';
+import { getBranchCommitContribution, getCurrentBranch } from '@/utils/command';
 
 const props = defineProps({
   repo: {
@@ -48,8 +49,15 @@ const toCommit = () => {
   _viewExtend!()
 }
 
-const toGraph = async () => {
-
+const toContribution = async () => {
+  if (!validTip()) return
+  router.push({
+    name: 'contribution',
+    params: {
+      path: props.repo.path
+    } 
+  })
+  _viewExtend!()
 }
 
 </script>
@@ -90,7 +98,7 @@ const toGraph = async () => {
         :class="mouseHover ? 'right-[calc(var(--n-padding-left)*-1)]' : 'right-[calc(var(--n-padding-left)*-3)]'"
         @mouseleave="onLeave">
         <div @click.stop='toCommit'><Icon icon="fluent:book-24-regular" width="24" height="24" /></div>
-        <div @click.stop='toGraph'><Icon icon="cil:graph" width="24" height="24" /></div>
+        <div @click.stop='toContribution'><Icon icon="cil:graph" width="24" height="24" /></div>
       </Glassmorphism>
     </div>
   </NCard>

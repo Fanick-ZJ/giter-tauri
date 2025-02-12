@@ -1,6 +1,8 @@
 use crate::util::build_commit;
 use crate::util::change_status_to_file_status;
 use crate::util::is_binary_file;
+use crate::util::second_to_date;
+use anyhow::Error;
 use anyhow::Result;
 use git2::TreeWalkMode;
 use git2::{BranchType, Oid, Repository, Revwalk, Status};
@@ -8,6 +10,7 @@ use log::error;
 use similar::DiffOp;
 use similar::TextDiff;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Pointer;
 use std::path;
@@ -17,6 +20,8 @@ use std::vec;
 use types::{author::Author, branch::Branch, commit::Commit, status::WorkStatus};
 
 use super::cache::Cache;
+use super::commit;
+use super::contribution::CommitStatistic;
 use super::diff::ContentDiff;
 use super::file::File;
 use super::file::UntrackedFile;
@@ -59,6 +64,14 @@ impl GitDataProvider {
     pub fn workdir(&self) -> &Path {
         self.repository.workdir().unwrap()
     }
+
+    pub fn author(&self) -> Result<Author> {
+        let config = self.repository.config()?;
+        let name = config.get_string("user.name")?;
+        let email = config.get_string("user.email")?;
+        Ok(Author { name, email })
+    }
+
 
     fn blob_path<T: AsRef<Path>>(&self, path: T) -> Result<PathBuf> {
         let path = path.as_ref();
@@ -343,7 +356,7 @@ impl GitDataProvider {
         Ok(commits)
     }
 
-    /// 获取分支所有提交，git2中的提交对象
+    /// 获取分支所有提交(分支的最后一次提交)，git2中的提交对象
     fn branch_commit_inner(&self, branch: &Branch) -> Result<git2::Commit> {
         let b_type = if branch.is_remote {
             BranchType::Remote
@@ -524,32 +537,99 @@ impl GitDataProvider {
                 author.email().unwrap().to_string(),
             ));
         }
-        let lasted_id = branch_commit.id().to_string();
+        let lasted_id = branch_commit.id();
         let authors: Vec<Author> = author_set.into_iter().collect();
         // 3. 设置缓存
-        self.set_authors_cache(authors.clone(), branch, lasted_id.parse()?);
+        self.set_authors_cache(authors.clone(), branch, &lasted_id);
         Ok(authors)
+    }
+
+    
+    pub fn get_branch_commit_contribution(&self, branch: &Branch) -> Result<Vec<CommitStatistic>> {
+        let authors = self.authors(branch)?;
+        let commits = self.branch_commit_inner(branch)?;
+        let mut revwalk = self.repository.revwalk()?;
+        revwalk.push(commits.id())?;
+        let mut map = HashMap::<String, CommitStatistic>::new();
+        let cache = self.branch_contribution_cache(branch);
+        if let Some(cache) = cache {
+            map.extend(cache.0);
+            revwalk.hide(cache.1)?;
+        }
+        for commit in revwalk.by_ref().into_iter() {
+            if let Ok(commit) = commit {
+                let commit = self.repository.find_commit(commit)?;
+                let author = commit.author();
+                let email = author.email().unwrap().to_string();
+                let time = second_to_date(commit.time().seconds());
+                if let Err(_) = time {
+                    continue;
+                }
+                let time = time.unwrap();
+                if !map.contains_key(email.as_str()) {
+                    let author = authors.iter().find(|a| a.email == email);
+                    if let None = author {
+                        continue;
+                    }
+                    let author = author.unwrap().clone();
+                    map.insert(email.clone(), CommitStatistic::new(self.workdir().to_path_buf(), branch.clone(), author));      
+                }
+                let stat = map.get_mut(email.as_str()).unwrap();
+                let _ = stat.add(time, 1);
+            } else {
+                continue;
+            }
+        }
+        // 获取最后一次提交的id
+        let lasted_id = commits.id();
+        self.set_branch_contribution_cache(branch, &map, &lasted_id);
+        Ok(map.into_values().collect())
     }
 
     /// 获取提交者缓存
     fn authors_cache(&self, branch: &Branch) -> Option<(Vec<Author>, Oid)> {
         if let Some(cache) = self.cache.borrow().as_ref() {
             let authors = cache.branch_authors(self.repository.path().to_str().unwrap(), branch);
-            if let Some((authors, last_commit_id)) = authors {
-                return Some((authors, last_commit_id));
+            if let Some((authors, latest_commit_id)) = authors {
+                return Some((authors, latest_commit_id));
             }
         }
         None
     }
+
+    /// 获取分支的贡献者统计
+    /// 
+    pub fn branch_contribution_cache(&self, branch: &Branch) -> Option<(HashMap<String, CommitStatistic>, Oid)> {
+        if let Some(cache) = self.cache.borrow().as_ref() {
+            let contrib = cache.branch_contribution(self.repository.path().to_str().unwrap(), branch);
+            if let Some((contrib, latest_commit_id)) = contrib {
+                return Some((contrib, latest_commit_id));
+            }
+        }
+        None
+    }
+    /// 设置分支的贡献者统计
+    /// 
+    pub fn set_branch_contribution_cache(
+        &self,
+        branch: &Branch,
+        contrib: &HashMap<String, CommitStatistic>,
+        latest_commit_id: &Oid,
+    ) {
+        if let Some(cache) = self.cache.borrow_mut().as_mut() {
+            let path = self.repository.path().to_str().unwrap();
+            cache.set_branch_contribution(path, branch, contrib, latest_commit_id);
+        }
+    }
     /// 设置提交者缓存
     ///
-    pub fn set_authors_cache(&self, authors: Vec<Author>, branch: &Branch, lasted_id: Oid) {
+    pub fn set_authors_cache(&self, authors: Vec<Author>, branch: &Branch, lasted_id: &Oid) {
         if let Some(cache) = self.cache.borrow_mut().as_mut() {
             cache.set_authors(
                 self.repository.path().to_str().unwrap(),
                 &authors,
                 branch,
-                &lasted_id,
+                lasted_id,
             );
         }
     }
@@ -570,6 +650,12 @@ mod tests {
             "test_untracked_files: {:?}",
             provider.untracked_files().unwrap()
         );
+    }
+
+    #[test]
+    fn test_get_author() {
+        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
+        println!("test_get_author: {:?}", provider.author().unwrap());
     }
 
     #[test]

@@ -6,3 +6,4 @@ pub mod file;
 pub mod git_data_provider;
 pub mod status;
 pub mod diff;
+pub mod contribution;

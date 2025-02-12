@@ -11,6 +11,11 @@ export const router = createRouter({
       name: "commit",
       path: "/commit/:id",
       component: () => import("@/views/commit/index.vue")
+    },
+    {
+      name: "contribution",
+      path: "/contribution/:path",
+      component: () => import("@/views/contribution/index.vue") 
     }
   ]
 })

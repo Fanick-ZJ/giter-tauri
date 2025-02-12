@@ -1,5 +1,5 @@
-use crate::core::handle;
-use giter_utils::types::{git_data_provider::GitDataProvider, status::WorkStatus};
+use crate::{core::handle, types::error::CommandError};
+use giter_utils::types::{contribution::CommitStatistic, git_data_provider::GitDataProvider, status::WorkStatus};
 use giter_watcher::types::modify_watcher::ModifyWatcher;
 use notify::Event;
 use serde::{Deserialize, Serialize};
@@ -51,5 +51,16 @@ pub fn repos_modified_emit_cb() -> fn(Event) {
         }
 
         // app.emit("emit_test", event.paths);
+    }
+}
+
+
+pub fn emit_branch_contribution(key: &str, value: anyhow::Result<Vec<CommitStatistic>>) {
+    let app = handle::Handle::global().app_handle().unwrap();
+    if let Err(e) = value {
+        let _ = app.emit(&format!("giter://branch_contribution/{}", key), e.to_string());
+    }
+    else {
+        let _ = app.emit(&format!("giter://branch_contribution/{}", key), value.unwrap());
     }
 }

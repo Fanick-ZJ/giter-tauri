@@ -53,16 +53,24 @@ pub fn init_cache() -> Result<()> {
         fs::create_dir_all(&database_path)?;
     }
     let cache_path = database_path.join("cache.db");
+    println!("{:?}", cache_path);
     let conn = Connection::open(cache_path)?;
-    conn.execute(
+    conn.execute_batch(
         "create table if not exists branch_author (
         id integer primary key autoincrement,
         path text not null,
         branch text not null,
         authors text not null,
-        last_commit_id varchar(20) not null
-      )",
-        (),
+        latest_commit_id varchar(20) not null
+      );
+      create table if not exists contribution (
+        id integer primary key autoincrement,
+        path text not null,
+        branch text not null,
+        contributors text not null,
+        latest_commit_id varchar(20) not null
+      );
+      "
     )?;
     Ok(())
 }

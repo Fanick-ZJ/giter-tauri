@@ -6,14 +6,9 @@ mod utils;
 
 use crate::utils::resolve;
 use cmd::{
-    add_watch, authors, blob_content, branch_commits, branches, clear_all_cache, clear_cache, commit_content, current_branch, file_diff, get_commit, get_db_path, get_driver, get_folders, get_separator, is_repo, remove_watch, repos, set_repo_ownership, work_status
+    add_watch, authors, blob_content, branch_commits, branches, clear_all_cache, clear_cache, commit_content, current_branch, file_diff, get_branch_commit_contribution, get_commit, get_db_path, get_driver, get_folders, get_global_author, get_repo_author, get_separator, is_repo, remove_watch, repos, set_repo_ownership, work_status
 };
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -49,7 +44,10 @@ pub fn run() {
             commit_content,
             file_diff,
             blob_content,
-            get_commit
+            get_commit,
+            get_branch_commit_contribution,
+            get_global_author,
+            get_repo_author
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

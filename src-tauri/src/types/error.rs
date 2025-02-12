@@ -3,7 +3,7 @@ use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
 
 make_serializable! {
-    #[derive(Deserialize, Debug)]
+    #[derive(Deserialize, Debug, Clone)]
     pub enum CommandError {
         RepositoryHasWatched(String),   // 仓库已经被监听
         AddWatcherError(String),        // 添加监听失败
@@ -27,5 +27,8 @@ make_serializable! {
         GetFileDiffError(String),       // 获取文件差异失败
         GetFileContentError(String),    // 获取文件内容失败
         GetCommitError(String),         // 获取提交失败
+        GetBranchCommitContributionError(String), // 获取分支提交贡献失败
+        GetGlobalAuthorError(String),   // 获取全局作者失败
+        GetRepoAuthorError(String),     // 获取仓库作者失败
     }
 }

@@ -75,6 +75,13 @@ export type DiffContent = {
   ops: DiffOpt[],
   display: string
 }
+type DateStr = string
+export type CommitStatistic = {
+  repo: string,
+  branch: Branch,
+  authors: Author,
+  stats: {[key in DateStr]: number}[]
+}
 
 declare global {
   interface Window {

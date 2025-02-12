@@ -1,20 +1,18 @@
 use crate::{
-    core::handle,
-    types::{cache::RepoPath, error::CommandError, fs::Dir, store},
-    utils::{
+    core::handle, emit::emit_branch_contribution, types::{cache::RepoPath, error::CommandError, fs::Dir, store}, utils::{
         dirs,
         fs::{get_first_level_dirs, get_logical_driver},
-    },
+    }
 };
 use git2::Oid;
 use giter_utils::{
     types::{
-        author::Author, branch::Branch, cache::Cache, commit::Commit, diff::ContentDiff, file::File, git_data_provider::GitDataProvider, status::WorkStatus
+        author::Author, branch::Branch, cache::Cache, commit::Commit, contribution::CommitStatistic, diff::ContentDiff, file::File, git_data_provider::GitDataProvider, status::WorkStatus
     },
     util::{is_git_repo, set_owner},
 };
 use giter_watcher::types::modify_watcher::ModifyWatcher;
-use std::sync::Mutex;
+use std::{sync::Mutex, thread};
 use tauri::Manager;
 
 fn get_provider(repo: &str) -> Result<GitDataProvider, CommandError> {
@@ -273,4 +271,34 @@ pub fn get_commit(repo: RepoPath, cid: String) -> Result<Commit, CommandError> {
         return Err(CommandError::GetCommitError(e.to_string()));
     }
     Ok(commit.unwrap())
+}
+
+#[tauri::command]
+pub fn get_branch_commit_contribution(key: String, repo: RepoPath, branch: Branch) -> Result<(), CommandError> {
+    let provider = get_provider(&repo)?;
+    // 由于第一次执行时间很长，所以开一个线程执行
+    thread::spawn(move || {
+        let contrib = provider.get_branch_commit_contribution(&branch);
+        emit_branch_contribution(&key, contrib);
+    });
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_global_author() -> Result<Author, CommandError> {
+    let author = giter_utils::util::get_global_git_author();
+    if let Err(e) = author {
+        return Err(CommandError::GetGlobalAuthorError(e.to_string()));
+    }
+    Ok(author.unwrap())
+}
+
+#[tauri::command]
+pub fn get_repo_author(repo: RepoPath) -> Result<Author, CommandError> {
+    let provider = get_provider(&repo)?;
+    let author = provider.author();
+    if let Err(e) = author {
+        return Err(CommandError::GetRepoAuthorError(e.to_string()));
+    }
+    Ok(author.unwrap())
 }

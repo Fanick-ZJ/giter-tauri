@@ -7,8 +7,8 @@ version = "0.0.1"
 parking_lot = "0.12.3"
 bitflags = "2.8.0"
 similar = { version = "2.7.0", features = ["serde"]}
+regex = "1"
 git2 = "0.20.0"
-gix-discover = "0.37.0"
 serde = { version = "1.0.216", features = ["derive"] }
 imara-diff = "0.1.7"
 log = "0.4.22"
