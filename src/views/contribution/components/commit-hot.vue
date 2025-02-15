@@ -73,6 +73,10 @@ const clearWeekDayList = () => {
 }
 const weekDayList = ref<(DayStat | undefined)[][]>(_.times(7, () => _.times(53, () => undefined)))
 
+watch(() => props.stats, (newVal) => {
+  currentYear.value = newVal[0].year
+}, {immediate: true})
+
 watch(() => currentYearDayStat.value,  (newVal) => {
   clearWeekDayList()
   newVal.forEach((day: DayStat) => {

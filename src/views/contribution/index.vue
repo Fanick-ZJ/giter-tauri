@@ -18,6 +18,7 @@ const branches = ref<Branch[]>([])
 const currentBranch = ref<Branch>()
 const contribution = ref<CommitStatistic[]>([])
 const curAuthor = ref<Author>()
+const myAuthor = ref<Author>()
 const authors = ref<Author[]>([])
 const globalAuthor = ref<Author>()
 
@@ -64,6 +65,7 @@ const init = async () => {
     }
     // 设置默认显示的作者
     // 显示顺序为：仓库作者，全局作者，第一个作者
+    myAuthor.value = repoAuthor || globalAuthor
     let email = repoAuthor?.email || globalAuthor?.email || authors.value[0].email
     curAuthor.value = authors.value.find((author) => {
       return author.email === email
@@ -139,6 +141,14 @@ const selectedContribution = computed(() => {
   return yearStats
 })
 
+const isMe = computed(() => {
+  if (!myAuthor.value) {
+    return false 
+  }
+  console.log(myAuthor.value.email, curAuthor.value?.email)
+  return  myAuthor.value.email === curAuthor.value?.email
+})
+
 const handleSwitchYear = (year: number) => {
  console.log(year) 
 }
@@ -169,12 +179,18 @@ const handleClick = (date: string) => {
           <div class="flex relative" v-if="curAuthor || globalAuthor">
             <HashAvatar :author="curAuthor || globalAuthor || emptyAuthor" :width="80" :borderRadius="15"/>
             <div class="flex flex-col ml-5">
-              <div class="text-4xl font-bold">{{curAuthor?.name || globalAuthor?.name}}</div>
-              <div class="text-xl text-slate-500">{{curAuthor?.email || globalAuthor?.email}}</div>
+              <div class="text-4xl font-bold">
+                <span>{{curAuthor?.name || globalAuthor?.name}}</span>
+                <span v-if="isMe">[我]</span>
+              </div>
+              <div class="text-xl text-slate-500">
+                <span>{{curAuthor?.email || globalAuthor?.email}}</span>
+              </div>
             </div>
             <NSelect 
               class="w-[200px] absolute right-0 top-0"
               placeholder="选择作者"
+              filterable
               v-model:value="selectedAuthor" :options="authorOptions"/>
           </div>
           <CommitHot @date-click="handleClick" @switch-year="handleSwitchYear" :stats="selectedContribution"/>
