@@ -115,3 +115,25 @@ export function getMonacoLanguage(fileName: string) {
   // @ts-ignore
   return languageMapping[fileExtension] || 'plaintext';
 }
+
+export const getWeekNumber = (date: Date) => {
+  var target  = new Date(date.valueOf());
+  var dayNr   = (date.getDay() + 6) % 7;
+  target.setDate(target.getDate() - dayNr + 3);
+  var firstThursday = target.valueOf();
+  target.setMonth(0, 1);
+  if (target.getDay() != 4) {
+      target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+  }
+  return Math.ceil((firstThursday - target.getTime()) / 604800000);
+}
+
+/**
+ * 获取每个月的天数
+ * @param date 
+ */
+export const getDaysOfMonth = (year: number) => {
+  const isLeapYear = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  const daysInMonth = [31, isLeapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return daysInMonth;
+}

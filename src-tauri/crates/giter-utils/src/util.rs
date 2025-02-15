@@ -1,9 +1,10 @@
+use std::fmt::Debug;
 use std::io::Read;
-use std::process::Command;
 use std::time::UNIX_EPOCH;
 
 use anyhow::Result;
 use git2::{Commit as Git2Commit, Config, Delta, Oid, Repository};
+use chrono::{DateTime, Utc, TimeZone};
 
 use crate::types::author::Author;
 use crate::types::commit::Commit;
@@ -179,34 +180,16 @@ pub fn is_binary_file(path: &str) -> std::io::Result<bool> {
     Ok(non_printable_count > threshold)
 }
 
-// 简化的日期计算函数（仅作演示）
-fn calculate_date(days: u64) -> (u64, u64, u64) {
-    let days_in_year = 365;
-    let year = 1970 + days / days_in_year;
-    let remaining_days = days % days_in_year;
-    let month = remaining_days / 30 + 1;
-    let day = remaining_days % 30 + 1;
-    (year, month, day)
-}
-
-pub fn second_to_date(second: i64) -> Result<String, String> {
-    let timestamp = UNIX_EPOCH + std::time::Duration::from_secs(second as u64);
-    match timestamp.duration_since(UNIX_EPOCH) {
-        Ok(duration) => {
-            let seconds = duration.as_secs();
-            let minutes = seconds / 60;
-            let hours = minutes / 60;
-            let days = hours / 24;
-            let (year, month, day) = calculate_date(days as u64);
-            // month 和 day 都需要补零
-            let month = if month < 10 { format!("0{}", month) } else { format!("{}", month) };
-            let day = if day < 10 { format!("0{}", day) } else { format!("{}", day) };
-            return Ok(format!("{}-{}-{}", year, month, day));
-        }
-        Err(_) => {
-            return Err("Invalid timestamp".to_string());
-        }
-    }
+pub fn stamp_to_ymd(stamp: i64) -> Result<String, String> {
+    // 将时间戳转换为 DateTime<Utc> 类型
+    let datetime  = Utc.timestamp_opt(stamp, 0);
+    let t = match datetime {
+        chrono::offset::LocalResult::Single(time) => Ok(time),
+        chrono::offset::LocalResult::Ambiguous(early, latest) => Ok(latest),
+        chrono::offset::LocalResult::None => Err("Invalid timestamp".to_string()),
+    };
+    let datetime = t?;
+    Ok(datetime.format("%Y-%m-%d").to_string())
 }
 
 /// 判断日期是否为YYYY-MM-DD格式

@@ -1,7 +1,7 @@
 use crate::util::build_commit;
 use crate::util::change_status_to_file_status;
 use crate::util::is_binary_file;
-use crate::util::second_to_date;
+use crate::util::stamp_to_ymd;
 use anyhow::Error;
 use anyhow::Result;
 use git2::TreeWalkMode;
@@ -561,7 +561,7 @@ impl GitDataProvider {
                 let commit = self.repository.find_commit(commit)?;
                 let author = commit.author();
                 let email = author.email().unwrap().to_string();
-                let time = second_to_date(commit.time().seconds());
+                let time = stamp_to_ymd(commit.time().seconds());
                 if let Err(_) = time {
                     continue;
                 }

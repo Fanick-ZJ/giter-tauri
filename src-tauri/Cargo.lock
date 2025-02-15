@@ -1538,6 +1538,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "bitflags 2.8.0",
+ "chrono",
  "git2",
  "imara-diff",
  "log",

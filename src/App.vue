@@ -18,10 +18,9 @@ const homeRef = ref<InstanceType<typeof RepoHome>>()
 const naviDarkTheme = computed(() => (themeStore.isDark ? darkTheme : undefined))
 
 onMounted(() => {
- // 取消右键事件
- homeRef.value?.$el.addEventListener('contextmenu', (e: any) => {
-    e.preventDefault()  
-  }) 
+  document.addEventListener('contextmenu', (e: any) => {
+    e.preventDefault() 
+  })
 })
 
 
@@ -57,7 +56,7 @@ provide(viewShrink, viewToShrink)
 <template>
   <NConfigProvider :theme="naviDarkTheme" :locale="zhCN">
     <AppProvider>
-      <NFlex :wrap="false">
+      <NFlex :wrap="false" @contextmenu.prevent>
         <RepoHome ref="homeRef" :style="homeStyle"/>
         <div class="flex-1" v-show="isExtend">
           <ExtendPage/>

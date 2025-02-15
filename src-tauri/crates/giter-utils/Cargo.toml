@@ -8,6 +8,7 @@ parking_lot = "0.12.3"
 bitflags = "2.8.0"
 similar = { version = "2.7.0", features = ["serde"]}
 regex = "1"
+chrono = "0.4"
 git2 = "0.20.0"
 serde = { version = "1.0.216", features = ["derive"] }
 imara-diff = "0.1.7"

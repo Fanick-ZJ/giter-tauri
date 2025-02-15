@@ -6,6 +6,7 @@ extern crate imara_diff;
 extern crate log;
 extern crate parking_lot;
 extern crate serde;
+extern crate chrono;
 
 pub mod types;
 pub mod util;
