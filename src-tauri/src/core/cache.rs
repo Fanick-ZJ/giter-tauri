@@ -43,9 +43,9 @@ impl GitCache {
                 row.get::<_, String>(3),
                 row.get::<_, String>(4),
             ) {
-                (Ok(branch), Ok(authors), Ok(latest_commit_id)) => {
+                (Ok(branch), Ok(authors), Ok(last_commit_id)) => {
                     let authors: Vec<Author> = serde_json::from_str(&authors).unwrap();
-                    if let Err(e) = Oid::from_str(&latest_commit_id) {
+                    if let Err(e) = Oid::from_str(&last_commit_id) {
                         log::error!(target: "app", "Failed to the app home directory: {}", e);
                         return Err(rusqlite::Error::QueryReturnedNoRows);
                     } else {
@@ -53,7 +53,7 @@ impl GitCache {
                             branch,
                             AuthorCache {
                                 authors: Some(authors),
-                                latest_commit_id: Some(latest_commit_id),
+                                last_commit_id: Some(last_commit_id),
                             },
                         ))
                     }
@@ -77,10 +77,10 @@ impl GitCache {
 
     /// 更新作者缓存
     fn update_author_inner(&self, repo: RepoPath, author_cache: &BranchAuthorCache) {
-        let insert_sql = "Insert into branch_author (id, path, branch, authors, latest_commit_id) values (null, ?1, ?2, ?3, ?4)";
+        let insert_sql = "Insert into branch_author (id, path, branch, authors, last_commit_id) values (null, ?1, ?2, ?3, ?4)";
         let select_sql = "select count(*) from branch_author where path=?1 and branch=?2";
         let update_sql =
-            "update branch_author set authors=?1, latest_commit_id=?2 where path=?3 and branch=?4";
+            "update branch_author set authors=?1, last_commit_id=?2 where path=?3 and branch=?4";
         // 查询是否存在
         let conn = conn_db(self.path.clone()).unwrap();
         let mut stmt = conn.prepare(select_sql).unwrap();
@@ -97,7 +97,7 @@ impl GitCache {
                     update_sql,
                     [
                         serde_json::to_string(&cache.authors).unwrap(),
-                        cache.latest_commit_id.clone().unwrap(),
+                        cache.last_commit_id.clone().unwrap(),
                         repo.to_string(),
                         branch.to_string(),
                     ],
@@ -113,7 +113,7 @@ impl GitCache {
                         repo.as_str(),
                         branch.as_str(),
                         serde_json::to_string(&cache.authors).unwrap().as_str(),
-                        cache.latest_commit_id.clone().unwrap().as_str(),
+                        cache.last_commit_id.clone().unwrap().as_str(),
                     ],
                 );
                 if let Err(e) = insert {
@@ -171,10 +171,10 @@ impl ProviderCache for GitCache {
             .unwrap();
         let caches = stmt.query_row([repo, branch.name.as_str()], |row| {
             match (row.get::<_, String>(3), row.get::<_, String>(4)) {
-                (Ok(authors), Ok(latest_commit_id)) => {
+                (Ok(authors), Ok(last_commit_id)) => {
                     let authors: Vec<Author> = serde_json::from_str(&authors).unwrap();
-                    let latest_commit_id = Oid::from_str(&latest_commit_id).unwrap();
-                    Ok((authors, latest_commit_id))
+                    let last_commit_id = Oid::from_str(&last_commit_id).unwrap();
+                    Ok((authors, last_commit_id))
                 }
                 _ => Err(rusqlite::Error::QueryReturnedNoRows),
             }
@@ -191,11 +191,11 @@ impl ProviderCache for GitCache {
         repo: &str,
         authors: &Vec<Author>,
         branch: &Branch,
-        latest_commit_id: &Oid,
+        last_commit_id: &Oid,
     ) {
         let author_cache = AuthorCache {
             authors: Some(authors.clone()),
-            latest_commit_id: Some(latest_commit_id.to_string()),
+            last_commit_id: Some(last_commit_id.to_string()),
         };
         let map = HashMap::from([(branch.name.clone(), author_cache)]);
         self.update_author(repo.to_string(), &map);
@@ -237,7 +237,7 @@ impl ProviderCache for GitCache {
     }
     
     fn branch_contribution(&self, repo: &str, branch: &Branch) -> Option<(HashMap<String, CommitStatistic>, Oid)> {
-        let sql = "select contributors, latest_commit_id from contribution where path=?1 and branch=?2 limit 1";
+        let sql = "select contributors, last_commit_id from contribution where path=?1 and branch=?2 limit 1";
         let conn = self.conn();
         let mut stmt = conn.prepare(sql).unwrap();
         let caches = stmt.query_map([repo, &branch.name], |row| {
@@ -272,11 +272,11 @@ impl ProviderCache for GitCache {
         repo: &str,
         branch: &Branch,
         contrib: &HashMap<String, CommitStatistic>,
-        latest_commit_id: &Oid,
+        last_commit_id: &Oid,
     ) {
         let select_sql = "select count(*) from contribution where path=?1 and branch=?2"; 
-        let insert_sql = "insert into contribution (id, path, branch, contributors, latest_commit_id) values (null,?1,?2,?3,?4)";
-        let update_sql = "update contribution set contributors=?1, latest_commit_id=?2 where path=?3 and branch=?4";
+        let insert_sql = "insert into contribution (id, path, branch, contributors, last_commit_id) values (null,?1,?2,?3,?4)";
+        let update_sql = "update contribution set contributors=?1, last_commit_id=?2 where path=?3 and branch=?4";
         let conn = self.conn();
         let mut stmt = conn.prepare(select_sql).unwrap();
         let res = stmt.query_row([repo, &branch.name], |row| row.get::<_, i32>(0));
@@ -288,7 +288,7 @@ impl ProviderCache for GitCache {
         if count > 0 {
             let update = conn.execute(update_sql, [
                 serde_json::to_string(contrib).unwrap(),
-                latest_commit_id.to_string(),
+                last_commit_id.to_string(),
                 repo.to_string(),
                 branch.name.clone(),
             ]);
@@ -300,7 +300,7 @@ impl ProviderCache for GitCache {
                 repo.to_string(),
                 branch.name.clone(),
                 serde_json::to_string(contrib).unwrap(),
-                latest_commit_id.to_string(),
+                last_commit_id.to_string(),
             ]);
             if let Err(e) = insert {
                 log::error!("insert cache error: {:?}", e);

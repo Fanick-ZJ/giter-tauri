@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::Read;
 use std::time::UNIX_EPOCH;
@@ -5,6 +6,9 @@ use std::time::UNIX_EPOCH;
 use anyhow::Result;
 use git2::{Commit as Git2Commit, Config, Delta, Oid, Repository};
 use chrono::{DateTime, Utc, TimeZone};
+use serde::de::Error;
+use serde::Deserialize;
+use serde_json::Value;
 
 use crate::types::author::Author;
 use crate::types::commit::Commit;
@@ -185,7 +189,7 @@ pub fn stamp_to_ymd(stamp: i64) -> Result<String, String> {
     let datetime  = Utc.timestamp_opt(stamp, 0);
     let t = match datetime {
         chrono::offset::LocalResult::Single(time) => Ok(time),
-        chrono::offset::LocalResult::Ambiguous(early, latest) => Ok(latest),
+        chrono::offset::LocalResult::Ambiguous(early, last) => Ok(last),
         chrono::offset::LocalResult::None => Err("Invalid timestamp".to_string()),
     };
     let datetime = t?;
@@ -230,3 +234,16 @@ pub fn get_global_git_author() -> Result<Author, String> {
     Ok(Author::new(name, email))
 }
 
+pub fn deserialize_from_map<T>(map: &HashMap<String, Value>, key: &str, default: T) -> T
+where
+    T: for<'a> Deserialize<'a>,
+{
+    // 从 HashMap 中获取 value
+    let value = map.get(key);
+    if value.is_none() {
+        return default;
+    }
+    let value = value.unwrap();
+    // 将 value 反序列化为目标类型
+    serde_json::from_value(value.clone()).unwrap_or(default)
+}

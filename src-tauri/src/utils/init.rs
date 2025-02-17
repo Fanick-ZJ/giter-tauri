@@ -61,14 +61,14 @@ pub fn init_cache() -> Result<()> {
         path text not null,
         branch text not null,
         authors text not null,
-        latest_commit_id varchar(20) not null
+        last_commit_id varchar(20) not null
       );
       create table if not exists contribution (
         id integer primary key autoincrement,
         path text not null,
         branch text not null,
         contributors text not null,
-        latest_commit_id varchar(20) not null
+        last_commit_id varchar(20) not null
       );
       "
     )?;

@@ -1545,6 +1545,7 @@ dependencies = [
  "parking_lot",
  "regex",
  "serde",
+ "serde_json",
  "similar",
 ]
 

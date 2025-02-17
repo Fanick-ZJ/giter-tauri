@@ -1,18 +1,21 @@
 use crate::util::build_commit;
 use crate::util::change_status_to_file_status;
+use crate::util::deserialize_from_map;
 use crate::util::is_binary_file;
 use crate::util::stamp_to_ymd;
-use anyhow::Error;
 use anyhow::Result;
 use git2::TreeWalkMode;
 use git2::{BranchType, Oid, Repository, Revwalk, Status};
 use log::error;
+use serde_json::Value;
 use similar::DiffOp;
 use similar::TextDiff;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Pointer;
+use std::i32;
+use std::i64;
 use std::path;
 use std::path::Path;
 use std::path::PathBuf;
@@ -20,12 +23,14 @@ use std::vec;
 use types::{author::Author, branch::Branch, commit::Commit, status::WorkStatus};
 
 use super::cache::Cache;
-use super::commit;
+use super::commit_filter::FilterConditions;
 use super::contribution::CommitStatistic;
 use super::diff::ContentDiff;
 use super::file::File;
 use super::file::UntrackedFile;
 use super::status::FileStatus;
+
+
 pub struct GitDataProvider {
     pub repository: Repository,
     cache: RefCell<Option<Box<dyn Cache + Send>>>,
@@ -586,12 +591,47 @@ impl GitDataProvider {
         Ok(map.into_values().collect())
     }
 
+    pub fn get_branch_commit_after_filt(&self, branch: &Branch, filter: &HashMap<String, Value>) -> Result<Vec<Commit>> {
+        let commits = self.branch_commit_inner(branch)?;
+        let mut revwalk = self.repository.revwalk()?;
+        revwalk.push(commits.id())?;
+        let filter = FilterConditions::build_from_sv_map(filter);
+        // 获取过滤条件
+        let last_id= filter.last_id.unwrap_or_default();
+        if last_id != "" {
+            let last_id = Oid::from_str(last_id.as_str())?;
+            revwalk.hide(last_id)?; 
+        }
+        let mut commits = Vec::<Commit>::new();
+        // 遍历提交
+        for commit in revwalk.by_ref().take(filter.count).into_iter() {
+            if let Ok(commit) = commit {
+                let commit = self.repository.find_commit(commit);
+                if let Err(_) = commit {
+                    continue; 
+                }
+                let commit = commit.unwrap();
+                let author = filter.author;
+                let email = commit.author().email().unwrap().to_string();
+                let name = commit.author().name().unwrap().to_string();
+                let time = commit.time().seconds();
+                
+                if time < filter.start_time || time > filter.end_time {
+                    continue; 
+                }
+                let commit = build_commit(&commit, &self.repository);
+                commits.push(commit);
+            } 
+        }
+        Ok(commits)
+    }
+
     /// 获取提交者缓存
     fn authors_cache(&self, branch: &Branch) -> Option<(Vec<Author>, Oid)> {
         if let Some(cache) = self.cache.borrow().as_ref() {
             let authors = cache.branch_authors(self.repository.path().to_str().unwrap(), branch);
-            if let Some((authors, latest_commit_id)) = authors {
-                return Some((authors, latest_commit_id));
+            if let Some((authors, last_commit_id)) = authors {
+                return Some((authors, last_commit_id));
             }
         }
         None
@@ -602,8 +642,8 @@ impl GitDataProvider {
     pub fn branch_contribution_cache(&self, branch: &Branch) -> Option<(HashMap<String, CommitStatistic>, Oid)> {
         if let Some(cache) = self.cache.borrow().as_ref() {
             let contrib = cache.branch_contribution(self.repository.path().to_str().unwrap(), branch);
-            if let Some((contrib, latest_commit_id)) = contrib {
-                return Some((contrib, latest_commit_id));
+            if let Some((contrib, last_commit_id)) = contrib {
+                return Some((contrib, last_commit_id));
             }
         }
         None
@@ -614,11 +654,11 @@ impl GitDataProvider {
         &self,
         branch: &Branch,
         contrib: &HashMap<String, CommitStatistic>,
-        latest_commit_id: &Oid,
+        last_commit_id: &Oid,
     ) {
         if let Some(cache) = self.cache.borrow_mut().as_mut() {
             let path = self.repository.path().to_str().unwrap();
-            cache.set_branch_contribution(path, branch, contrib, latest_commit_id);
+            cache.set_branch_contribution(path, branch, contrib, last_commit_id);
         }
     }
     /// 设置提交者缓存

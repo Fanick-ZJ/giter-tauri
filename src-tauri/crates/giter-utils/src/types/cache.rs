@@ -22,7 +22,7 @@ pub trait Cache {
         repo: &str,
         branch: &Branch,
         contrib: &HashMap<String, CommitStatistic>,
-        latest_commit_id: &Oid,
+        last_commit_id: &Oid,
     );
 
     /// 设置commit的作者
@@ -31,7 +31,7 @@ pub trait Cache {
         repo: &str,
         authors: &Vec<Author>,
         branch: &Branch,
-        latest_commit_id: &Oid,
+        last_commit_id: &Oid,
     );
 
     fn clear(&mut self, repo: &str);
