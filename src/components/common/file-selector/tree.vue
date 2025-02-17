@@ -142,7 +142,10 @@ const handleLoad = async (option: TreeOption | Folder) => {
   })
 }
 
+const checkedKeys = ref<string[]>([])
 const handleSelect = ({ option }: {option: TreeOption}) => {
+  // 清空选中的节点
+  checkedKeys.value = []
   const path = option.path as string
   selected = path
   emit('change', selected)
@@ -151,6 +154,10 @@ const handleSelect = ({ option }: {option: TreeOption}) => {
 const emit = defineEmits<{
   change: [selected: string]
 }>()
+
+defineExpose({
+ checkedKeys, 
+})
 
 </script>
 
@@ -166,7 +173,10 @@ const emit = defineEmits<{
       :block-node="true"
       :default-expanded-keys="defaultKeys"
       :override-default-node-click-behavior="handleSelect"
+      v-model:checked-keys="checkedKeys"
       style="height: 320px"
+      checkable
+      show-line
       virtual-scroll
       expand-on-click
       :on-load="handleLoad" />

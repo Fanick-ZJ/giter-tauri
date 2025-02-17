@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PropType, ref, useTemplateRef } from 'vue';
+import { PropType, ref, toRaw, useTemplateRef, watch } from 'vue';
 import FileTree from './tree.vue';
 import { NCard, NButton, NFlex, NInput } from 'naive-ui';
 import { SelectFilter } from './types';
@@ -50,22 +50,31 @@ let show = () => {
 }
 
 const close = () => {
-  // 关闭时, 调用resolve或reject
-  resolve(undefined)
   __show.value = false
-  if (closeCallback) {
-    closeCallback()
+  // 关闭时, 调用resolve或reject
+  if (selected.value || toRaw(fileTreeRef.value?.checkedKeys) || undefined) {
+    if (closeCallback) {
+      closeCallback()
+    }
+  } else {
+    reject() 
   }
 }
 
 const ok = () => {
-  resolve(selected.value)
+  resolve(selected.value || toRaw(fileTreeRef.value?.checkedKeys) || undefined)
   close()
 }
 
 const changed = (val: string) => {
   selected.value = val
 }
+
+watch(() => fileTreeRef.value?.checkedKeys, (val) => {
+  if (val && val.length > 0) {
+    selected.value = ''
+  }
+})
 
 defineExpose({
   selected,
@@ -82,9 +91,9 @@ defineExpose({
   <div v-if="__show" 
     class="w-screen h-screen bg-slate-400/50
     flex items-center justify-center fixed top-0 left-0 z-[3]">
-    <div class="w-[280px]">
+    <div class="w-[80%]">
       <NCard title="选择文件" size="small" closable @close="close">
-        <NInput placeholder="请输入文件路径" type="text" size="tiny" clearable :value="selected"/>
+        <NInput placeholder="请输入文件路径" type="text" size="tiny" clearable v-model:value="selected"/>
         <FileTree ref="fileTreeRef"
           v-bind="{...props}"
           @change="changed"

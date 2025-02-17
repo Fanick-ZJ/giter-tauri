@@ -9,6 +9,7 @@ import { NButton, NDropdown, NBadge, NFlex } from 'naive-ui'
 import { computed } from "vue";
 import { createNofication } from "./notification";
 import { isRepo } from "@/utils/command";
+import { defaultRepository } from "@/types/util";
 defineOptions({
   name: 'HomePageHeaders'
 })
@@ -17,14 +18,33 @@ const notifStore = useNotificationStore()
 
 const add = () => {
   useFileSelector({directory: true}).then(async (path) => {
-    if (path === undefined) return
-    if (! await isRepo(path)) {
+    console.log(path)
+    if (
+        path === undefined 
+      || path === '' 
+      || (Array.isArray(path) && path.length === 0)) {
       window.$message.error('请选择仓库目录')
-      return
+      return 
     }
-    useFileInfoDialog({path, mode: 'add'}).then((repo: Repository) => {
-      repoStore.add(repo)
-    })
+    if (!Array.isArray(path)) {
+      if (!await isRepo(path)) {
+        window.$message.error(`请选择有效的仓库目录: ${path}`)
+        return
+      }
+      useFileInfoDialog({path, mode: 'add'}).then((repo: Repository) => {
+        repoStore.add(repo)
+      })
+    } else {
+      for (const p of path) {
+        if (!await isRepo(p)) {
+          window.$message.error(`请选择有效的仓库目录: ${p}`)
+          return
+        }
+      }
+      for (const p of path) {
+        repoStore.add(defaultRepository(p))
+      }
+    }
   })
 }
 

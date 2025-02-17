@@ -211,8 +211,8 @@ const handleClick = (date: string) => {
         <div class="w-full h-[300px]">
           <div class="flex relative  mb-3">
             <HashAvatar :author="curAuthor || globalAuthor || emptyAuthor" :width="80" :borderRadius="15"/>
-            <div class="flex flex-col ml-5">
-              <div class="text-4xl font-bold">
+            <div class="flex flex-col ml-5 gap-1">
+              <div class="text-4xl font-bold h-[50px] leading-snug">
                 <NEllipsis style="max-width: 300px">{{curAuthor?.name || globalAuthor?.name}}</NEllipsis>
                 <span v-if="isMe">[我]</span>
               </div>
