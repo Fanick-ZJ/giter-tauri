@@ -218,36 +218,34 @@ const handleClick = (date: string) => {
         <NSkeleton height="50px" width="74%"/>
         <NSkeleton height="80px" width="82%"/>
       </NSpace>
-      <div v-else>
-        <div class="w-full h-[300px]">
-          <div class="flex relative  mb-3">
-            <HashAvatar :author="curAuthor || globalAuthor || emptyAuthor" :width="80" :borderRadius="15"/>
-            <div class="flex flex-col ml-5 gap-1">
-              <div class="text-4xl font-bold h-[50px] leading-snug">
-                <NEllipsis style="max-width: 300px">{{curAuthor?.name || globalAuthor?.name}}</NEllipsis>
-                <span v-if="isMe">[我]</span>
-              </div>
-              <div class="text-xl text-slate-500">
-                <span>{{curAuthor?.email || globalAuthor?.email}}</span>
-              </div>
+      <div v-else class="w-full h-[300px]">
+        <div class="flex relative  mb-3">
+          <HashAvatar :author="curAuthor || globalAuthor || emptyAuthor" :width="80" :borderRadius="15"/>
+          <div class="flex flex-col ml-5 gap-1">
+            <div class="text-4xl font-bold h-[50px] leading-snug">
+              <NEllipsis style="max-width: 300px">{{curAuthor?.name || globalAuthor?.name}}</NEllipsis>
+              <span v-if="isMe">[我]</span>
             </div>
-            <NSelect 
-              class="w-[200px] absolute right-0 top-0"
-              placeholder="选择作者"
-              filterable
-              v-model:value="selectedAuthor" :options="authorOptions"/>
-            <NSelect 
-              class="w-[150px] absolute right-[210px] top-0"
-              placeholder="选择分支"
-              filterable
-              v-model:value="selectedBranch" :options="branchOptions"/>
+            <div class="text-xl text-slate-500">
+              <span>{{curAuthor?.email || globalAuthor?.email}}</span>
+            </div>
           </div>
-          <CommitHot v-show="!contributionLoading" @date-click="handleClick" @switch-year="handleSwitchYear" :stats="selectedContribution"/>
-          <NSpace vertical v-if="contributionLoading">
-            <NSkeleton height="40px" width="99%"/>
-            <NSkeleton height="40px" width="99%"/>
-          </NSpace>
+          <NSelect 
+            class="w-[200px] absolute right-0 top-0"
+            placeholder="选择作者"
+            filterable
+            v-model:value="selectedAuthor" :options="authorOptions"/>
+          <NSelect 
+            class="w-[150px] absolute right-[210px] top-0"
+            placeholder="选择分支"
+            filterable
+            v-model:value="selectedBranch" :options="branchOptions"/>
         </div>
+        <CommitHot v-show="!contributionLoading" @date-click="handleClick" @switch-year="handleSwitchYear" :stats="selectedContribution"/>
+        <NSpace vertical v-if="contributionLoading">
+          <NSkeleton height="40px" width="99%"/>
+          <NSkeleton height="40px" width="99%"/>
+        </NSpace>
       </div>
     </NLayout>
   </LayoutPage>

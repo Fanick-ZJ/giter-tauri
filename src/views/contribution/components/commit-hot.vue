@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { CommitStatistic, Repository, YMDStr } from '@/types';
-import { computed, nextTick, onMounted, PropType, Ref, ref, toRaw, watch } from 'vue';
+import { computed, nextTick, onMounted, PropType, ref, watch } from 'vue';
 import _ from 'lodash'
 import { getDaysOfMonth, getWeekNumber } from '@/utils/tool';
-import { NPopover } from 'naive-ui';
+import { NPopover, NScrollbar } from 'naive-ui';
 import { upToDataElement } from '@/components/repo-home/util';
 import { DayStat } from '../types';
-import { firstWalk } from 'echarts/types/src/chart/tree/layoutHelper.js';
 
 defineOptions({
   name: 'CommitHot'
@@ -223,7 +221,7 @@ const emit = defineEmits({
         {{ popoverText }}
       </NPopover>
     </div>
-    <div class="flex flex-col gap-2 w-[100px]">
+    <NScrollbar class="flex flex-col gap-2 w-[100px]" style="max-height: 130px;">
       <div v-for="year in yearRange">
         <div class="rounded-sm pl-1 pr-10 py-1" 
           :class="currentYear == year ? 'bg-sky-600 text-white' : 'hover:bg-slate-100 transition-all duration-50 ease-in-out'"
@@ -231,7 +229,7 @@ const emit = defineEmits({
           <span>{{year}}</span>
         </div>
       </div>
-    </div>
+    </NScrollbar>
   </div>
 </template>
 

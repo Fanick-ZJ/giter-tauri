@@ -11,6 +11,7 @@ import RepoHome from '@/components/repo-home/index.vue'
 import { viewExtend, viewShrink } from './types/key';
 import ExtendPage from '@/components/extend-page/index.vue'
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
+import { EXPAND_MIN_WIDTH, MIN_HEIGHT, REPOLIST_WIDTH } from './const';
 
 const themeStore = useThemeStore()
 const homeRef = ref<InstanceType<typeof RepoHome>>()
@@ -29,24 +30,25 @@ const homeStyle = ref<StyleValue>()
 const viewToExtend = async () => {
   if (isExtend.value) return
   isExtend.value = true
-  const homeWidth = homeRef.value?.$el.clientWidth
   homeStyle.value = {
-    maxWidth: isExtend.value? homeWidth + 'px' : '100%',
-    minWidth: isExtend.value? homeWidth + 'px' : ''
+    maxWidth: isExtend.value? REPOLIST_WIDTH + 'px' : '100%',
+    minWidth: isExtend.value? REPOLIST_WIDTH + 'px' : ''
   } 
   await nextTick()
   const curWind = getCurrentWindow()
   const {width, height} = await curWind.innerSize()
-  curWind.setSize(new LogicalSize(width + 770, height))
+  curWind.setSize(new LogicalSize(REPOLIST_WIDTH + 770, height))
+  curWind.setMinSize(new LogicalSize(EXPAND_MIN_WIDTH, MIN_HEIGHT))
   
 }
 
 const viewToShrink = () => {
   isExtend.value = false
-  const width = homeRef.value?.$el.clientWidth
   const height = homeRef.value?.$el.clientHeight
   
-  getCurrentWindow().setSize(new LogicalSize(width!, height!))
+  const curWind = getCurrentWindow()
+  curWind.setSize(new LogicalSize(REPOLIST_WIDTH, height!))
+  curWind.setMinSize(new LogicalSize(REPOLIST_WIDTH, MIN_HEIGHT))
 }
 
 provide(viewExtend, viewToExtend)
