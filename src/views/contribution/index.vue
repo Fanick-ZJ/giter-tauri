@@ -1,6 +1,6 @@
 <script setup lang="ts">import { computed, ref, toRaw, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { NLayout, NSkeleton, NSpace, NSelect } from 'naive-ui';
+import { NLayout, NSkeleton, NSpace, NSelect, NEllipsis } from 'naive-ui';
 import LayoutPage from '@/components/common/layout-page/index.vue'
 import { useRepoStore } from '@/store/modules/repo';
 import { Author, Branch, CommitStatistic, Repository, YMDStr } from '@/types';
@@ -22,10 +22,11 @@ const myAuthor = ref<Author>()
 const authors = ref<Author[]>([])
 const globalAuthor = ref<Author>()
 
-const loading = ref(true)
+const totalLoading = ref(true)
+const contributionLoading = ref(true)
 
 const init = async () => {
-  loading.value = true
+  totalLoading.value = true
   let path = repo.value!.path
   try{
     currentBranch.value = await getCurrentBranch(path)
@@ -71,7 +72,7 @@ const init = async () => {
       return author.email === email
     }) || authors.value[0]
   }).finally(() => {
-    loading.value = false 
+    totalLoading.value = false 
   })
 }
 
@@ -110,6 +111,38 @@ const authorOptions = computed(() => {
   })
 })
 
+const selectedBranch = computed({
+  get() {
+    return currentBranch.value?.reference || ''
+  },
+  set(val) {
+    currentBranch.value = branches.value.find((branch) => {
+      return branch.reference === val
+    })
+  }
+})
+const branchOptions = computed(() => {
+  return branches.value.map((branch) => {
+    return {
+      label: branch.name,
+      value: branch.reference
+    }
+  }) 
+})
+
+
+watch(() => currentBranch.value, () => {
+  if (currentBranch.value) {
+    contributionLoading.value = true
+    getBranchCommitContribution(repo.value!.path, currentBranch.value).then((res) => {
+      contribution.value = res
+    }).catch((err) => {
+      window.$message.error('获取贡献失败')
+    })
+  } 
+})
+
+
 const selectedContribution = computed(() => {
   let filted = contribution.value.filter((stat) => {
     return stat.author.email === curAuthor.value?.email || stat.author.name === curAuthor.value?.name
@@ -138,6 +171,7 @@ const selectedContribution = computed(() => {
       stats
     }
   })
+  contributionLoading.value = false
   return yearStats
 })
 
@@ -145,7 +179,6 @@ const isMe = computed(() => {
   if (!myAuthor.value) {
     return false 
   }
-  console.log(myAuthor.value.email, curAuthor.value?.email)
   return  myAuthor.value.email === curAuthor.value?.email
 })
 
@@ -162,7 +195,7 @@ const handleClick = (date: string) => {
 <template>
   <LayoutPage title="贡献统计" :subtitle="repo?.alias">
     <NLayout>
-      <NSpace vertical v-if="loading">
+      <NSpace vertical v-if="totalLoading">
         <NSkeleton height="40px" width="33%"/>
         <NSkeleton height="40px" width="66%"/>
         <NSkeleton height="40px" width="99%"/>
@@ -175,12 +208,12 @@ const handleClick = (date: string) => {
         <NSkeleton height="80px" width="82%"/>
       </NSpace>
       <div v-else>
-        <div class="w-full h-[300px] ">
-          <div class="flex relative" v-if="curAuthor || globalAuthor">
+        <div class="w-full h-[300px]">
+          <div class="flex relative  mb-3">
             <HashAvatar :author="curAuthor || globalAuthor || emptyAuthor" :width="80" :borderRadius="15"/>
             <div class="flex flex-col ml-5">
               <div class="text-4xl font-bold">
-                <span>{{curAuthor?.name || globalAuthor?.name}}</span>
+                <NEllipsis style="max-width: 300px">{{curAuthor?.name || globalAuthor?.name}}</NEllipsis>
                 <span v-if="isMe">[我]</span>
               </div>
               <div class="text-xl text-slate-500">
@@ -192,8 +225,17 @@ const handleClick = (date: string) => {
               placeholder="选择作者"
               filterable
               v-model:value="selectedAuthor" :options="authorOptions"/>
+            <NSelect 
+              class="w-[150px] absolute right-[210px] top-0"
+              placeholder="选择分支"
+              filterable
+              v-model:value="selectedBranch" :options="branchOptions"/>
           </div>
-          <CommitHot @date-click="handleClick" @switch-year="handleSwitchYear" :stats="selectedContribution"/>
+          <CommitHot v-show="!contributionLoading" @date-click="handleClick" @switch-year="handleSwitchYear" :stats="selectedContribution"/>
+          <NSpace vertical v-if="contributionLoading">
+            <NSkeleton height="40px" width="99%"/>
+            <NSkeleton height="40px" width="99%"/>
+          </NSpace>
         </div>
       </div>
     </NLayout>

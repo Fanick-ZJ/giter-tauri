@@ -6,6 +6,7 @@ import { getDaysOfMonth, getWeekNumber } from '@/utils/tool';
 import { NPopover } from 'naive-ui';
 import { upToDataElement } from '@/components/repo-home/util';
 import { DayStat } from '../types';
+import { firstWalk } from 'echarts/types/src/chart/tree/layoutHelper.js';
 
 defineOptions({
   name: 'CommitHot'
@@ -42,9 +43,20 @@ const getWeekAndWeekDay = (date: Date) => {
     let weekDay = date.getDay()
     // 如果是周日的话，需要将周数加1
     let week = getWeekNumber(date) + (weekDay == 0 ? 1 : 0)
+    const firstDay = new Date(date.getFullYear(), 0, 1)
+    const firstDayWeek = getWeekNumber(firstDay) + (weekDay == 0 ? 1 : 0)
     // 如果是十二月的最后几天所在的那一周，是下一年的第一周，要设置为52，为了显示在一张图里
     if (date.getMonth() == 11 && (week == 0 || week == 1)) {
       week = 52
+    }
+    // 如果输入日期是一月份的，且这年的第一年第一天是算在上一年周数里的话，就要特殊处理
+    if (date.getMonth() == 0 && firstDayWeek >= 51) {
+      // 如果是一月份、且星期数是上一年的
+      if (date.getMonth() == 0 && week >= 51) {
+        week = weekDay == 0? 1 : 0
+      } else {
+        week += 1 
+      }
     }
   return {
     week,
