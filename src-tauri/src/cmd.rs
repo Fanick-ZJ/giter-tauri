@@ -12,7 +12,8 @@ use giter_utils::{
     util::{is_git_repo, set_owner},
 };
 use giter_watcher::types::modify_watcher::ModifyWatcher;
-use std::{sync::Mutex, thread};
+use serde_json::Value;
+use std::{collections::HashMap, sync::Mutex, thread};
 use tauri::Manager;
 
 fn get_provider(repo: &str) -> Result<GitDataProvider, CommandError> {
@@ -301,4 +302,14 @@ pub fn get_repo_author(repo: RepoPath) -> Result<Author, CommandError> {
         return Err(CommandError::GetRepoAuthorError(e.to_string()));
     }
     Ok(author.unwrap())
+}
+
+#[tauri::command]
+pub fn get_branch_commits_after_filter(repo: RepoPath, branch: Branch, filter: HashMap<String, Value>) -> Result<Vec<Commit>, CommandError> {
+    let provider = get_provider(&repo)?;
+    let commits = provider.get_branch_commits_after_filter(&branch, &filter);
+    if let Err(e) = commits {
+        return Err(CommandError::GetBranchCommitsError(e.to_string()));
+    }
+    Ok(commits.unwrap())
 }

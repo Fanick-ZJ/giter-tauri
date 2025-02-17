@@ -3,7 +3,7 @@ use std::hash::Hash;
 
 const DEFAULT_NAME: &str = "%%%%%%%DEFAULT_NAME%%%%%%%";
 const DEFAULT_EMAIL: &str = "%%%%%%%DEFAULT_EMAIL%%%%%%%";
-#[derive(Deserialize, Serialize, Hash, Debug, Clone)]
+#[derive(Deserialize, Serialize, Hash, Debug, Clone, Default)]
 pub struct Author {
     pub name: String,
     pub email: String,

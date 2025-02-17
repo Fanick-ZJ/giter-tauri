@@ -15,7 +15,6 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Pointer;
 use std::i32;
-use std::i64;
 use std::path;
 use std::path::Path;
 use std::path::PathBuf;
@@ -591,37 +590,29 @@ impl GitDataProvider {
         Ok(map.into_values().collect())
     }
 
-    pub fn get_branch_commit_after_filt(&self, branch: &Branch, filter: &HashMap<String, Value>) -> Result<Vec<Commit>> {
-        let commits = self.branch_commit_inner(branch)?;
-        let mut revwalk = self.repository.revwalk()?;
-        revwalk.push(commits.id())?;
+    pub fn get_branch_commits_after_filter(&self, branch: &Branch, filter: &HashMap<String, Value>) -> Result<Vec<Commit>> {
+        let branch_commits = self.get_branch_commits(branch, i32::MAX)?;
         let filter = FilterConditions::build_from_sv_map(filter);
         // 获取过滤条件
         let last_id= filter.last_id.unwrap_or_default();
-        if last_id != "" {
-            let last_id = Oid::from_str(last_id.as_str())?;
-            revwalk.hide(last_id)?; 
-        }
         let mut commits = Vec::<Commit>::new();
         // 遍历提交
-        for commit in revwalk.by_ref().take(filter.count).into_iter() {
-            if let Ok(commit) = commit {
-                let commit = self.repository.find_commit(commit);
-                if let Err(_) = commit {
-                    continue; 
-                }
-                let commit = commit.unwrap();
-                let author = filter.author;
-                let email = commit.author().email().unwrap().to_string();
-                let name = commit.author().name().unwrap().to_string();
-                let time = commit.time().seconds();
-                
-                if time < filter.start_time || time > filter.end_time {
-                    continue; 
-                }
-                let commit = build_commit(&commit, &self.repository);
-                commits.push(commit);
-            } 
+        for commit in branch_commits.into_iter() {
+            if commit.commit_id == last_id {
+                break; 
+            }
+            if commits.len() >= filter.count {
+                break;
+            }
+            let author = &filter.author;
+            let time = commit.datetime;
+            if !author.is_default() && author.email != commit.author_email && author.name != commit.author_name {
+                continue; 
+            }
+            if time < filter.start_time || time > filter.end_time {
+                continue; 
+            }
+            commits.push(commit);
         }
         Ok(commits)
     }

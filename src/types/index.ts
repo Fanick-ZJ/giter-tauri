@@ -83,6 +83,14 @@ export type CommitStatistic = {
   stats: {[key in YMDStr]: number}[]
 }
 
+export type CommitFilter = {
+  lastId?: string,
+  count?: number,
+  author?: Author
+  startTime?: number,
+  endTime?: number
+}
+
 declare global {
   interface Window {
     $message: MessageApiInjection;

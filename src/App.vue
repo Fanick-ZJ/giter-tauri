@@ -37,7 +37,8 @@ const viewToExtend = async () => {
   await nextTick()
   const curWind = getCurrentWindow()
   const {width, height} = await curWind.innerSize()
-  curWind.setSize(new LogicalSize(width + 550, height))
+  curWind.setSize(new LogicalSize(width + 770, height))
+  
 }
 
 const viewToShrink = () => {

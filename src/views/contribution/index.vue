@@ -4,7 +4,7 @@ import { NLayout, NSkeleton, NSpace, NSelect, NEllipsis } from 'naive-ui';
 import LayoutPage from '@/components/common/layout-page/index.vue'
 import { useRepoStore } from '@/store/modules/repo';
 import { Author, Branch, CommitStatistic, Repository, YMDStr } from '@/types';
-import { getAuthors, getBranchCommitContribution, getBranches, getCurrentBranch, getGlobalAuthor, getRepoAuthor } from '@/utils/command';
+import { getAuthors, getBranchCommitContribution, getBranchCommitsAfterFilter, getBranches, getCurrentBranch, getGlobalAuthor, getRepoAuthor } from '@/utils/command';
 import HashAvatar from '@/components/common/hash-avatar/index.vue'
 import CommitHot from './components/commit-hot.vue'
 import { emptyAuthor } from '@/types/util';
@@ -188,6 +188,17 @@ const handleSwitchYear = (year: number) => {
 
 const handleClick = (date: string) => {
   console.log(date)
+  const startTime = new Date(date)
+  const endTime = new Date(startTime.getTime() + 1000 * 60 * 60 * 24)
+  console.log(repo.value!.path, currentBranch.value!)
+  getBranchCommitsAfterFilter(repo.value!.path, currentBranch.value!, {
+    author: curAuthor.value,
+    count: 1 << 31,
+    startTime: startTime.getTime(),
+    endTime: endTime.getTime()
+  }).then((res) => {
+   console.log(res)
+  })
 }
 
 </script>

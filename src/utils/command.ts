@@ -1,7 +1,7 @@
 import { ADD_WATCH, BLOB_CONTENT, COMMIT_CONTENT, FILE_DIFF, GET_AUTHORS, GET_BRANCHES, GET_COMMIT, GET_BRANCH_COMMITS, GET_CURRENT_BRANCH, GET_DRIVER, GET_FOLDERS, GET_SEPARATOR, IS_REPO, REMOVE_WATCH, SET_OWNERSHIP, WORK_STATUS, BRANCH_COMMIT_CONTRIBUTION } from "@/const/command";
 import { BRANCH_COMMIT_CONTRIBUTION_KEY } from "@/const/listen";
 import { RepoStatus } from "@/enum";
-import { Author, Branch, Commit, CommitStatistic, DiffContent, File } from "@/types";
+import { Author, Branch, Commit, CommitFilter, CommitStatistic, DiffContent, File } from "@/types";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -94,4 +94,8 @@ export const getGlobalAuthor = () => {
 
 export const getRepoAuthor = (repo: RepoPath) => {
   return invoke<Author>('get_repo_author', { repo })  
+}
+
+export const getBranchCommitsAfterFilter = (repo: RepoPath, branch: Branch, filter: CommitFilter) => {
+  return invoke<Commit[]>('get_branch_commits_after_filter', { repo, branch, filter })
 }
