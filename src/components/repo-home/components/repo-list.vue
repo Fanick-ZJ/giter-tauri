@@ -2,7 +2,7 @@
 import { useRepoStore, ValidRepository } from '@/store/modules/repo';
 import RepoItem from './repo-item.vue'
 import { NFlex, NDropdown } from 'naive-ui';
-import { computed, nextTick, PropType, ref } from 'vue';
+import { computed, nextTick, PropType, ref, watch } from 'vue';
 import { upToDataElement } from '@/utils/dom';
 import { useFileInfoDialog } from '@/components/common/info-dialog';
 import { openFileManager } from '@/utils/tool';
@@ -79,36 +79,33 @@ const handleSelect = (key: string) => {
   }
 }
 
-const filtedRepos = computed(() => {
-  if (!props.filter || Object.keys(props.filter).length == 0) return repoStore.repos
+const filtedRepos = ref<ValidRepository[]>(repoStore.repos)
+watch(() => props.filter, (filter) => {
+  if (!filter || Object.keys(filter).length == 0) return repoStore.repos
   let repos = repoStore.repos
-  const filter = props.filter
   repos = repos.filter((repo) => {
-    console.log(repo, filter)
     if (filter.alias && repo.alias.indexOf(filter.alias!) == -1) {
-      console.log(1)
       return false
     }
     if (filter.path && repo.path.indexOf(filter.path!) == -1) {
-      console.log(2)
       return false 
     }
     if (typeof filter.top != 'undefined' && repo.top != filter.top) {
-      console.log(3, typeof filter.top, typeof filter.top != undefined, repo.top, filter.top)
       return false
     }
     if (typeof filter.hasWatched != 'undefined' && repo.hasWatch != filter.hasWatched) {
-      console.log(4)
       return false
     }
     if (typeof filter.valid != 'undefined' && repo.valid != filter.valid) {
-      console.log(5)
+      return false 
+    }
+    if (filter.order && repo.order!= filter.order) {
       return false 
     }
     return true
   })
-  return repos
-})
+  filtedRepos.value = repos
+}, {deep: true})
 </script>
 
 <template>

@@ -16,14 +16,14 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
   const repos = ref<ValidRepository[]>([])
   const status: Map<RepoPath, Ref<RepoStatus>> = new Map()
 
-  const _init_opt = (repo: ValidRepository) => {
-    isRepo(repo.path).then(is => {
+  const _init_opt = async (repo: ValidRepository) => {
+    return isRepo(repo.path).then(is => {
       if (!is){
         repo.valid = false
-        return
+        return repo
       }
       if (!repo.hasWatch) {
-        return
+        return repo
       }
       addWatch(repo.path)
       status.set(repo.path, ref(RepoStatus.Ok))
@@ -32,10 +32,11 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
       }).catch((err) => {
         cmdErrNotify(err, () => workStatus(repo.path))
       })
-    })
-    .then(() => {
-      repos.value.push(repo)
-      repos.value.sort(repoSort) 
+      return repo
+    }).catch((err) => {
+      repo.valid = false
+      cmdErrNotify(err, () => isRepo(repo.path))
+      return repo
     })
   }
 
@@ -57,21 +58,21 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
   }
 
   const init_repo = async () => {
-    readRepos().then((res: string | any[]) => {
-      for (let i = 0; i < res.length; i++) {
-        const repo = res[i];
-        repo.hasWatch = !!repo.hasWatch
-        repo.top = !!repo.top
-        Object.assign(repo, {
-          valid: true,
-        })
-        _init_opt(repo as ValidRepository)
-      }
+    const __repos = await readRepos()
+    const repoInitPromise:Promise<ValidRepository>[] = []
+    for (let i = 0; i < __repos.length; i++) {
+      const repo = __repos[i];
+      repo.hasWatch = !!repo.hasWatch
+      repo.top = !!repo.top
+      Object.assign(repo, {
+        valid: true,
+      })
+      repoInitPromise.push(_init_opt(repo as ValidRepository))
+    }
+    await Promise.all(repoInitPromise).then((res) => {
+      repos.value = res.sort(repoSort)
     })
   }
-  // 读取仓库信息
-  init_repo()
-
 
   // 添加仓库
   const add = (repo: Repository) => {
@@ -129,6 +130,7 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
   }
 
   return {
+    init_repo,
     repos,
     add,
     status,

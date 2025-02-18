@@ -5,6 +5,6 @@ import './index.scss'
 
 const app = createApp(App);
 
-setupStore(app);
+await setupStore(app);
 
 app.mount("#app");
