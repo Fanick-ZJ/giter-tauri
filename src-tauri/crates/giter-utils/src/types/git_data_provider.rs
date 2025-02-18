@@ -1,7 +1,7 @@
 use crate::util::build_commit;
 use crate::util::change_status_to_file_status;
-use crate::util::deserialize_from_map;
 use crate::util::is_binary_file;
+use crate::util::is_binary_file_content;
 use crate::util::stamp_to_ymd;
 use anyhow::Result;
 use git2::TreeWalkMode;
@@ -444,8 +444,18 @@ impl GitDataProvider {
                 .to_str()
                 .unwrap()
                 .to_string();
-            let is_binary = delta.new_file().is_binary();
-            let old_is_binary = delta.old_file().is_binary();
+            // git2的is_blob函数好像有问题，直接用文件内容判断吧
+            let is_binary = if delta.new_file().exists() {
+                is_binary_file_content(self.get_blob_content(delta.new_file().id())?)?
+            } else {
+                false
+            };
+            let old_is_binary = if delta.old_file().exists() {
+                is_binary_file_content(self.get_blob_content(delta.old_file().id())?)?
+            } else {
+                false
+            };
+            println!("old: {}, new: {}, path: {}", old_is_binary, is_binary, path);
             let size = delta.new_file().size();
             let status = change_status_to_file_status(&delta.status());
             let new_blob = repo.find_blob(delta.new_file().id());

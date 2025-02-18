@@ -250,7 +250,10 @@ const applyEditorStyle = () => {
       <Icon icon="eos-icons:bubble-loading" width="24" height="24" />
     </div>
     <div v-if="success" ref="editorContainer"></div>
-    <div v-if="!loading && !success">
+    <div v-else-if="props.file.isBinary">
+      二进制文件
+    </div>
+    <div v-else-if="!loading && !success">
       加载失败
     </div>
   </NCard>

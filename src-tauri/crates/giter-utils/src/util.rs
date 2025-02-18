@@ -154,6 +154,45 @@ pub fn set_owner(path: &str) -> Result<bool, git2::Error> {
 }
 
 
+// 判断文件是否为二进制文件(直接输入文件内容)
+/// 返回 `Ok(true)` 表示是二进制文件，`Ok(false)` 表示是文本文件
+pub fn is_binary_file_content(content: Vec<u8>) -> std::io::Result<bool> {
+    
+    // 读取前 1024 字节用于检测（可根据需要调整）
+    let head_len = if content.len() < 1024 { content.len() } else { 1024 };
+    let head = content[..head_len].to_vec();
+
+    // 空字节检查
+    if head.contains(&0x00) {
+        return Ok(true);
+    }
+
+    // 统计不可打印的 ASCII 字符数量
+    let non_printable_count = content.iter().filter(|&&byte| {
+        !matches!(
+            byte,
+            0x09 | 0x0A | 0x0D |
+            0x20 ..= 0xFF
+        )
+    }).count();
+
+    let non_printable = content.iter().filter(|&&byte| {
+        !matches!(
+            byte,
+            0x09 | 0x0A | 0x0D |
+            0x20 ..= 0xFF
+        )
+    });
+
+    // 如果不可打印字符超过 5%，视为二进制文件
+    let threshold = content.len() / 20; // 5%
+    if non_printable_count > threshold {
+        println!("{:?}", non_printable);
+        
+    }
+    Ok(non_printable_count > threshold)
+}
+
 // 判断文件是否为二进制文件
 /// 返回 `Ok(true)` 表示是二进制文件，`Ok(false)` 表示是文本文件
 pub fn is_binary_file(path: &str) -> std::io::Result<bool> {
