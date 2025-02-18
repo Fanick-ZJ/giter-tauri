@@ -39,6 +39,7 @@ const viewToExtend = async () => {
   const {width, height} = await curWind.innerSize()
   curWind.setSize(new LogicalSize(REPOLIST_WIDTH + 770, height))
   curWind.setMinSize(new LogicalSize(EXPAND_MIN_WIDTH, MIN_HEIGHT))
+  curWind.setMaxSize(null)
   
 }
 
@@ -47,6 +48,7 @@ const viewToShrink = () => {
   const height = homeRef.value?.$el.clientHeight
   
   const curWind = getCurrentWindow()
+  curWind.setMaxSize(new LogicalSize(REPOLIST_WIDTH, 99999999))
   curWind.setSize(new LogicalSize(REPOLIST_WIDTH, height!))
   curWind.setMinSize(new LogicalSize(REPOLIST_WIDTH, MIN_HEIGHT))
 }

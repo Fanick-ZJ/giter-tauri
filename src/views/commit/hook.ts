@@ -1,5 +1,4 @@
-import { upToDataElement } from "@/components/repo-home/util"
-import { commitContent, getBranchCommits } from "@/utils/command"
+import { upToDataElement } from '@/utils/dom';
 import { nextTick, ref } from "vue"
 import { useCommitDetailDialog } from "./components/detail-dialog"
 

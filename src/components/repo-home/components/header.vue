@@ -5,11 +5,14 @@ import { useRepoStore } from "@/store/modules/repo";
 import { useNotificationStore } from "@/store/modules/notification";
 import { Repository } from "@/types";
 import { Icon } from "@iconify/vue";
-import { NButton, NDropdown, NBadge, NFlex } from 'naive-ui'
-import { computed } from "vue";
+import { NButton, NModal, NBadge, NFlex, NCard } from 'naive-ui'
+import { computed, ref } from "vue";
 import { createNofication } from "./notification";
 import { isRepo } from "@/utils/command";
 import { defaultRepository } from "@/types/util";
+import { FilterModel } from "../types";
+import RepoFilterForm from "./repo-filter-form.vue";
+
 defineOptions({
   name: 'HomePageHeaders'
 })
@@ -48,6 +51,24 @@ const add = () => {
   })
 }
 
+const filterShow = ref(false)
+const filterModel = ref<FilterModel>({
+  alias: '',
+  path: '',
+  hasWatched: true,
+  top: false,
+  valid: true
+})
+const showFilter = () => {
+  filterShow.value = !filterShow.value
+}
+
+const handleFilter = (model: FilterModel) => {
+  console.log(model)
+  filterModel.value = model
+  filterShow.value = false 
+}
+
 const notifShow = computed(() => {
   return notifStore.notifications.length > 0
 })
@@ -61,6 +82,10 @@ const showMsg = () => {
     createNofication(notif)
   })
 }
+
+defineExpose({
+ filter: filterModel 
+})
 </script>
 
 <template>
@@ -68,21 +93,29 @@ const showMsg = () => {
     <div class="flex-1 font-bold text-lg">
       仓库
     </div>
-    <NFlex justify="end" class="w-[80px]">
+    <NFlex justify="end" class="w-[120px]" style="gap: 0">
+      <NButton quaternary circle @click="showFilter">
+        <template #icon>
+          <Icon icon="line-md:filter" width="30" height="30" color="gray"/>
+        </template>
+      </NButton>
       <NButton quaternary circle @click="add">
         <template #icon>
           <Icon icon="lets-icons:add-duotone" width="30" height="30" color="gray"/>
         </template>
       </NButton>
-      <NDropdown v-if="notifShow" trigger="hover">
-        <NButton quaternary circle @click="showMsg">
-          <NBadge :value="notifSize" :max="99">
-            <Icon icon="lets-icons:message-alt-duotone" width="24" height="24"  color="gray"/>
-          </NBadge>
-        </NButton>
-      </NDropdown>
+      <NButton v-if="notifShow" quaternary circle @click="showMsg">
+        <NBadge :value="notifSize" :max="99">
+          <Icon icon="lets-icons:message-alt-duotone" width="24" height="24"  color="gray"/>
+        </NBadge>
+      </NButton>
     </NFlex>
   </div>
+  <NModal v-model:show="filterShow">
+    <NCard title="仓库筛选" class="w-[80%]">
+      <RepoFilterForm v-model:model-value="filterModel" @filter="handleFilter"/>
+    </NCard>
+  </NModal>
 </template>
 
 

@@ -2,13 +2,21 @@
 import { useRepoStore, ValidRepository } from '@/store/modules/repo';
 import RepoItem from './repo-item.vue'
 import { NFlex, NDropdown } from 'naive-ui';
-import { nextTick, ref } from 'vue';
-import { upToDataElement } from '../util';
+import { computed, nextTick, PropType, ref } from 'vue';
+import { upToDataElement } from '@/utils/dom';
 import { useFileInfoDialog } from '@/components/common/info-dialog';
 import { openFileManager } from '@/utils/tool';
+import { FilterModel } from '../types';
 
 defineOptions({
   name: 'RepoList'
+})
+
+const props = defineProps({
+ filter: {
+  type: Object as PropType<FilterModel>,
+  required: false
+ } 
 })
 const repoStore = useRepoStore()
 
@@ -70,11 +78,42 @@ const handleSelect = (key: string) => {
       break;
   }
 }
+
+const filtedRepos = computed(() => {
+  if (!props.filter || Object.keys(props.filter).length == 0) return repoStore.repos
+  let repos = repoStore.repos
+  const filter = props.filter
+  repos = repos.filter((repo) => {
+    console.log(repo, filter)
+    if (filter.alias && repo.alias.indexOf(filter.alias!) == -1) {
+      console.log(1)
+      return false
+    }
+    if (filter.path && repo.path.indexOf(filter.path!) == -1) {
+      console.log(2)
+      return false 
+    }
+    if (typeof filter.top != 'undefined' && repo.top != filter.top) {
+      console.log(3, typeof filter.top, typeof filter.top != undefined, repo.top, filter.top)
+      return false
+    }
+    if (typeof filter.hasWatched != 'undefined' && repo.hasWatch != filter.hasWatched) {
+      console.log(4)
+      return false
+    }
+    if (typeof filter.valid != 'undefined' && repo.valid != filter.valid) {
+      console.log(5)
+      return false 
+    }
+    return true
+  })
+  return repos
+})
 </script>
 
 <template>
   <NFlex @contextmenu="handleContextMenu" vertical>
-    <template v-for="item in repoStore.repos" :key="item.path">
+    <template v-for="item in filtedRepos" :key="item.path">
       <RepoItem :repo="item" />
     </template>
     <NDropdown

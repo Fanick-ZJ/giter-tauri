@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, PropType, ref, watch } from 'vue';
 import _ from 'lodash'
 import { getDaysOfMonth, getWeekNumber } from '@/utils/tool';
 import { NPopover, NScrollbar } from 'naive-ui';
-import { upToDataElement } from '@/components/repo-home/util';
+import { upToDataElement } from '@/utils/dom';
 import { DayStat } from '../types';
 
 defineOptions({
@@ -164,8 +164,8 @@ const handleClick = (e: MouseEvent) => {
 }
 
 const emit = defineEmits({
-  'switch-year': (year: number) => true ,
-  'date-click': (date: string) => true,
+  'switch-year': (year: number) => undefined ,
+  'date-click': (date: string) => undefined,
 })
 
 </script>
