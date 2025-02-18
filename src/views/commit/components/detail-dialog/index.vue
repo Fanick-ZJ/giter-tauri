@@ -54,6 +54,7 @@ onBeforeUnmount(() => {
   diffDetailRefs.value.forEach(item => {
     observer.observe(item.$el)
   }) 
+  commitFiles.value = []
   observer.disconnect()
 })
 

@@ -455,7 +455,6 @@ impl GitDataProvider {
             } else {
                 false
             };
-            println!("old: {}, new: {}, path: {}", old_is_binary, is_binary, path);
             let size = delta.new_file().size();
             let status = change_status_to_file_status(&delta.status());
             let new_blob = repo.find_blob(delta.new_file().id());
