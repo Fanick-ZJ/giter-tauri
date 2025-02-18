@@ -161,12 +161,12 @@ pub fn get_separator() -> String {
 }
 
 #[tauri::command]
-pub fn is_repo(repo: RepoPath) -> bool {
+pub async fn is_repo(repo: RepoPath) -> bool {
     is_git_repo(&repo)
 }
 
 #[tauri::command]
-pub fn work_status(repo: RepoPath) -> Result<WorkStatus, CommandError> {
+pub async fn work_status(repo: RepoPath) -> Result<WorkStatus, CommandError> {
     let provider = get_provider(&repo)?;
     let statuses = provider.work_status();
     if let Err(e) = statuses {

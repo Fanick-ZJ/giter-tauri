@@ -1,75 +1,154 @@
 import { ADD_WATCH, BLOB_CONTENT, COMMIT_CONTENT, FILE_DIFF, GET_AUTHORS, GET_BRANCHES, GET_COMMIT, GET_BRANCH_COMMITS, GET_CURRENT_BRANCH, GET_DRIVER, GET_FOLDERS, GET_SEPARATOR, IS_REPO, REMOVE_WATCH, SET_OWNERSHIP, WORK_STATUS, BRANCH_COMMIT_CONTRIBUTION } from "@/const/command";
 import { BRANCH_COMMIT_CONTRIBUTION_KEY } from "@/const/listen";
-import { RepoStatus } from "@/enum";
 import { Author, Branch, Commit, CommitFilter, CommitStatistic, DiffContent, File } from "@/types";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
+type InvokeUnit = {
+  id: number,
+  command: string,
+  args: any,
+  resolve: (value: any) => void,
+  reject: (reason: any) => void,
+  startTime: number,
+}
+
+// 事件执行单例总线，用于执行事件、流量限制等
+class InvokeBus {
+  private taskCount = 0;
+  private static instance: InvokeBus;
+  private invokePool: InvokeUnit[] = [];
+  private flowMaxSize = 20;
+  private flow: number = 0;
+  private constructor() { }
+  public static getInstance(): InvokeBus {
+    if (!InvokeBus.instance) {
+      InvokeBus.instance = new InvokeBus();
+    }
+    return InvokeBus.instance;
+  }
+
+  public async invoke<T>(command: string, args?: any): Promise<T> {
+    if (this.flow >= this.flowMaxSize) {
+      // 返回一个Promise，将其放入invokePool中，等待其他Promise执行完毕后再执行
+      let resolve: (value: T) => void;
+      let reject: (reason: any) => void;
+      const promise = new Promise<T>((_resolve, _reject) => {
+        resolve = _resolve;
+        reject = _reject;
+        this.taskCount++
+        this.invokePool.push({
+          id: this.taskCount,
+          command,
+          args,
+          resolve,
+          reject,
+          startTime: Date.now(),
+        })
+      })
+      return promise
+    } else {
+      // 直接执行
+      this.flow++
+      return invoke<T>(command, args).finally(() => {
+        this.flow--
+        this.next() 
+      })
+    }
+  }
+
+  private next() {
+    if (this.flow >= this.flowMaxSize) {
+      return
+    }
+    if (this.invokePool.length > 0) {
+      const invokeUnit = this.invokePool.shift()
+      if (invokeUnit) {
+        this.flow++
+        invoke(invokeUnit.command, invokeUnit.args).then((res) => {
+          invokeUnit.resolve(res)
+        }).catch((err) => {
+          invokeUnit.reject(err) 
+        }).finally(() => {
+          this.flow--
+          this.next()
+          console.log(`${invokeUnit.id} invoke ${invokeUnit.command} cost ${Date.now() - invokeUnit.startTime}ms , has ${this.invokePool.length} tasks in queue`)
+        })
+      } 
+    } 
+  }
+
+  setFlowMaxSize(size: number) {
+    this.flowMaxSize = size 
+  }
+  
+}
+
 type RepoPath = string
+const bus = InvokeBus.getInstance()
 export const addWatch = (repo: RepoPath) => {
-  return invoke(ADD_WATCH, { repo });
+  return bus.invoke(ADD_WATCH, { repo });
 }
 
 export const getDriver = () => {
-  return invoke(GET_DRIVER); 
+  return bus.invoke(GET_DRIVER); 
 }
 
 export const getSeparator = () => {
-  return invoke(GET_SEPARATOR);
+  return bus.invoke(GET_SEPARATOR);
 }
 
 export const getFolders = (path: string) => {
-  return invoke(GET_FOLDERS, { path });
+  return bus.invoke(GET_FOLDERS, { path });
 }
 
 export const isRepo = (repo: RepoPath) => {
-  return invoke(IS_REPO, { repo });
+  return bus.invoke(IS_REPO, { repo });
 }
 
 export const workStatus = (repo: RepoPath) => {
-  const status = invoke(WORK_STATUS, { repo })
-  return status
+  return bus.invoke(WORK_STATUS, { repo })
 }
 
 export const setOwnership = (repo: RepoPath) => {
-  return invoke(SET_OWNERSHIP, { repo }) 
+  return bus.invoke(SET_OWNERSHIP, { repo }) 
 }
 
 export const removeWatch = (repo: RepoPath) => {
-  return invoke(REMOVE_WATCH , { repo })
+  return bus.invoke(REMOVE_WATCH , { repo })
 }
 
 export const getBranches = (repo: RepoPath) => {
-  const branches = invoke<Branch[]>(GET_BRANCHES, { repo })
+  const branches = bus.invoke<Branch[]>(GET_BRANCHES, { repo })
   return branches
 }
 
 export const getCurrentBranch = (repo: RepoPath) : Promise<Branch> => {
-  return invoke<Branch>(GET_CURRENT_BRANCH, { repo })
+  return bus.invoke<Branch>(GET_CURRENT_BRANCH, { repo })
 }
 
 export const getBranchCommits = (repo: RepoPath, branch: Branch, count: Number) => {
-  return invoke<Commit[]>(GET_BRANCH_COMMITS, { repo, branch, count }) 
+  return bus.invoke<Commit[]>(GET_BRANCH_COMMITS, { repo, branch, count }) 
 }
 
 export const getAuthors = (repo: RepoPath, branch: Branch) => {
-  return invoke<Author[]>(GET_AUTHORS, { repo, branch }) 
+  return bus.invoke<Author[]>(GET_AUTHORS, { repo, branch }) 
 }
 
 export const commitContent = (repo: RepoPath, cid: string) => {
-  return invoke<File[]>(COMMIT_CONTENT, { repo, cid })
+  return bus.invoke<File[]>(COMMIT_CONTENT, { repo, cid })
 }
 
 export const getCommit = (repo: RepoPath, cid: string) => {
-  return invoke<Commit>(GET_COMMIT, { repo, cid})
+  return bus.invoke<Commit>(GET_COMMIT, { repo, cid})
 }
 
 export const fileDiff = (repo: RepoPath, old_id: string, new_id: string) => {
-  return invoke<DiffContent>(FILE_DIFF, { repo, old: old_id, 'new': new_id })
+  return bus.invoke<DiffContent>(FILE_DIFF, { repo, old: old_id, 'new': new_id })
 }
 
 export const getBlobContent = (repo: RepoPath, cid: string) => {
-  return invoke<number[]>(BLOB_CONTENT, { repo, cid })
+  return bus.invoke<number[]>(BLOB_CONTENT, { repo, cid })
 }
 
 export const getBranchCommitContribution = (repo: RepoPath, branch: Branch): Promise<CommitStatistic[]> => {
@@ -84,18 +163,18 @@ export const getBranchCommitContribution = (repo: RepoPath, branch: Branch): Pro
         unsub() 
       })
     })
-    invoke(BRANCH_COMMIT_CONTRIBUTION, { key, repo, branch }) 
+    bus.invoke(BRANCH_COMMIT_CONTRIBUTION, { key, repo, branch }) 
   })
 }
 
 export const getGlobalAuthor = () => {
-  return invoke<Author>('get_global_author')
+  return bus.invoke<Author>('get_global_author')
 }
 
 export const getRepoAuthor = (repo: RepoPath) => {
-  return invoke<Author>('get_repo_author', { repo })  
+  return bus.invoke<Author>('get_repo_author', { repo })  
 }
 
 export const getBranchCommitsAfterFilter = (repo: RepoPath, branch: Branch, filter: CommitFilter) => {
-  return invoke<Commit[]>('get_branch_commits_after_filter', { repo, branch, filter })
+  return bus.invoke<Commit[]>('get_branch_commits_after_filter', { repo, branch, filter })
 }
