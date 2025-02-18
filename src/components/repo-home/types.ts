@@ -1,9 +1,9 @@
 export type FilterModel = {
     group?: string
     order?: number
-    top?: boolean
-    hasWatched?: boolean
     alias?: string
     path?: string
-    valid?: boolean
+    top?: 'yes' | 'no' | ''
+    hasWatched?: 'yes' | 'no' | ''
+    valid?: 'yes' | 'no' | ''
 }

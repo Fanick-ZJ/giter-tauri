@@ -21,7 +21,6 @@ const notifStore = useNotificationStore()
 
 const add = () => {
   useFileSelector({directory: true}).then(async (path) => {
-    console.log(path)
     if (
         path === undefined 
       || path === '' 
@@ -55,16 +54,15 @@ const filterShow = ref(false)
 const filterModel = ref<FilterModel>({
   alias: '',
   path: '',
-  hasWatched: true,
-  top: false,
-  valid: true
+  hasWatched: 'yes',
+  top: '',
+  valid: 'yes'
 })
 const showFilter = () => {
   filterShow.value = !filterShow.value
 }
 
 const handleFilter = (model: FilterModel) => {
-  console.log(model)
   filterModel.value = model
   filterShow.value = false 
 }

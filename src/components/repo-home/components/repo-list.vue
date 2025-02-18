@@ -90,14 +90,17 @@ watch(() => props.filter, (filter) => {
     if (filter.path && repo.path.indexOf(filter.path!) == -1) {
       return false 
     }
-    if (typeof filter.top != 'undefined' && repo.top != filter.top) {
-      return false
+    if (typeof filter.top != 'undefined') {
+      if (filter.top == 'yes' && !repo.top) return false
+      if (filter.top == 'no' && repo.top) return false
     }
-    if (typeof filter.hasWatched != 'undefined' && repo.hasWatch != filter.hasWatched) {
-      return false
+    if (typeof filter.hasWatched != 'undefined') {
+      if (filter.hasWatched == 'yes' &&!repo.hasWatch) return false
+      if (filter.hasWatched == 'no' && repo.hasWatch) return false
     }
-    if (typeof filter.valid != 'undefined' && repo.valid != filter.valid) {
-      return false 
+    if (typeof filter.valid != 'undefined') {
+      if (filter.valid == 'yes' &&!repo.valid) return false
+      if (filter.valid == 'no' && repo.valid) return false
     }
     if (filter.order && repo.order!= filter.order) {
       return false 

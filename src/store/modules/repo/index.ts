@@ -28,7 +28,7 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
       addWatch(repo.path)
       status.set(repo.path, ref(RepoStatus.Ok))
       workStatus(repo.path).then((res) => {
-        setStatus(repo.path, res) 
+        setStatus(repo.path, res as RepoStatus) 
       }).catch((err) => {
         cmdErrNotify(err, () => workStatus(repo.path))
       })

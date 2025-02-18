@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { NForm, NFormItem, NInput, NInputNumber, NSwitch, NButton } from 'naive-ui';
+import { NForm, NFormItem, NInput, NInputNumber, NSwitch, NButton, NRadioGroup, NRadioButton } from 'naive-ui';
 import { FilterModel } from '../types';
-import { PropType } from 'vue';
 
 const model = defineModel<FilterModel>({
   default: () => {
@@ -47,13 +46,25 @@ const emit = defineEmits({
       <NInputNumber clearable v-model:value="model.order"/>
     </NFormItem>
     <NFormItem label="是否监控">
-      <NSwitch v-model:value="model.hasWatched"/>
+      <NRadioGroup v-model:value="model.hasWatched">
+        <NRadioButton key="yes" value="yes">是</NRadioButton>
+        <NRadioButton key="no" value="no">否</NRadioButton>
+        <NRadioButton key="" value="">不生效</NRadioButton>
+      </NRadioGroup>
     </NFormItem>
     <NFormItem label="是否置顶">
-      <NSwitch v-model:value="model.top"/>
+      <NRadioGroup v-model:value="model.top">
+        <NRadioButton key="yes" value="yes">是</NRadioButton>
+        <NRadioButton key="no" value="no">否</NRadioButton>
+        <NRadioButton key="" value="">不生效</NRadioButton>
+      </NRadioGroup>
     </NFormItem>
     <NFormItem label="是否有效">
-      <NSwitch v-model:value="model.valid"/>
+      <NRadioGroup v-model:value="model.valid">
+        <NRadioButton key="yes" value="yes">是</NRadioButton>
+        <NRadioButton key="no" value="no">否</NRadioButton>
+        <NRadioButton key="" value="">不生效</NRadioButton>
+      </NRadioGroup>
     </NFormItem>
     <NFormItem>
       <NButton type="primary" @click="handleClick">查询</NButton>

@@ -161,7 +161,7 @@ const initEditor = (content: string) => {
 // 找到diff信息行
 const findDiffInfoLine = (content: String) => {
   const reg = /^@@ -(\d*),(\d*) \+(\d*),(\d*) @@$/
-  const n = []
+  const n: number[] = []
   const lines = content.split('\n')
   for (let i = 0 ; i < lines.length; i++) {
     if (lines[i].search(reg) >= 0) {

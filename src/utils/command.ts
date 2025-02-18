@@ -72,7 +72,7 @@ class InvokeBus {
         }).finally(() => {
           this.flow--
           this.next()
-          console.log(`${invokeUnit.id} invoke ${invokeUnit.command} cost ${Date.now() - invokeUnit.startTime}ms , has ${this.invokePool.length} tasks in queue`)
+          // console.log(`${invokeUnit.id} invoke ${invokeUnit.command} cost ${Date.now() - invokeUnit.startTime}ms , has ${this.invokePool.length} tasks in queue`)
         })
       } 
     } 

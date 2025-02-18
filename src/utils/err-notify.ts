@@ -29,7 +29,7 @@ const RepoOwnershipError = (err: Error, okCb?: () => void): NotificationBody => 
 }
 
 export const cmdErrNotify = (err: Error, okCb?: () => void, immediatly=false) => {
-  let notify = undefined;
+  let notify;
   if (err.type === 'RepoHasnotOwnership') {
     notify = RepoOwnershipError(err, okCb)
   }
