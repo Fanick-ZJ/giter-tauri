@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeMount, onBeforeUnmount, onMounted, onUnmounted, StyleValue, useTemplateRef, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, StyleValue, watch } from 'vue';
 import { Commit, File } from '@/types';
 
 import { ref } from 'vue';
-import { NCard, NFlex, NLayout, NTag } from 'naive-ui';
+import { NCard, NFlex, NLayout, NTag, NPagination } from 'naive-ui';
 import { commitContent, fileDiff, getCommit } from '@/utils/command';
 import { useElementSize } from '@vueuse/core';
 import DiffDetailComponent from './diff-detail-item.vue';
@@ -29,8 +29,15 @@ const commit = ref<Commit>()
 
 // 懒加载, 滚动到可视区域再加载, 避免卡顿
 const diffDetailRefs = ref<InstanceType<typeof DiffDetailComponent>[]>([])
-const observer = new IntersectionObserver(entries => {
+let observer: IntersectionObserver;
+
+const obserAll = () => {
+  if (observer) {
+    observer.disconnect() 
+  }
+  observer = new IntersectionObserver(entries => {
   entries.forEach(entry => {
+    console.log('observer', entry.isIntersecting)
     if (entry.isIntersecting) {
       const index = diffDetailRefs.value.findIndex(item => item.$el === entry.target)
       diffDetailRefs.value[index].load()
@@ -38,6 +45,10 @@ const observer = new IntersectionObserver(entries => {
     }
   })
 })
+  diffDetailRefs.value.forEach(item => {
+    observer.observe(item.$el)
+  }) 
+}
 
 onMounted(async () => {
   commit.value = await getCommit(props.repo, props.commitId)
@@ -45,9 +56,7 @@ onMounted(async () => {
   // 设置滚动条的z-index,在layout上设置了style无效
   containerRef.value!.querySelector('.n-scrollbar-rail')!.setAttribute('style', 'z-index: 4')
   await nextTick()
-  diffDetailRefs.value.forEach(item => {
-    observer.observe(item.$el) 
-  })
+  obserAll()
 })
 
 onBeforeUnmount(() => {
@@ -94,6 +103,17 @@ watch(size.height, async () => {
   } 
 })
 
+const page = ref(1)
+const pageSize = ref(10)
+
+const pageItems = computed(() => {
+  return commitFiles.value?.slice((page.value - 1) * pageSize.value, page.value * pageSize.value) || [] 
+})
+
+watch(() => page.value, async () => {
+  await nextTick()
+  obserAll() 
+})
 
 </script>
 
@@ -134,10 +154,16 @@ watch(size.height, async () => {
           class="absolute w-full"
           :style="containerStyle" 
           :native-scrollbar="false">
-          <NFlex>
-            <template v-for="item in commitFiles" :key="item.objectId">
+          <NFlex justify="center">
+            <template v-for="item in pageItems" :key="item.objectId">
               <DiffDetailComponent ref="diffDetailRefs" :repo="repo" :file="item" />
             </template>
+            <NPagination
+              :item-count="commitFiles?.length"
+              v-model:page="page"
+              v-model:page-size="pageSize"
+              :page-sizes="[10, 20, 30]" 
+              show-size-picker/>
           </NFlex>
         </NLayout>
       </div>

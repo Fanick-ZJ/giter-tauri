@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRepoStore } from '@/store/modules/repo';
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { Icon } from '@iconify/vue'
 import LayoutPage from '@/components/common/layout-page/index.vue'
@@ -10,10 +10,12 @@ import CommitItem from './components/commit-item.vue'
 import { NFlex, NPagination, NButton, NIcon, NSelect, NDropdown } from 'naive-ui';
 import { Model } from './type';
 import FilterForm from './components/filter-form.vue'
+import LoadingView from '@/components/common/loading-view.vue'
 import { useContextMenu } from './hook';
 
 const route = useRoute()
 const repoStore = useRepoStore()
+const loading = ref(false)
 const id = ref(parseInt(route.params.id as string))
 const repo = ref<Repository>()
 const page = ref(1)
@@ -34,8 +36,10 @@ const init = async () => {
 
 const getCommits = async () => {
   let path = repo.value!.path
+  loading.value = true
   getBranchCommits(path, curBranch.value!, 1 << 31).then((res) => {
     commits.value = res
+    loading.value = false
   })
 }
 
@@ -153,11 +157,13 @@ const {
     <template #filter-form>
       <FilterForm v-if="showFilter" :author-list="authors" v-bind:model-value="filterModel"></FilterForm>
     </template>
-    <NFlex @contextmenu="handleContextMenu" :data-repo="repo?.path">
-      <template v-for="c in filtedList.slice((page - 1) * pageSize, page * pageSize)">
-        <CommitItem :commit="c"/>
-      </template>
-    </NFlex>
+    <LoadingView :loading="loading">
+      <NFlex @contextmenu="handleContextMenu" :data-repo="repo?.path">
+        <template v-for="c in filtedList.slice((page - 1) * pageSize, page * pageSize)">
+          <CommitItem :commit="c"/>
+        </template>
+      </NFlex>
+    </LoadingView>
     <template #footer>
       <NFlex justify="center">
         <NPagination 

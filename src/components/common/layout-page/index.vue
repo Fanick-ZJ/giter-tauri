@@ -26,13 +26,21 @@ const pageSize = useElementSize(pageRef)
 const footerSize = useElementSize(footerRef)
 
 const contentStyle = computed(() => {
-  return {
-    height: pageSize.height.value - 35 - footerSize.height.value +'px'
+  const height = pageSize.height.value - 35 - footerSize.height.value
+  if (height < 0) {
+    return {
+      'max-height': '100%'
+    }
+  } else {
+    return {
+      'max-height': pageSize.height.value - 35 - footerSize.height.value +'px'
+    }
   }
 })
 
 </script>
 <template>
+  <!-- 头部 -->
   <div class="h-screen flex flex-col gap-[5px]" ref="pageRef" :style="{padding: `${padding}px`}">
     <div class="flex h-[35px] justify-between">
       <div>
@@ -43,6 +51,7 @@ const contentStyle = computed(() => {
         <slot name="header-extra"/>
       </div>
     </div>
+    <!-- 筛选表单部分 -->
     <div>
       <slot name="filter-form"/>
     </div>

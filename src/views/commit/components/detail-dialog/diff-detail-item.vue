@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, PropType, Ref, ref } from 'vue';
 import { DiffContent, File } from '@/types';
-import { Icon } from '@iconify/vue';
 import { NCard } from 'naive-ui';
 import * as monaco from 'monaco-editor';
 import { getMonacoLanguage } from '@/utils/tool';
+import LoadingView from '@/components/common/loading-view.vue';
 import { fileDiff, getBlobContent } from '@/utils/command';
 
 defineOptions({
@@ -26,8 +26,8 @@ const diffContent = ref<DiffContent>()
 let addedLines: Ref<number[]> = ref([])
 let deletedLines: Ref<number[]> = ref([])
 let diffDetailLines: Ref<number[]> = ref([])
-const success = ref<Boolean>(false)
-const loading = ref<Boolean>(true)
+const success = ref<boolean>(false)
+const loading = ref<boolean>(true)
 
 // 暴露给外部调用，动态加载，避免拥堵
 const load = async () => {
@@ -36,6 +36,8 @@ const load = async () => {
     loading.value = false
     return
   }
+
+  loading.value = false
   if (props.file.status === 'Added') {
     getBlobContent(props.repo, props.file.objectId).then(async res => {
       // 将u8数组转换为字符串
@@ -51,7 +53,6 @@ const load = async () => {
       await nextTick()
       initEditor(str)
       applyEditorStyle()
-      loading.value = false
     })
   }
   else if (props.file.status === 'Deleted') {
@@ -69,8 +70,6 @@ const load = async () => {
     }).catch(err => {
       console.error(err)
       success.value = false
-    }).finally(() => {
-      loading.value = false
     })
   }
   else {
@@ -88,10 +87,8 @@ const load = async () => {
     }).catch(err => {
       console.error(err)
       success.value = false
-    }).finally(() => {
-      loading.value = false
     })
-  }	
+  }
 }
 
 
@@ -246,16 +243,17 @@ const applyEditorStyle = () => {
         <div class="h-[10px] w-[30px]" :style="modifRatiStyle"></div>
       </div>
     </template>
-    <div v-if="loading" class="w-full h-full flex justify-center items-center">
-      <Icon icon="eos-icons:bubble-loading" width="24" height="24" />
-    </div>
-    <div v-if="success" ref="editorContainer"></div>
-    <div v-else-if="props.file.isBinary">
-      二进制文件
-    </div>
-    <div v-else-if="!loading && !success">
-      加载失败
-    </div>
+    <LoadingView :loading="loading">
+      <div>
+        <div v-if="success" ref="editorContainer"></div>
+        <div v-else-if="props.file.isBinary">
+          二进制文件
+        </div>
+        <div v-else-if="!loading && !success">
+          加载失败
+        </div>
+      </div>
+    </LoadingView>
   </NCard>
 </template>
 
