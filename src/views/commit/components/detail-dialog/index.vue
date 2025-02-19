@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, StyleValue, watch } from 'vue';
-import { Commit, File } from '@/types';
+import { computed, nextTick, onBeforeUnmount, onMounted, StyleValue, useTemplateRef, watch } from 'vue';
+import { Commit, CommitFile } from '@/types';
 
 import { ref } from 'vue';
 import { NCard, NFlex, NLayout, NTag, NPagination } from 'naive-ui';
@@ -24,7 +24,7 @@ const props = defineProps({
   }
 })
 
-const commitFiles = ref<File[]>()
+const commitFiles = ref<CommitFile[]>()
 const commit = ref<Commit>()
 
 // 懒加载, 滚动到可视区域再加载, 避免卡顿
@@ -103,8 +103,12 @@ watch(size.height, async () => {
   } 
 })
 
+const contentRef = useTemplateRef('contentRef')
 const page = ref(1)
 const pageSize = ref(10)
+const handlePageChange = (page: number) => {
+  contentRef.value?.scrollTo(0, 0)
+}
 
 const pageItems = computed(() => {
   return commitFiles.value?.slice((page.value - 1) * pageSize.value, page.value * pageSize.value) || [] 
@@ -151,9 +155,11 @@ watch(() => page.value, async () => {
       </template>
       <div class="h-full relative" ref="containerRef">
         <NLayout 
+          ref="contentRef"
           class="absolute w-full"
           :style="containerStyle" 
-          :native-scrollbar="false">
+          :native-scrollbar="false"
+          >
           <NFlex justify="center">
             <template v-for="item in pageItems" :key="item.objectId">
               <DiffDetailComponent ref="diffDetailRefs" :repo="repo" :file="item" />
@@ -162,7 +168,8 @@ watch(() => page.value, async () => {
               :item-count="commitFiles?.length"
               v-model:page="page"
               v-model:page-size="pageSize"
-              :page-sizes="[10, 20, 30]" 
+              :page-sizes="[10, 20, 30]"
+              @update-page="handlePageChange" 
               show-size-picker/>
           </NFlex>
         </NLayout>

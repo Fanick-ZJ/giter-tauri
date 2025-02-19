@@ -1,6 +1,6 @@
 import { ADD_WATCH, BLOB_CONTENT, COMMIT_CONTENT, FILE_DIFF, GET_AUTHORS, GET_BRANCHES, GET_COMMIT, GET_BRANCH_COMMITS, GET_CURRENT_BRANCH, GET_DRIVER, GET_FOLDERS, GET_SEPARATOR, IS_REPO, REMOVE_WATCH, SET_OWNERSHIP, WORK_STATUS, BRANCH_COMMIT_CONTRIBUTION } from "@/const/command";
 import { BRANCH_COMMIT_CONTRIBUTION_KEY } from "@/const/listen";
-import { Author, Branch, Commit, CommitFilter, CommitStatistic, DiffContent, File } from "@/types";
+import { Author, Branch, Commit, CommitFilter, CommitStatistic, DiffContent, CommitFile } from "@/types";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -136,7 +136,7 @@ export const getAuthors = (repo: RepoPath, branch: Branch) => {
 }
 
 export const commitContent = (repo: RepoPath, cid: string) => {
-  return bus.invoke<File[]>(COMMIT_CONTENT, { repo, cid })
+  return bus.invoke<CommitFile[]>(COMMIT_CONTENT, { repo, cid })
 }
 
 export const getCommit = (repo: RepoPath, cid: string) => {

@@ -42,7 +42,7 @@ export type Commit = {
 }
 
 
-export type File = {
+export type CommitFile = {
   path: string
   type: string
   size: number

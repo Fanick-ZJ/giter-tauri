@@ -7,7 +7,7 @@ import LayoutPage from '@/components/common/layout-page/index.vue'
 import { getAuthors, getBranchCommits, getBranches, getCurrentBranch } from '@/utils/command';
 import { Author, Branch, Commit, Repository } from '@/types';
 import CommitItem from './components/commit-item.vue'
-import { NFlex, NPagination, NButton, NIcon, NSelect, NDropdown } from 'naive-ui';
+import { NFlex, NPagination, NButton, NIcon, NSelect, NDropdown, NLayout } from 'naive-ui';
 import { Model } from './type';
 import FilterForm from './components/filter-form.vue'
 import LoadingView from '@/components/common/loading-view.vue'
@@ -142,7 +142,7 @@ const {
 
 </script>
 <template>
-  <LayoutPage title="提交记录" :subtitle="repo?.alias">
+  <LayoutPage title="提交记录" :subtitle="repo?.alias" :loading="loading">
     <template #header-extra>
       <div class="flex gap-x-[10px]">
         <NSelect v-model:value="selectedBranch" clearable :options="branchOptions" placeholder="选择分支" class="w-[200px]">
@@ -157,13 +157,11 @@ const {
     <template #filter-form>
       <FilterForm v-if="showFilter" :author-list="authors" v-bind:model-value="filterModel"></FilterForm>
     </template>
-    <LoadingView :loading="loading">
-      <NFlex @contextmenu="handleContextMenu" :data-repo="repo?.path">
-        <template v-for="c in filtedList.slice((page - 1) * pageSize, page * pageSize)">
-          <CommitItem :commit="c"/>
-        </template>
-      </NFlex>
-    </LoadingView>
+    <NFlex @contextmenu="handleContextMenu" :data-repo="repo?.path">
+      <template v-for="c in filtedList.slice((page - 1) * pageSize, page * pageSize)">
+        <CommitItem :commit="c"/>
+      </template>
+    </NFlex>
     <template #footer>
       <NFlex justify="center">
         <NPagination 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, PropType, Ref, ref } from 'vue';
-import { DiffContent, File } from '@/types';
+import { DiffContent, CommitFile } from '@/types';
 import { NCard } from 'naive-ui';
 import * as monaco from 'monaco-editor';
 import { getMonacoLanguage } from '@/utils/tool';
@@ -17,7 +17,7 @@ const props = defineProps({
     required: true 
   },
   file: {
-    type: Object as PropType<File>,
+    type: Object as PropType<CommitFile>,
     required: true
   }
 })

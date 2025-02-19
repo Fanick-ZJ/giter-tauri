@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useElementSize } from '@vueuse/core';
-import { NLayout, NLayoutHeader, NLayoutContent, NLayoutFooter } from 'naive-ui';
+import { NScrollbar } from 'naive-ui';
+import LoadingView from '@/components/common/loading-view.vue';
 import { computed, ref, useTemplateRef } from 'vue';
 defineOptions({
   name: 'LayoutPage'
@@ -18,6 +19,10 @@ const props = defineProps({
   padding: {
     type: Number,
     default: 10
+  },
+  loading: {
+    type: Boolean,
+    default: false 
   }
 })
 const pageRef = ref<HTMLElement>()
@@ -25,17 +30,9 @@ const footerRef = ref<HTMLElement>()
 const pageSize = useElementSize(pageRef)
 const footerSize = useElementSize(footerRef)
 
-const contentStyle = computed(() => {
-  const height = pageSize.height.value - 35 - footerSize.height.value
-  if (height < 0) {
-    return {
-      'max-height': '100%'
-    }
-  } else {
-    return {
-      'max-height': pageSize.height.value - 35 - footerSize.height.value +'px'
-    }
-  }
+const contentHeight = computed(() => {
+  const height = pageSize.height.value - 35 - footerSize.height.value  - props.padding * 2
+  return height
 })
 
 </script>
@@ -55,9 +52,11 @@ const contentStyle = computed(() => {
     <div>
       <slot name="filter-form"/>
     </div>
-    <NLayout :style="contentStyle" :native-scrollbar="false">
-      <slot/>
-    </NLayout>
+    <LoadingView :loading="loading">
+      <NScrollbar>
+        <slot />
+      </NScrollbar>
+    </LoadingView>
     <div ref="footerRef">
       <slot name="footer"/>
     </div>
