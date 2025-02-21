@@ -79,6 +79,10 @@ export function createSingletonComponent<T extends Component>(
   return instanceManager
 }
 
+export const fileExtension = (path: string) => {
+  return path.split('.').pop() || '' 
+}
+
 export function getMonacoLanguage(fileName: string) {
   const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
 

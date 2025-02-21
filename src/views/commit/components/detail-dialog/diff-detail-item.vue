@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, PropType, Ref, ref } from 'vue';
+import { computed, defineComponent, nextTick, onBeforeUnmount, onMounted, onUnmounted, PropType, Ref, ref, shallowRef } from 'vue';
 import { DiffContent, CommitFile } from '@/types';
-import { NCard } from 'naive-ui';
+import { NCard, NWatermark, NFlex } from 'naive-ui';
 import * as monaco from 'monaco-editor';
 import { getMonacoLanguage } from '@/utils/tool';
 import LoadingView from '@/components/common/loading-view.vue';
 import { fileDiff, getBlobContent } from '@/utils/command';
+import { BinaryResult, processBinaryData } from './utils';
 
 defineOptions({
   name: 'DiffDetailComponent' 
@@ -28,12 +29,18 @@ let deletedLines: Ref<number[]> = ref([])
 let diffDetailLines: Ref<number[]> = ref([])
 const success = ref<boolean>(false)
 const loading = ref<boolean>(true)
+const binaryComps:Ref<BinaryResult> = shallowRef([undefined, undefined])
 
 // 暴露给外部调用，动态加载，避免拥堵
 const load = async () => {
   if (props.file.isBinary) {
-    success.value = false
+    processBinaryData(props.repo, props.file)!.then(res => {
+      console.log(res)
+      binaryComps.value = res
+      success.value = true	
+    })
     loading.value = false
+    success.value = false
     return
   }
 
@@ -233,7 +240,7 @@ const applyEditorStyle = () => {
       </div>
     </template>
     <template #header-extra>
-      <div class="flex gap-1 items-center">
+      <div v-if="!file.isBinary" class="flex gap-1 items-center">
         <div class="text-green-400">
           {{ + addedLines.length  }}
         </div>
@@ -245,9 +252,44 @@ const applyEditorStyle = () => {
     </template>
     <LoadingView :loading="loading">
       <div>
-        <div v-if="success" ref="editorContainer"></div>
+        <div v-if="success && !props.file.isBinary" ref="editorContainer"></div>
         <div v-else-if="props.file.isBinary">
-          二进制文件
+          <NFlex>
+            <di class="flex-1">
+              <NWatermark 
+                content="NEW" 
+                selectable 
+                cross 
+                class="z-[2] w-full h-full flex justify-center items-center"
+                :x-offset="12"
+                :y-offset="12"
+                :width="100"
+                :height="50"
+                :rotate="-15">
+                <component v-if="binaryComps[0]" :is="binaryComps[0].name" v-bind="binaryComps[0].param"/>
+                <div v-else>
+                  新的数据没有了喔😊
+                </div>
+              </NWatermark>
+            </di>
+            <div class="flex-1">
+              <NWatermark 
+                content="OLD" 
+                selectable 
+                cross 
+                class="z-[2] w-full h-full flex justify-center items-center"
+                :x-offset="12"
+                :y-offset="12"
+                :width="100"
+                :height="50"
+                :rotate="-15">
+                <component v-if="binaryComps[1]" :is="binaryComps[1].name" v-bind="binaryComps[1].param"/>
+                <div v-else class="text-center text-lg font-medium text-gray-900 italic dark:text-gray-200 ">
+                  没有就的数据喔😊
+                </div>
+              </NWatermark>
+            </div>
+          </NFlex>
         </div>
         <div v-else-if="!loading && !success">
           加载失败

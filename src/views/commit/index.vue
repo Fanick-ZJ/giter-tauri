@@ -10,7 +10,6 @@ import CommitItem from './components/commit-item.vue'
 import { NFlex, NPagination, NButton, NIcon, NSelect, NDropdown, NLayout } from 'naive-ui';
 import { Model } from './type';
 import FilterForm from './components/filter-form.vue'
-import LoadingView from '@/components/common/loading-view.vue'
 import { useContextMenu } from './hook';
 
 const route = useRoute()

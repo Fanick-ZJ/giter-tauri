@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup lang="tsx">
 import { computed, nextTick, onBeforeUnmount, onMounted, StyleValue, useTemplateRef, watch } from 'vue';
 import { Commit, CommitFile } from '@/types';
 
@@ -37,10 +37,9 @@ const obserAll = () => {
   }
   observer = new IntersectionObserver(entries => {
   entries.forEach(entry => {
-    console.log('observer', entry.isIntersecting)
     if (entry.isIntersecting) {
       const index = diffDetailRefs.value.findIndex(item => item.$el === entry.target)
-      diffDetailRefs.value[index].load()
+      diffDetailRefs.value[index].$.exposed!.load()
       observer.unobserve(entry.target)
     }
   })

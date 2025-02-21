@@ -84,7 +84,7 @@ class InvokeBus {
   
 }
 
-type RepoPath = string
+type RepoPath = String
 const bus = InvokeBus.getInstance()
 export const addWatch = (repo: RepoPath) => {
   return bus.invoke(ADD_WATCH, { repo });
@@ -147,7 +147,7 @@ export const fileDiff = (repo: RepoPath, old_id: string, new_id: string) => {
   return bus.invoke<DiffContent>(FILE_DIFF, { repo, old: old_id, 'new': new_id })
 }
 
-export const getBlobContent = (repo: RepoPath, cid: string) => {
+export const getBlobContent = (repo: RepoPath, cid: String) => {
   return bus.invoke<number[]>(BLOB_CONTENT, { repo, cid })
 }
 
