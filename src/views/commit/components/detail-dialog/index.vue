@@ -164,6 +164,7 @@ watch(() => page.value, async () => {
               <DiffDetailComponent ref="diffDetailRefs" :repo="repo" :file="item" />
             </template>
             <NPagination
+              v-if="(commitFiles?.length || 0) > pageSize"
               :item-count="commitFiles?.length"
               v-model:page="page"
               v-model:page-size="pageSize"

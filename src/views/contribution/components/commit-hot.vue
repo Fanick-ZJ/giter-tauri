@@ -19,12 +19,11 @@ const props = defineProps({
    required: true
   }
 })
-const currentYear =  ref<number>(props.stats.length > 0 ? props.stats[0].year : 0)
-
+const currentYear =  ref<number>(props.stats.length > 0 ? _.last(props.stats)!.year : 0)
 const yearRange = computed(() => {
   return props.stats!.map((stat) => {
     return stat.year
-  }).sort()
+  }).sort().reverse()
 })
 
 const currentYearDayStat = computed(() => {
@@ -84,7 +83,7 @@ const clearWeekDayList = () => {
 const weekDayList = ref<(DayStat | undefined)[][]>(_.times(7, () => _.times(53, () => undefined)))
 
 watch(() => props.stats, (newVal) => {
-  currentYear.value = newVal[0].year
+  currentYear.value = _.last(newVal)!.year
 }, {immediate: true})
 
 watch(() => currentYearDayStat.value,  (newVal) => {

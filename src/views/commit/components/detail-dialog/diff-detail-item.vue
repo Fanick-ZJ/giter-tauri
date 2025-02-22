@@ -38,8 +38,9 @@ const load = async () => {
       console.log(res)
       binaryComps.value = res
       success.value = true	
+    }).finally(() => {
+      loading.value = false	
     })
-    loading.value = false
     success.value = false
     return
   }
@@ -255,7 +256,7 @@ const applyEditorStyle = () => {
         <div v-if="success && !props.file.isBinary" ref="editorContainer"></div>
         <div v-else-if="props.file.isBinary">
           <NFlex>
-            <di class="flex-1">
+            <di class="flex-1 gap-2">
               <NWatermark 
                 content="NEW" 
                 selectable 
