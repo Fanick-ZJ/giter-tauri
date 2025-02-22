@@ -114,10 +114,14 @@ pub fn build_file_between_tree(
 
 /// 判断是否是git仓库
 pub fn is_git_repo(path: &str) -> bool {
-    if let Ok(repo) = Repository::open(path) {
-        return true;
-    } else {
-        return false;
+    match Repository::open(path) {
+        Ok(_) => true,
+        Err(e) => {
+            if e.code() == git2::ErrorCode::Owner {
+               return true
+            }
+            false
+        }, 
     }
 }
 

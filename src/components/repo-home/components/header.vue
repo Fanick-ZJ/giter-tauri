@@ -54,9 +54,9 @@ const filterShow = ref(false)
 const filterModel = ref<FilterModel>({
   alias: '',
   path: '',
-  hasWatched: 'yes',
+  hasWatched: '',
   top: '',
-  valid: 'yes'
+  valid: ''
 })
 const showFilter = () => {
   filterShow.value = !filterShow.value
@@ -92,6 +92,11 @@ defineExpose({
       仓库
     </div>
     <NFlex justify="end" class="w-[120px]" style="gap: 0">
+      <NButton v-if="notifShow" quaternary circle @click="showMsg">
+        <NBadge :value="notifSize" :max="99">
+          <Icon icon="lets-icons:message-alt-duotone" width="24" height="24"  color="gray"/>
+        </NBadge>
+      </NButton>  
       <NButton quaternary circle @click="showFilter">
         <template #icon>
           <Icon icon="line-md:filter" width="30" height="30" color="gray"/>
@@ -101,11 +106,6 @@ defineExpose({
         <template #icon>
           <Icon icon="lets-icons:add-duotone" width="30" height="30" color="gray"/>
         </template>
-      </NButton>
-      <NButton v-if="notifShow" quaternary circle @click="showMsg">
-        <NBadge :value="notifSize" :max="99">
-          <Icon icon="lets-icons:message-alt-duotone" width="24" height="24"  color="gray"/>
-        </NBadge>
       </NButton>
     </NFlex>
   </div>

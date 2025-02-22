@@ -79,8 +79,9 @@ const handleSelect = (key: string) => {
   }
 }
 
-const filtedRepos = ref<ValidRepository[]>(repoStore.repos)
-watch(() => props.filter, (filter) => {
+const filtedRepos = ref<ValidRepository[]>()
+watch([() => props.filter, () => repoStore.repos], (newVal) => {
+  const filter = newVal[0]
   if (!filter || Object.keys(filter).length == 0) return repoStore.repos
   let repos = repoStore.repos
   repos = repos.filter((repo) => {
