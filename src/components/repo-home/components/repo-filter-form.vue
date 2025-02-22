@@ -9,9 +9,9 @@ const model = defineModel<FilterModel>({
       alias: '',
       path: '',
       order: 0,
-      hasWatched: false,
-      top: false,
-      valid: true
+      hasWatched: undefined,
+      top: undefined,
+      valid: undefined
     } 
   }
 })

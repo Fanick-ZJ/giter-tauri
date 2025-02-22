@@ -17,24 +17,25 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
   const status: Map<RepoPath, Ref<RepoStatus>> = new Map()
 
   const _init_opt = async (repo: ValidRepository) => {
-    return isRepo(repo.path).then(is => {
+    return isRepo(repo.path).then(async is => {
       if (!is){
         repo.valid = false
         return repo
       }
-      if (!repo.hasWatch) {
-        return repo
+      if (repo.hasWatch) {
+        addWatch(repo.path) 
       }
-      addWatch(repo.path)
       status.set(repo.path, ref(RepoStatus.Ok))
-      workStatus(repo.path).then((res) => {
-        setStatus(repo.path, res as RepoStatus) 
-      }).catch((err) => {
-        cmdErrNotify(err, () => workStatus(repo.path))
-      })
+      try {
+       const _status = await workStatus(repo.path) 
+       repo.valid = true
+       setStatus(repo.path, _status as RepoStatus)
+      } catch (error) {
+        cmdErrNotify(error as any, () => workStatus(repo.path))
+        repo.valid = false
+      }
       return repo
     }).catch((err) => {
-      repo.valid = false
       cmdErrNotify(err, () => isRepo(repo.path))
       return repo
     })
@@ -64,10 +65,11 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
       const repo = __repos[i];
       repo.hasWatch = !!repo.hasWatch
       repo.top = !!repo.top
-      Object.assign(repo, {
-        valid: true,
-      })
-      repoInitPromise.push(_init_opt(repo as ValidRepository))
+      const validRepo: ValidRepository = {
+        ...repo,
+        valid: false 
+      }
+      repoInitPromise.push(_init_opt(validRepo))
     }
     await Promise.all(repoInitPromise).then((res) => {
       repos.value = res.sort(repoSort)
@@ -78,11 +80,15 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
   const add = (repo: Repository) => {
     saveRepo(repo).then((res: QueryResult) => {
       repo.id = res.lastInsertId as number
-      Object.assign(repo, {
-        valid: true,
-      })
+      const validRepo: ValidRepository = {
+        ...repo,
+        valid: false 
+      }
       // @ts-ignore
-      _init_opt(repo)
+      _init_opt(repo).then((res) => {
+        repos.value.push(res)
+        repos.value.sort(repoSort) 
+      })
     })
   }
 

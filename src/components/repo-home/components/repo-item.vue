@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { NCard, NEllipsis, NPopover } from 'naive-ui';
-import { computed, inject, nextTick, PropType, ref } from 'vue';
+import { computed, inject, nextTick, PropType, ref, StyleValue } from 'vue';
 import { RepoStatus } from '@/enum';
 import { Icon } from '@iconify/vue';
 import { useRepoStore, ValidRepository } from '@/store/modules/repo';
