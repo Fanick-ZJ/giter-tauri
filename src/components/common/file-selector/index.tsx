@@ -23,7 +23,7 @@ export const useFileSelector = (options: FileSelectorOptions): (Promise<string>)
   return comp.instance.$.exposed?.show()
 }
 
-export class FileSelectorDialog extends AbstractDialog<String | String[]> {
+export class FileSelectorDialog extends AbstractDialog<string | string[]> {
   private props: FileSelectorOptions
   constructor (props: FileSelectorOptions) {
     super({

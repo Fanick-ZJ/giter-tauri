@@ -138,8 +138,8 @@ export class AbstractDialog<R> {
     }
     else if (this.buttonBox === 'ok-cancel') {
       return () => (
-        <div class="flex justify-end">
-          <NButton onClick={_this.ok.bind(_this)}>
+        <div class="flex justify-end gap-2">
+          <NButton onClick={_this.ok.bind(_this)} type='primary'>
             确定
           </NButton>
           <NButton onClick={_this.close.bind(_this)}>
