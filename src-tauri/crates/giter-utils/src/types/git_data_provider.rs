@@ -2,6 +2,7 @@ use crate::util::build_commit;
 use crate::util::change_status_to_file_status;
 use crate::util::is_binary_file;
 use crate::util::is_binary_file_content;
+use crate::util::size_by_path;
 use crate::util::stamp_to_ymd;
 use anyhow::Result;
 use git2::TreeWalkMode;
@@ -25,7 +26,8 @@ use super::cache::Cache;
 use super::commit_filter::FilterConditions;
 use super::contribution::CommitStatistic;
 use super::diff::ContentDiff;
-use super::file::File;
+use super::file::ChangedFile;
+use super::file::CommittedFile;
 use super::file::UntrackedFile;
 use super::status::FileStatus;
 
@@ -47,7 +49,7 @@ impl Pointer for GitDataProvider {
 }
 
 impl GitDataProvider {
-    pub fn new(repository: &str) -> Result<Self, git2::Error> {
+    pub fn new<P: AsRef<Path>>(repository: P) -> Result<Self, git2::Error> {
         let repo = Repository::open(repository);
         match repo {
             Ok(repo) => Ok(GitDataProvider {
@@ -76,17 +78,12 @@ impl GitDataProvider {
         Ok(Author { name, email })
     }
 
-
-    fn blob_path<T: AsRef<Path>>(&self, path: T) -> Result<PathBuf> {
+    /// 根据仓库文件的相对地址，获取文件的绝对地址
+    /// 
+    fn blob_path<T: AsRef<Path>>(&self, path: T) -> PathBuf {
         let path = path.as_ref();
         let path = self.workdir().join(path);
-        Ok(path)
-    }
-
-    fn blob_size_by_path<T: AsRef<Path>>(&self, path: T) -> Result<u64> {
-        let path = self.blob_path(path)?;
-        let metadata = path.metadata()?;
-        Ok(metadata.len())
+        path
     }
 
     /// 获取位追踪的文件列表
@@ -98,10 +95,10 @@ impl GitDataProvider {
             Ok(status) => {
                 for item in &status {
                     if item.status() == Status::WT_NEW {
-                        let path = item.path().unwrap();
-                        let size = self.blob_size_by_path(path)? as usize;
-                        let is_binary = is_binary_file(path)?;
-                        let untracked_file = UntrackedFile::new(path, size, is_binary);
+                        let abs_path = self.blob_path(item.path().unwrap());
+                        let size = size_by_path(&abs_path)? as usize;
+                        let is_binary = is_binary_file(&abs_path)?;
+                        let untracked_file = UntrackedFile::new(&abs_path, size, is_binary);
                         untracks.push(untracked_file);
                     }
                 }
@@ -154,6 +151,106 @@ impl GitDataProvider {
             Err(err) => return Err(anyhow::anyhow!(err.message().to_string())),
         }
         Ok(false)
+    }
+
+    pub fn get_path_oid(&self, path: &PathBuf) -> Result<Oid> {
+        // 获取 HEAD 引用
+        let reference = self.repository.head()?;
+
+        // 剥离引用为 Commit
+        let commit = reference.peel_to_commit()?;
+
+        // 获取 Commit 的树对象
+        let tree = commit.tree()?;
+
+        // 从树对象中查找路径对应的条目
+        let entry = tree.get_path(&path)?;
+
+        // 返回条目的 Oid
+        Ok(entry.id())
+    }
+
+    fn status_to_changed_status(&self, status: Status) -> FileStatus {
+        println!("status: {:?}", status);
+        match status {
+            Status::WT_NEW | Status::INDEX_NEW => FileStatus::Added,
+            Status::WT_MODIFIED | Status::INDEX_MODIFIED => FileStatus::Modified,
+            Status::WT_DELETED | Status::INDEX_DELETED => FileStatus::Deleted, 
+            Status::WT_RENAMED | Status::INDEX_RENAMED => FileStatus::Renamed,
+            _ => FileStatus::Ok,
+        }
+    }
+
+    fn blob_is_binary(&self, oid: Oid) -> Result<bool> {
+        let blob = self.repository.find_blob(oid);
+        if let Err(_) = blob {
+            return Ok(false);
+        }
+        let blob = blob.unwrap();
+        let content = blob.content();
+        let is = is_binary_file_content(content.to_vec())?;
+        Ok(is)
+
+    }
+
+    pub fn staged_files(&self) -> Result<Vec<ChangedFile>> {
+        let status = self.repository.statuses(None)?;
+        let mut modified: Vec<ChangedFile> = Vec::new();
+        for item in &status {
+            let index_status = Status::INDEX_DELETED.bits()
+                | Status::INDEX_MODIFIED.bits()
+                | Status::INDEX_NEW.bits()
+                | Status::INDEX_RENAMED.bits()
+                | Status::INDEX_TYPECHANGE.bits();
+            if index_status > 0 {
+                let abs_path = self.blob_path(item.path().unwrap());
+                let path = PathBuf::from(item.path().unwrap());
+                println!("path: {:?}", abs_path);
+                let size = size_by_path(&abs_path)? as usize;
+                println!("size: {}", size);
+                let is_binary = is_binary_file(&abs_path)?;
+                println!("is_binary: {}", is_binary);
+                let oid = self.get_path_oid(&path)?;
+                println!("oid: {}", oid);
+                let old_is_binary = self.blob_is_binary(oid)?;
+                println!("old_is_binary: {}", old_is_binary);
+                let status = self.status_to_changed_status(item.status());
+                let changed_file = ChangedFile::new(path, size, Some(is_binary), Some(old_is_binary), Some(oid), status);
+                modified.push(changed_file); 
+            } 
+        } 
+        Ok(modified)
+    }
+
+    pub fn changed_files(&self) -> Result<Vec<ChangedFile>> {
+        let status = self.repository.statuses(None)?;
+        let mut modified: Vec<ChangedFile> = Vec::new(); 
+        for item in &status {
+            let index_status = Status::WT_DELETED.bits()
+            | Status::WT_MODIFIED.bits()
+            | Status::WT_NEW.bits()
+            | Status::WT_RENAMED.bits()
+            | Status::WT_TYPECHANGE.bits()
+            | Status::WT_NEW.bits();
+            if index_status > 0 {
+                let abs_path = self.blob_path(item.path().unwrap());
+                let path = PathBuf::from(item.path().unwrap());
+                println!("path: {:?}", abs_path);
+                let size = size_by_path(&abs_path)? as usize;
+                println!("size: {}", size);
+                let is_binary = is_binary_file(&abs_path)?;
+                println!("is_binary: {}", is_binary);
+                let oid = self.get_path_oid(&abs_path)?;
+                println!("oid: {}", oid);
+                let old_is_binary = self.blob_is_binary(oid)?;
+                println!("old_is_binary: {}", old_is_binary);
+                let status = self.status_to_changed_status(item.status());
+                println!("status: {:?}", status);
+                let changed_file = ChangedFile::new(path, size, Some(is_binary), Some(old_is_binary), Some(oid), status);
+                modified.push(changed_file);
+            }
+        }
+        Ok(modified)
     }
 
     pub fn current_branch(&self) -> Result<Branch> {
@@ -390,21 +487,21 @@ impl GitDataProvider {
         Ok(commits)
     }
 
-    fn tree_walk(&self, tree: &git2::Tree) -> Result<Vec<File>> {
-        let mut files: Vec<File> = Vec::new();
+    fn tree_walk(&self, tree: &git2::Tree) -> Result<Vec<CommittedFile>> {
+        let mut files: Vec<CommittedFile> = Vec::new();
         let _ = tree.walk(TreeWalkMode::PostOrder, |root, entry| {
             let path = Path::new(root);
             let path = path.join(entry.name().unwrap()).to_str().unwrap().to_string();
             let blob = self.repository.find_blob(entry.id());
             if blob.is_err() {
-                files.push(File::new(path, 0, FileStatus::Added, "0".repeat(20), "0".repeat(20), false, false, false));
+                files.push(CommittedFile::new(path, 0, FileStatus::Added, "0".repeat(20), "0".repeat(20), false, false, false));
             } else {
                 let blob = blob.unwrap();
                 let size = blob.size();
                 let status = FileStatus::Added;
                 let object_id = entry.id().to_string();
                 let is_binary = blob.is_binary();
-                files.push(File::new(path, size, status, object_id, "0".repeat(20), true, is_binary, false));
+                files.push(CommittedFile::new(path, size, status, object_id, "0".repeat(20), true, is_binary, false));
             }
             1
         });
@@ -419,7 +516,7 @@ impl GitDataProvider {
 
     /// 获取一个提交的内容
     ///
-    pub fn commit_content(&self, commit_id: impl Into<Oid>) -> Result<Vec<File>> {
+    pub fn commit_content(&self, commit_id: impl Into<Oid>) -> Result<Vec<CommittedFile>> {
         let repo = &self.repository;
         // 获取父提交
         let commit = repo.find_commit(commit_id.into())?;
@@ -431,7 +528,7 @@ impl GitDataProvider {
             return Ok(files);
         }
         let old_tree = old_tree.unwrap().tree()?;
-        let mut files: Vec<File> = Vec::new();
+        let mut files: Vec<CommittedFile> = Vec::new();
         // 对比两个树的差异
         let diff = repo.diff_tree_to_tree(Some(&old_tree), Some(&now_tree), None)?;
         let deltas = diff.deltas();
@@ -464,7 +561,7 @@ impl GitDataProvider {
                 Ok(blob) => (true, blob.content().to_vec()),
                 Err(_) => (false, Vec::new()),
             };
-            let file = File::new(path, size as usize, status, new_id, old_id, exist, is_binary, old_is_binary);
+            let file = CommittedFile::new(path, size as usize, status, new_id, old_id, exist, is_binary, old_is_binary);
             files.push(file);
         }
         Ok(files)

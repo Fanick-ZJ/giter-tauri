@@ -1,5 +1,6 @@
 use std::{fmt, path::{Path, PathBuf}};
 
+use git2::Oid;
 use serde::{
     de::{Error as DeError, SeqAccess, Visitor},
     ser::SerializeStruct,
@@ -9,7 +10,7 @@ use types::status::FileStatus;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct File {
+pub struct CommittedFile {
     pub path: String,
     pub size: usize,
     pub status: FileStatus,
@@ -20,7 +21,7 @@ pub struct File {
     pub old_is_binary: bool,
 }
 
-impl File {
+impl CommittedFile {
     pub fn new(
         path: String,
         size: usize,
@@ -135,3 +136,55 @@ impl<'de> Deserialize<'de> for UntrackedFile {
         deserializer.deserialize_struct("UntrackedFile", FIELDS, UntrackedFileVisitor)
     }
 }
+ 
+
+
+
+#[derive(Debug, Clone)]
+pub struct ChangedFile {
+    pub path: Box<Path>,
+    pub size: usize,
+    pub is_binary: Option<bool>,
+    pub old_is_binary: Option<bool>,
+    pub prev_object_id: Option<Oid>,
+    pub status: FileStatus,
+}
+
+impl ChangedFile {
+    pub fn new<T: AsRef<Path>>(
+        path: T,
+        size: usize,
+        is_binary: Option<bool>,
+        old_is_binary: Option<bool>,
+        prev_object_id: Option<Oid>,
+        status: FileStatus,
+    ) -> Self {
+        let path_buf = path.as_ref().to_path_buf();
+        Self {
+            path: path_buf.into_boxed_path(),
+            size,
+            is_binary,
+            old_is_binary,
+            prev_object_id,
+            status,
+        }
+    }
+}
+
+impl Serialize for ChangedFile {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut s = serializer.serialize_struct("ChangedFile", 6)?;
+        s.serialize_field("path", &self.path.to_string_lossy())?;
+        s.serialize_field("size", &self.size)?;
+        s.serialize_field("isBinary", &self.is_binary)?;
+        s.serialize_field("oldIsBinary", &self.old_is_binary)?;
+        s.serialize_field("prevObjectId", &self.prev_object_id.unwrap().to_string())?;
+        s.serialize_field("status", &self.status)?;
+        s.end()
+    }
+}
+
+

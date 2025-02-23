@@ -1,4 +1,4 @@
-import { ADD_WATCH, BLOB_CONTENT, COMMIT_CONTENT, FILE_DIFF, GET_AUTHORS, GET_BRANCHES, GET_COMMIT, GET_BRANCH_COMMITS, GET_CURRENT_BRANCH, GET_DRIVER, GET_FOLDERS, GET_SEPARATOR, IS_REPO, REMOVE_WATCH, SET_OWNERSHIP, WORK_STATUS, BRANCH_COMMIT_CONTRIBUTION } from "@/const/command";
+import { ADD_WATCH, BLOB_CONTENT, COMMIT_CONTENT, FILE_DIFF, GET_AUTHORS, GET_BRANCHES, GET_COMMIT, GET_BRANCH_COMMITS, GET_CURRENT_BRANCH, GET_DRIVER, GET_FOLDERS, GET_SEPARATOR, IS_REPO, REMOVE_WATCH, SET_OWNERSHIP, WORK_STATUS, BRANCH_COMMIT_CONTRIBUTION, GET_GLOBAL_AUTHOR, GET_REPO_AUTHOR, GET_BRANCH_COMMITS_AFTER_FILTER, GET_CHANGED_FILES, GET_STAFED_FILES } from "@/const/command";
 import { BRANCH_COMMIT_CONTRIBUTION_KEY } from "@/const/listen";
 import { Author, Branch, Commit, CommitFilter, CommitStatistic, DiffContent, CommitFile } from "@/types";
 import { invoke } from "@tauri-apps/api/core";
@@ -168,13 +168,21 @@ export const getBranchCommitContribution = (repo: RepoPath, branch: Branch): Pro
 }
 
 export const getGlobalAuthor = () => {
-  return bus.invoke<Author>('get_global_author')
+  return bus.invoke<Author>(GET_GLOBAL_AUTHOR)
 }
 
 export const getRepoAuthor = (repo: RepoPath) => {
-  return bus.invoke<Author>('get_repo_author', { repo })  
+  return bus.invoke<Author>(GET_REPO_AUTHOR, { repo })  
 }
 
 export const getBranchCommitsAfterFilter = (repo: RepoPath, branch: Branch, filter: CommitFilter) => {
-  return bus.invoke<Commit[]>('get_branch_commits_after_filter', { repo, branch, filter })
+  return bus.invoke<Commit[]>(GET_BRANCH_COMMITS_AFTER_FILTER, { repo, branch, filter })
+}
+
+export const getChangedFiles = (repo: RepoPath) => {
+  return bus.invoke<CommitFile[]>(GET_CHANGED_FILES, { repo }) 
+}
+
+export const getStagedFiles = (repo: RepoPath) => {
+  return bus.invoke<CommitFile[]>(GET_STAFED_FILES, { repo }) 
 }

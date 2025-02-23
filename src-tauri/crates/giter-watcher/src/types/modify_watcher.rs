@@ -1,82 +1,102 @@
 use notify::{Config, Event, RecommendedWatcher, Watcher};
+use dashmap::DashMap;
+use dashmap::rayon::map::Iter;  // 并行迭代器 trait
 use parking_lot::RwLock;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 use std::time::Duration;
 
 pub struct ModifyWatcher {
     pub name: String,
     pub repos: Arc<RwLock<Vec<PathBuf>>>,
     watcher: Option<RecommendedWatcher>,
-    cb: Option<Arc<dyn FnMut(Event) + Send + Sync>>,
+    cb_map: Arc<DashMap<usize, Box<dyn Fn(Arc<Event>) + Send + Sync>>>,
+    next_id: AtomicUsize,
 }
 
 impl ModifyWatcher {
     pub fn new() -> Self {
-        let repos: Arc<RwLock<Vec<PathBuf>>> = Arc::new(RwLock::new(Vec::new()));
-
         Self {
-            name: "".to_string(),
-            repos,
+            name: String::new(),
+            repos: Arc::new(RwLock::new(Vec::new())),
             watcher: None,
-            cb: None,
-        }
-    }
-    ///将某个地址加入监听
-    ///
-    fn watch<'a>(&mut self, p: impl Into<&'a PathBuf>) {
-        let path = p.into();
-        match self.watcher {
-            Some(ref mut watcher) => {
-                watcher
-                    .watch(path, notify::RecursiveMode::Recursive)
-                    .unwrap();
-            }
-            None => {}
+            cb_map: Arc::new(DashMap::new()),
+            next_id: AtomicUsize::new(0),
         }
     }
 
-    pub fn init(&mut self, cb: fn(notify::event::Event)) {
+    pub fn init(&mut self) -> notify::Result<()> {
         if self.watcher.is_none() {
-            // 默认配置
             let config = Config::default()
-                .with_poll_interval(Duration::from_secs(3))
+                .with_poll_interval(Duration::from_secs(30))
                 .with_compare_contents(false);
-            // 新建文件监听器
-            let cb = Arc::new(cb);
-            let cb_clone = Arc::clone(&cb);
-            let watcher = RecommendedWatcher::new(
+
+            let cb_map = Arc::clone(&self.cb_map);
+            let mut watcher = RecommendedWatcher::new(
                 move |event: notify::Result<Event>| {
-                    cb_clone(event.unwrap());
+                    let event = match event {
+                        Ok(e) => Arc::new(e),
+                        Err(e) => {
+                            eprintln!("Watcher error: {}", e);
+                            return;
+                        }
+                    };
+
+                    cb_map.iter().for_each(|entry| {
+                        entry.value()(Arc::clone(&event));
+                    });
                 },
                 config,
-            )
-            .unwrap();
+            )?;
+
+            // 重新注册已有路径
+            let repos = self.repos.read().clone();
+            for path in &repos {
+                watcher.watch(path, notify::RecursiveMode::Recursive)?;
+            }
+
             self.watcher = Some(watcher);
-            self.cb = Some(cb);
-            // 添加监听路径
-            let mut repos = self.repos.write();
-            repos.clear();
         }
+        Ok(())
     }
 
-    pub fn add_watch(&mut self, p: impl Into<PathBuf>) {
+    pub fn add_watch(&mut self, p: impl Into<PathBuf>) -> notify::Result<()> {
         let path = p.into();
-        if self.repos.read().contains(&path) {
-            return;
+        let mut repos = self.repos.write();
+        if !repos.contains(&path) {
+            repos.push(path.clone());
+            if let Some(watcher) = &mut self.watcher {
+                watcher.watch(&path, notify::RecursiveMode::Recursive)?;
+            }
         }
-        self.repos.write().push(path.clone());
-        self.watch(&path);
+        Ok(())
     }
 
-    pub fn remove_watch(&mut self, p: impl Into<PathBuf>) {
+    pub fn remove_watch(&mut self, p: impl Into<PathBuf>) -> notify::Result<()> {
         let path = p.into();
-        if !self.repos.read().contains(&path) {
-            return;
+        let mut repos = self.repos.write();
+        if let Some(index) = repos.iter().position(|x| x == &path) {
+            repos.remove(index);
+            if let Some(watcher) = &mut self.watcher {
+                watcher.unwatch(&path)?;
+            }
         }
-        self.repos.write().retain(|x| x != &path);
-        if self.watcher.is_some() {
-            self.watcher.as_mut().unwrap().unwatch(&path).unwrap();
-        }
+        Ok(())
+    }
+
+    pub fn add_callback<F>(&self, callback: F) -> usize
+    where
+        F: Fn(Arc<Event>) + 'static + Send + Sync,
+    {
+        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        self.cb_map.insert(id, Box::new(callback));
+        id
+    }
+
+    pub fn remove_callback(&self, id: usize) {
+        self.cb_map.remove(&id);
     }
 }

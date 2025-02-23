@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { useFileSelector } from "@/components/common/file-selector";
 import { useFileInfoDialog } from "@/components/common/info-dialog";
 import { useRepoStore } from "@/store/modules/repo";
 import { useNotificationStore } from "@/store/modules/notification";
@@ -12,6 +11,7 @@ import { isRepo } from "@/utils/command";
 import { defaultRepository } from "@/types/util";
 import { FilterModel } from "../types";
 import RepoFilterForm from "./repo-filter-form.vue";
+import { FileSelectorDialog } from "@/components/common/file-selector/index.tsx";
 
 defineOptions({
   name: 'HomePageHeaders'
@@ -20,7 +20,8 @@ const repoStore = useRepoStore()
 const notifStore = useNotificationStore()
 
 const add = () => {
-  useFileSelector({directory: true}).then(async (path) => {
+  const dlg = new FileSelectorDialog({directory: true})
+  dlg.show()?.then(async (path) => {
     if (
         path === undefined 
       || path === '' 
@@ -111,7 +112,7 @@ defineExpose({
   </div>
   <NModal v-model:show="filterShow">
     <NCard title="仓库筛选" class="w-[80%]">
-      <RepoFilterForm v-model:model-value="filterModel" @filter="handleFilter"/>
+      <RepoFilterForm :model="filterModel" @filter="handleFilter"/>
     </NCard>
   </NModal>
 </template>

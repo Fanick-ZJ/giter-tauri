@@ -15,16 +15,16 @@ export const getDirName = (path: string) => {
   return path.split(SEPERATOR).pop()
 }
 
-type Data = Record<string, unknown>;
+export type InstanceProps = (Record<string, unknown> & VNodeProps);
 
 type CreateInstanceOptions<T extends Component> = {
   component: T // 要挂载的组件
-  props?: (Data & VNodeProps) | null
+  props?: (Record<string, unknown> & VNodeProps) | null
   className: string    // 容器唯一类名
   parent?: HTMLElement // 父容器 (默认document.body)
 }
 
-type InstanceManager<T extends Component> = {
+export type InstanceManager<T extends Component> = {
   instance: ComponentPublicInstance<T>
   unmount: () => void
 }

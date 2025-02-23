@@ -9,7 +9,9 @@ import Glassmorphism from '@/components/common/glassmorphism.vue';
 import StatusLight from './status-light.vue';
 import { viewExtend } from '@/types/key';
 import { useRouter } from 'vue-router';
+import { SourceControlDialog } from '@/components/common/source-control-dialog/index';
 import { getBranchCommitContribution, getCurrentBranch } from '@/utils/command';
+// import { useSourceControlDialog } from '@/components/common/source-control-dialog';
 
 const props = defineProps({
   repo: {
@@ -60,6 +62,16 @@ const toContribution = async () => {
   _viewExtend!()
 }
 
+const handleLightClick = () => {
+  if (!validTip()) return
+  const dlg = new SourceControlDialog({
+    repo: props.repo
+  })
+  dlg.show()?.then((res) => {
+    console.log(res) 
+  })
+}
+
 </script>
 <template>
   <!-- 若仓库为无效仓库，就添加斜线标志 -->
@@ -77,8 +89,8 @@ const toContribution = async () => {
           已置顶
         </NPopover>
       </div>
-      <div class="absolute left-[-15px] h-full">
-        <StatusLight :status="status" />
+      <div v-if="status != RepoStatus.Ok" class="absolute left-[-15px] h-full"  @click="handleLightClick">
+        <StatusLight :status="status"/>
       </div>
       <NEllipsis class="flex-auto">
         <Glassmorphism class="inline-block px-1">

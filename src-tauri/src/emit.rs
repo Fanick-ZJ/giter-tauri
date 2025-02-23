@@ -3,57 +3,87 @@ use giter_utils::types::{contribution::CommitStatistic, git_data_provider::GitDa
 use giter_watcher::types::modify_watcher::ModifyWatcher;
 use notify::Event;
 use serde::{Deserialize, Serialize};
-use std::collections::hash_set::HashSet;
+use std::{collections::hash_set::HashSet, sync::Arc};
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::{Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager};
+
+#[derive(Serialize, Debug, Clone)]
+struct Status {
+    path: String,
+    status: WorkStatus,
+}
+
+fn get_event_repo_paths(app: &AppHandle, event: Arc<Event>) -> HashSet<PathBuf> {
+    let watcher = app.state::<Mutex<ModifyWatcher>>();            
+    let repos_lock = watcher.lock().unwrap_or_else(|poison| poison.into_inner());
+    let repos = repos_lock.repos.read().clone();
+    let paths = &event.paths;
+    let mut repo_set: HashSet<PathBuf> = HashSet::new();
+    // 过滤出需要更新的仓库
+    for repo in repos {
+        for path in paths.iter() {
+            if path.starts_with(&repo) {
+                repo_set.insert(repo.clone());
+            }
+        }
+    }
+    repo_set
+}
 
 /// 仓库监控到文件修改后执行的回调函数
 ///
-pub fn repos_modified_emit_cb() -> fn(Event) {
-    #[derive(Serialize, Debug, Clone)]
-    struct Status {
-        path: String,
-        status: WorkStatus,
+pub fn satatus_change_emit(event: Arc<Event>) {
+    let app = handle::Handle::global().app_handle();
+    if let None = app {
+        log::error!("satatus_change_emit: app is none");
+        return;
     }
-    move |event: Event| {
-        let app = handle::Handle::global().app_handle().unwrap();
-        let watcher = app.state::<Mutex<ModifyWatcher>>();
-        let paths = event.paths;
-        let mut repo_set: HashSet<PathBuf> = HashSet::new();
-        for repo in watcher.lock().unwrap().repos.read().iter() {
-            for path in paths.iter() {
-                if path.starts_with(repo) {
-                    repo_set.insert(repo.clone());
-                }
-            }
+    let app = app.unwrap();
+    let repo_set = get_event_repo_paths(&app, event);
+    // 遍历仓库，更新状态
+    for path in repo_set.iter() {
+        let provider = GitDataProvider::new(path);
+        if provider.is_err() { 
+            log::error!("satatus_change_emit: provider build error: {:?}", path);
+            continue; 
         }
-
-        for path in repo_set.iter() {
-            let path = path.to_str().unwrap();
-            let provider = GitDataProvider::new(path);
-            if provider.is_err() {
-                continue;
-            }
-            let status = provider.unwrap().work_status();
-            if let Ok(status) = status {
-                app.emit(
-                    "giter://status_changed",
-                    Status {
-                        path: path.to_string(),
-                        status,
-                    },
-                )
-                .expect("TODO: panic message");
-            } else {
-                log::error!("status: {:?}", status);
-            }
+        let status = provider.unwrap().work_status();
+        println!("path: {:?}", path);
+        if let Ok(status) = status {
+            app.emit(
+                "giter://status_changed",
+                Status {
+                    path: path.display().to_string(),
+                    status,
+                },
+            )
+            .expect("TODO: panic message");
+        } else {
+            log::error!("status: {:?}", status);
         }
-
-        // app.emit("emit_test", event.paths);
     }
 }
 
+pub fn changed_emit(event: Arc<Event>) {
+    let app = handle::Handle::global().app_handle();
+    if let None = app {
+        log::error!("changed_emit: app is none");
+        return;
+    }
+    let app = app.unwrap();
+    let repo_set = get_event_repo_paths(&app, event);
+    // 遍历仓库，发送文件修改事件
+    for path in repo_set.iter() {
+        let provider = GitDataProvider::new(path);
+        if provider.is_err() {
+            log::error!("changed_emit: provider build error: {:?}", path);
+            continue;
+        }
+        app.emit("giter://changed_emit", path.display().to_string())
+            .expect("TODO: panic message");
+    }
+}
 
 pub fn emit_branch_contribution(key: &str, value: anyhow::Result<Vec<CommitStatistic>>) {
     let app = handle::Handle::global().app_handle().unwrap();

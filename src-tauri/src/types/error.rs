@@ -30,5 +30,7 @@ make_serializable! {
         GetBranchCommitContributionError(String), // 获取分支提交贡献失败
         GetGlobalAuthorError(String),   // 获取全局作者失败
         GetRepoAuthorError(String),     // 获取仓库作者失败
+        GetChangedFilesError(String),   // 获取变更文件失败
+        GetStagedFilesError(String),    // 获取暂存文件失败
     }
 }

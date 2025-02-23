@@ -1,20 +1,19 @@
 <script setup lang="ts">
 import { NForm, NFormItem, NInput, NInputNumber, NSwitch, NButton, NRadioGroup, NRadioButton } from 'naive-ui';
 import { FilterModel } from '../types';
+import { PropType, ref, toRaw } from 'vue';
 
-const model = defineModel<FilterModel>({
-  default: () => {
-    return {
-      group: '',
-      alias: '',
-      path: '',
-      order: 0,
-      hasWatched: undefined,
-      top: undefined,
-      valid: undefined
-    } 
-  }
+const props = defineProps({
+ model : {
+  type: Object as PropType<FilterModel>,
+  required: false 
+ } 
 })
+
+const model = ref<FilterModel>({
+  ...toRaw(props.model)
+})
+
 
 const handleClick = () => {
   emit('filter', model.value) 
@@ -43,7 +42,7 @@ const emit = defineEmits({
       <NInput clearable v-model:value="model.path" />
     </NFormItem>
     <NFormItem label="序号">
-      <NInputNumber clearable v-model:value="model.order"/>
+      <NInputNumber :min="0" clearable v-model:value="model.order"/>
     </NFormItem>
     <NFormItem label="是否监控">
       <NRadioGroup v-model:value="model.hasWatched">

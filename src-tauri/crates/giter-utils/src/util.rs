@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::io::Read;
+use std::path::Path;
 use std::time::UNIX_EPOCH;
 
 use anyhow::Result;
@@ -12,7 +13,7 @@ use serde_json::Value;
 
 use crate::types::author::Author;
 use crate::types::commit::Commit;
-use crate::types::file::File;
+use crate::types::file::CommittedFile;
 use crate::types::status::FileStatus;
 
 pub fn has_git() -> bool {
@@ -72,8 +73,8 @@ pub fn build_file_between_tree(
     repo: &Repository,
     old_tree: &git2::Tree,
     new_tree: &git2::Tree,
-) -> Vec<File> {
-    let mut files: Vec<File> = Vec::new();
+) -> Vec<CommittedFile> {
+    let mut files: Vec<CommittedFile> = Vec::new();
     let diff = repo.diff_tree_to_tree(Some(old_tree), Some(new_tree), None);
     match diff {
         Ok(diff) => {
@@ -94,7 +95,7 @@ pub fn build_file_between_tree(
                 };
                 let is_binary = delta.new_file().is_binary();
                 let old_is_binary = delta.old_file().is_binary();
-                let file = File::new(
+                let file = CommittedFile::new(
                     path,
                     size,
                     status,
@@ -199,7 +200,7 @@ pub fn is_binary_file_content(content: Vec<u8>) -> std::io::Result<bool> {
 
 // 判断文件是否为二进制文件
 /// 返回 `Ok(true)` 表示是二进制文件，`Ok(false)` 表示是文本文件
-pub fn is_binary_file(path: &str) -> std::io::Result<bool> {
+pub fn is_binary_file<P: AsRef<Path>>(path: P) -> std::io::Result<bool> {
     // 打开文件
     let mut file = std::fs::File::open(path)?;
     
@@ -289,4 +290,10 @@ where
     let value = value.unwrap();
     // 将 value 反序列化为目标类型
     serde_json::from_value(value.clone()).unwrap_or(default)
+}
+
+pub fn size_by_path<P: AsRef<Path>>(path: P) -> Result<u64> {
+    let path = path.as_ref();
+    let metadata = std::fs::metadata(path)?;
+    Ok(metadata.len()) 
 }

@@ -7,7 +7,7 @@ use crate::{
 use git2::Oid;
 use giter_utils::{
     types::{
-        author::Author, branch::Branch, cache::Cache, commit::Commit, contribution::CommitStatistic, diff::ContentDiff, file::File, git_data_provider::GitDataProvider, status::WorkStatus
+        author::Author, branch::Branch, cache::Cache, commit::Commit,  diff::ContentDiff, file::{ChangedFile, CommittedFile}, git_data_provider::GitDataProvider, status::WorkStatus
     },
     util::{is_git_repo, set_owner},
 };
@@ -210,7 +210,7 @@ pub fn current_branch(repo: RepoPath) -> Result<Branch, CommandError> {
 }
 
 #[tauri::command]
-pub fn commit_content (repo: RepoPath, cid: String) -> Result<Vec<File>, CommandError> {
+pub fn commit_content (repo: RepoPath, cid: String) -> Result<Vec<CommittedFile>, CommandError> {
     let provider = get_provider(&repo)?;
     let oid = Oid::from_str(&cid);
     if let Err(e) = oid {
@@ -312,4 +312,24 @@ pub fn get_branch_commits_after_filter(repo: RepoPath, branch: Branch, filter: H
         return Err(CommandError::GetBranchCommitsError(e.to_string()));
     }
     Ok(commits.unwrap())
+}
+
+#[tauri::command]
+pub fn get_changed_files(repo: RepoPath) -> Result<Vec<ChangedFile>, CommandError> {
+    let provider = get_provider(&repo)?;
+    let files = provider.changed_files();
+    if let Err(e) = files {
+        return Err(CommandError::GetChangedFilesError(e.to_string()));
+    }
+    Ok(files.unwrap())
+}
+
+#[tauri::command]
+pub fn get_staged_files(repo: RepoPath) -> Result<Vec<ChangedFile>, CommandError> {
+    let provider = get_provider(&repo)?;
+    let files = provider.staged_files();
+    if let Err(e) = files {
+        return Err(CommandError::GetStagedFilesError(e.to_string()));
+    }
+    Ok(files.unwrap())
 }

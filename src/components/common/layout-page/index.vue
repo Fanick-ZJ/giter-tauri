@@ -53,7 +53,7 @@ const contentHeight = computed(() => {
       <slot name="filter-form"/>
     </div>
     <LoadingView :loading="loading">
-      <NScrollbar>
+      <NScrollbar :style="{zIndex: 2}">
         <slot />
       </NScrollbar>
     </LoadingView>

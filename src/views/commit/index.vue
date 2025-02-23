@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRepoStore } from '@/store/modules/repo';
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { Icon } from '@iconify/vue'
 import LayoutPage from '@/components/common/layout-page/index.vue'
@@ -11,6 +11,10 @@ import { NFlex, NPagination, NButton, NIcon, NSelect, NDropdown, NLayout } from 
 import { Model } from './type';
 import FilterForm from './components/filter-form.vue'
 import { useContextMenu } from './hook';
+import { listen } from '@tauri-apps/api/event';
+import { CHANGED_EMIT, STATUS_CHANGE, StatusChangePayloadType } from '@/const/listen';
+import _ from 'lodash';
+import { hasFlag, RepoStatus } from '@/enum';
 
 const route = useRoute()
 const repoStore = useRepoStore()
@@ -33,15 +37,27 @@ const init = async () => {
   authors.value = await getAuthors(repo.value!.path, curBranch.value)
 }
 
-const getCommits = async () => {
+const getCommits = _.debounce(async () => {
   let path = repo.value!.path
   loading.value = true
   getBranchCommits(path, curBranch.value!, 1 << 31).then((res) => {
     commits.value = res
     loading.value = false
   })
-}
+}, 500)
 
+// 文件变更时，重新获取数据
+const changed_listen = listen<StatusChangePayloadType>(STATUS_CHANGE, (event) => {
+    if (event.payload.path === repo.value!.path && hasFlag(event.payload.status, RepoStatus.Unpushed)) {
+    getCommits()
+  }
+})
+
+onBeforeUnmount(() => {
+  changed_listen.then((unlisten) => {
+    unlisten()
+  }) 
+})
 // 监听路由变化，重新获取数据
 watch(()=> route.path, () => {
   if (route.path.startsWith('/commit')) {
