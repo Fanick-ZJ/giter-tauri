@@ -171,7 +171,6 @@ impl GitDataProvider {
     }
 
     fn status_to_changed_status(&self, status: Status) -> FileStatus {
-        println!("status: {:?}", status);
         match status {
             Status::WT_NEW | Status::INDEX_NEW => FileStatus::Added,
             Status::WT_MODIFIED | Status::INDEX_MODIFIED => FileStatus::Modified,
@@ -197,25 +196,28 @@ impl GitDataProvider {
         let status = self.repository.statuses(None)?;
         let mut modified: Vec<ChangedFile> = Vec::new();
         for item in &status {
+            let bits = item.status().bits();
             let index_status = Status::INDEX_DELETED.bits()
                 | Status::INDEX_MODIFIED.bits()
                 | Status::INDEX_NEW.bits()
                 | Status::INDEX_RENAMED.bits()
                 | Status::INDEX_TYPECHANGE.bits();
-            if index_status > 0 {
+            if (bits & index_status) > 0 {
                 let abs_path = self.blob_path(item.path().unwrap());
                 let path = PathBuf::from(item.path().unwrap());
-                println!("path: {:?}", abs_path);
-                let size = size_by_path(&abs_path)? as usize;
-                println!("size: {}", size);
-                let is_binary = is_binary_file(&abs_path)?;
-                println!("is_binary: {}", is_binary);
-                let oid = self.get_path_oid(&path)?;
-                println!("oid: {}", oid);
+                let oid = self.get_path_oid(&path).unwrap_or(Oid::from_str("0").unwrap());
+                let size;
+                let is_binary;
+                if item.status() == Status::INDEX_DELETED || item.status() == Status::WT_DELETED {
+                    size = 0;
+                    is_binary = false;
+                } else {
+                    size = size_by_path(&abs_path)? as usize;
+                    is_binary = is_binary_file(&abs_path)?;
+                }
                 let old_is_binary = self.blob_is_binary(oid)?;
-                println!("old_is_binary: {}", old_is_binary);
                 let status = self.status_to_changed_status(item.status());
-                let changed_file = ChangedFile::new(path, size, Some(is_binary), Some(old_is_binary), Some(oid), status);
+                let changed_file = ChangedFile::new(abs_path, size, Some(is_binary), Some(old_is_binary), Some(oid), status);
                 modified.push(changed_file); 
             } 
         } 
@@ -226,27 +228,29 @@ impl GitDataProvider {
         let status = self.repository.statuses(None)?;
         let mut modified: Vec<ChangedFile> = Vec::new(); 
         for item in &status {
+            let bits = item.status().bits();
             let index_status = Status::WT_DELETED.bits()
             | Status::WT_MODIFIED.bits()
             | Status::WT_NEW.bits()
             | Status::WT_RENAMED.bits()
             | Status::WT_TYPECHANGE.bits()
             | Status::WT_NEW.bits();
-            if index_status > 0 {
+            if (bits & index_status) > 0 {
                 let abs_path = self.blob_path(item.path().unwrap());
                 let path = PathBuf::from(item.path().unwrap());
-                println!("path: {:?}", abs_path);
-                let size = size_by_path(&abs_path)? as usize;
-                println!("size: {}", size);
-                let is_binary = is_binary_file(&abs_path)?;
-                println!("is_binary: {}", is_binary);
-                let oid = self.get_path_oid(&abs_path)?;
-                println!("oid: {}", oid);
+                let oid = self.get_path_oid(&path).unwrap_or(Oid::from_str("0").unwrap());
+                let size;
+                let is_binary;
+                if item.status() == Status::WT_DELETED {
+                    size = 0;
+                    is_binary = false;
+                } else {
+                    size = size_by_path(&abs_path)? as usize;
+                    is_binary = is_binary_file(&abs_path)?;
+                }
                 let old_is_binary = self.blob_is_binary(oid)?;
-                println!("old_is_binary: {}", old_is_binary);
                 let status = self.status_to_changed_status(item.status());
-                println!("status: {:?}", status);
-                let changed_file = ChangedFile::new(path, size, Some(is_binary), Some(old_is_binary), Some(oid), status);
+                let changed_file = ChangedFile::new(abs_path, size, Some(is_binary), Some(old_is_binary), Some(oid), status);
                 modified.push(changed_file);
             }
         }

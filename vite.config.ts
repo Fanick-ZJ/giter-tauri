@@ -3,6 +3,7 @@ import vue from "@vitejs/plugin-vue";
 import path from 'path'
 import vueJsx from '@vitejs/plugin-vue-jsx'
 import monacoEditorPlugin from 'vite-plugin-monaco-editor-esm';
+import svgLoader from 'vite-svg-loader'
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vitejs.dev/config/
@@ -10,6 +11,7 @@ export default defineConfig(async () => ({
   plugins: [
     vue(), 
     vueJsx(),
+    svgLoader(),
     monacoEditorPlugin(),
   ],
   build: {

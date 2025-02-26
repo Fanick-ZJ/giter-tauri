@@ -9,9 +9,3 @@ export enum FileStatus {
   MODIFIED = 'modified',
   DELETED = 'deleted',
 }
-
-export type ChangedFiles = {
-  path: string
-  status: FileStatus
-  oid?: string
-}

@@ -141,3 +141,9 @@ export const getDaysOfMonth = (year: number) => {
   const daysInMonth = [31, isLeapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
   return daysInMonth;
 }
+
+export const basename = (path: string) => {
+  let idx = path.lastIndexOf('/') 
+  idx = idx > -1 ? idx : path.lastIndexOf('\\')
+  return path.slice(idx + 1)
+}

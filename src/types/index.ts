@@ -46,13 +46,15 @@ export type CommitFile = {
   path: string
   type: string
   size: number
-  status: FileStatus
-  objectId: string
-  prevObjectId: string
-  blobExist: boolean
   isBinary: boolean
   oldIsBinary: boolean
+  prevObjectId: string
+  status: FileStatus
+  objectId: string
+  blobExist: boolean
 }
+
+export type ChangedFile = Omit<Omit<Omit<CommitFile, 'type'>, 'objectId'>, 'blobExist'>
 
 export type Diff = {
   oldPath: string

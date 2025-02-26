@@ -6,6 +6,7 @@ import { createSingletonComponent } from '@/utils/tool'
 import { AbstractDialog } from '../abstract-dialog'
 import FileTree from './tree.vue'
 import { NInput } from 'naive-ui'
+import { fileNameIconMap } from '../file-icon/fileicons'
 
 const className = '__file__selector__container'
 

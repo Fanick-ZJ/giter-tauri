@@ -1,6 +1,6 @@
 import { ADD_WATCH, BLOB_CONTENT, COMMIT_CONTENT, FILE_DIFF, GET_AUTHORS, GET_BRANCHES, GET_COMMIT, GET_BRANCH_COMMITS, GET_CURRENT_BRANCH, GET_DRIVER, GET_FOLDERS, GET_SEPARATOR, IS_REPO, REMOVE_WATCH, SET_OWNERSHIP, WORK_STATUS, BRANCH_COMMIT_CONTRIBUTION, GET_GLOBAL_AUTHOR, GET_REPO_AUTHOR, GET_BRANCH_COMMITS_AFTER_FILTER, GET_CHANGED_FILES, GET_STAFED_FILES } from "@/const/command";
 import { BRANCH_COMMIT_CONTRIBUTION_KEY } from "@/const/listen";
-import { Author, Branch, Commit, CommitFilter, CommitStatistic, DiffContent, CommitFile } from "@/types";
+import { Author, Branch, Commit, CommitFilter, CommitStatistic, DiffContent, CommitFile, ChangedFile } from "@/types";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -180,9 +180,9 @@ export const getBranchCommitsAfterFilter = (repo: RepoPath, branch: Branch, filt
 }
 
 export const getChangedFiles = (repo: RepoPath) => {
-  return bus.invoke<CommitFile[]>(GET_CHANGED_FILES, { repo }) 
+  return bus.invoke<ChangedFile[]>(GET_CHANGED_FILES, { repo }) 
 }
 
 export const getStagedFiles = (repo: RepoPath) => {
-  return bus.invoke<CommitFile[]>(GET_STAFED_FILES, { repo }) 
+  return bus.invoke<ChangedFile[]>(GET_STAFED_FILES, { repo }) 
 }

@@ -12,7 +12,7 @@ import { Model } from './type';
 import FilterForm from './components/filter-form.vue'
 import { useContextMenu } from './hook';
 import { listen } from '@tauri-apps/api/event';
-import { CHANGED_EMIT, STATUS_CHANGE, StatusChangePayloadType } from '@/const/listen';
+import { STATUS_CHANGE, StatusChangePayloadType } from '@/const/listen';
 import _ from 'lodash';
 import { hasFlag, RepoStatus } from '@/enum';
 
