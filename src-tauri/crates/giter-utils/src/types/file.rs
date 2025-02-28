@@ -143,28 +143,19 @@ impl<'de> Deserialize<'de> for UntrackedFile {
 #[derive(Debug, Clone)]
 pub struct ChangedFile {
     pub path: Box<Path>,
-    pub size: usize,
-    pub is_binary: Option<bool>,
-    pub old_is_binary: Option<bool>,
-    pub prev_object_id: Option<Oid>,
+    pub prev_object_id: Oid,
     pub status: FileStatus,
 }
 
 impl ChangedFile {
     pub fn new<T: AsRef<Path>>(
         path: T,
-        size: usize,
-        is_binary: Option<bool>,
-        old_is_binary: Option<bool>,
-        prev_object_id: Option<Oid>,
+        prev_object_id: Oid,
         status: FileStatus,
     ) -> Self {
         let path_buf = path.as_ref().to_path_buf();
         Self {
             path: path_buf.into_boxed_path(),
-            size,
-            is_binary,
-            old_is_binary,
             prev_object_id,
             status,
         }
@@ -176,12 +167,9 @@ impl Serialize for ChangedFile {
     where
         S: serde::Serializer,
     {
-        let mut s = serializer.serialize_struct("ChangedFile", 6)?;
+        let mut s = serializer.serialize_struct("ChangedFile", 3)?;
         s.serialize_field("path", &self.path.to_string_lossy())?;
-        s.serialize_field("size", &self.size)?;
-        s.serialize_field("isBinary", &self.is_binary)?;
-        s.serialize_field("oldIsBinary", &self.old_is_binary)?;
-        s.serialize_field("prevObjectId", &self.prev_object_id.unwrap().to_string())?;
+        s.serialize_field("prevObjectId", &self.prev_object_id.to_string())?;
         s.serialize_field("status", &self.status)?;
         s.end()
     }

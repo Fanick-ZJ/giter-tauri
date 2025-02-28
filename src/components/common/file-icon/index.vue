@@ -26,8 +26,8 @@ const props = defineProps({
 })
 
 const svg = computed(() => {
-  const basename = props.pathOrName.split('/').pop() || ''
-  const ext = basename.split('.').pop() || ''
+  const basename = props.pathOrName.split('/').pop()?.toLocaleLowerCase() || ''
+  const ext = basename.split('.').pop()?.toLocaleLowerCase() || ''
   let svg = ''
   if (fileNameIconMap.has(basename)) {
     svg = fileNameIconMap.get(basename)!

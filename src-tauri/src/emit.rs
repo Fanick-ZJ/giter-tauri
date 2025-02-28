@@ -49,7 +49,6 @@ pub fn satatus_change_emit(event: Arc<Event>) {
             continue; 
         }
         let status = provider.unwrap().work_status();
-        println!("path: {:?}", path);
         if let Ok(status) = status {
             app.emit(
                 "giter://status_changed",

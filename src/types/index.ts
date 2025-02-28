@@ -54,7 +54,11 @@ export type CommitFile = {
   blobExist: boolean
 }
 
-export type ChangedFile = Omit<Omit<Omit<CommitFile, 'type'>, 'objectId'>, 'blobExist'>
+export type ChangedFile = {
+  path: string
+  status: FileStatus
+  prevObjectId: string
+}
 
 export type Diff = {
   oldPath: string

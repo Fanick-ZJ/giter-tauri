@@ -1,5 +1,5 @@
 // 使用组件，通过函数调用的方式，将组件附着在root上
-import {Component, defineComponent, nextTick, onBeforeMount, ref, watch } from 'vue'
+import {Component, defineComponent, nextTick, onBeforeMount, onBeforeUnmount, ref, watch } from 'vue'
 import { SourceConterolDialogProps } from './types'
 import { AbstractDialog } from '../abstract-dialog'
 import { NButton, NDivider, NDropdown, NInput } from 'naive-ui'
@@ -75,6 +75,12 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
             flush()
           }
         })
+
+        onBeforeUnmount(() => {
+          unsubscrib.then((unsub) => {
+            unsub()
+          }) 
+        })
         return () => (
           <div>
             {/* 头部commit书写区域 */}
@@ -98,13 +104,24 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
               {/* 变更的文件 */}
               {
                 stagedFiles.value.map((file) => {
-                  return <ChangedFileWidget key={file.path} file={file} type='staged'/>
+                  return <ChangedFileWidget repo={_this.props.repo} key={file.path} file={file} type='staged'/>
                 })
               }
-              <NDivider />
+              {/* divider */}
+              <div class='flex justify-center items-center
+              before:border-b before:flex-1 before:block
+              after:border-b after:flex-1 after:block
+              after:h-full'>
+                {
+                  stagedFiles.value.length > 0 && <div class='px-1 text-xs text-gray-600'>暂存↑</div>
+                }
+                {
+                  changedFiles.value.length > 0 && <div class='px-1 text-xs text-gray-600'>修改↓</div>
+                }
+              </div>
               {
                 changedFiles.value.map((file) => {
-                  return <ChangedFileWidget key={file.path} file={file} type='changed'/> 
+                  return <ChangedFileWidget repo={_this.props.repo} key={file.path} file={file} type='changed'/> 
                 })
               }
             </div>

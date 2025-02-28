@@ -13,7 +13,7 @@ use giter_utils::{
 };
 use giter_watcher::types::modify_watcher::ModifyWatcher;
 use serde_json::Value;
-use std::{collections::HashMap, sync::Mutex, thread};
+use std::{collections::HashMap, path::PathBuf, sync::Mutex, thread};
 use tauri::Manager;
 
 fn get_provider(repo: &str) -> Result<GitDataProvider, CommandError> {
@@ -332,4 +332,34 @@ pub fn get_staged_files(repo: RepoPath) -> Result<Vec<ChangedFile>, CommandError
         return Err(CommandError::GetStagedFilesError(e.to_string()));
     }
     Ok(files.unwrap())
+}
+
+#[tauri::command]
+pub fn add_to_stage(repo: RepoPath, path: String) -> Result<(), CommandError> {
+    let provider = get_provider(&repo)?;
+    let result = provider.add_to_stage(&PathBuf::from(path)); 
+    if let Err(e) = result {
+        return Err(CommandError::AddToStageError(e.to_string())); 
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn remove_from_stage(repo: RepoPath, path: String) -> Result<(), CommandError> {
+    let provider = get_provider(&repo)?;
+    let result = provider.remove_from_stage(&PathBuf::from(path));
+    if let Err(e) = result {
+        return Err(CommandError::RemoveFromStageError(e.to_string())); 
+    } 
+    Ok(())
+}
+
+#[tauri::command]
+pub fn checkout_file(repo: RepoPath, path: String) -> Result<(), CommandError> {
+    let provider = get_provider(&repo)?;
+    let result = provider.checkout_file(&PathBuf::from(path));
+    if let Err(e) = result {
+        return Err(CommandError::CheckoutFileError(e.to_string()));
+    }
+    Ok(())
 }

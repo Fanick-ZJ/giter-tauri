@@ -1,4 +1,4 @@
-import { ADD_WATCH, BLOB_CONTENT, COMMIT_CONTENT, FILE_DIFF, GET_AUTHORS, GET_BRANCHES, GET_COMMIT, GET_BRANCH_COMMITS, GET_CURRENT_BRANCH, GET_DRIVER, GET_FOLDERS, GET_SEPARATOR, IS_REPO, REMOVE_WATCH, SET_OWNERSHIP, WORK_STATUS, BRANCH_COMMIT_CONTRIBUTION, GET_GLOBAL_AUTHOR, GET_REPO_AUTHOR, GET_BRANCH_COMMITS_AFTER_FILTER, GET_CHANGED_FILES, GET_STAFED_FILES } from "@/const/command";
+import { ADD_WATCH, BLOB_CONTENT, COMMIT_CONTENT, FILE_DIFF, GET_AUTHORS, GET_BRANCHES, GET_COMMIT, GET_BRANCH_COMMITS, GET_CURRENT_BRANCH, GET_DRIVER, GET_FOLDERS, GET_SEPARATOR, IS_REPO, REMOVE_WATCH, SET_OWNERSHIP, WORK_STATUS, BRANCH_COMMIT_CONTRIBUTION, GET_GLOBAL_AUTHOR, GET_REPO_AUTHOR, GET_BRANCH_COMMITS_AFTER_FILTER, GET_CHANGED_FILES, GET_STAFED_FILES, ADD_TO_STAGE, REMOVE_FROM_STAGE, CHECKOUT_FILE } from "@/const/command";
 import { BRANCH_COMMIT_CONTRIBUTION_KEY } from "@/const/listen";
 import { Author, Branch, Commit, CommitFilter, CommitStatistic, DiffContent, CommitFile, ChangedFile } from "@/types";
 import { invoke } from "@tauri-apps/api/core";
@@ -185,4 +185,16 @@ export const getChangedFiles = (repo: RepoPath) => {
 
 export const getStagedFiles = (repo: RepoPath) => {
   return bus.invoke<ChangedFile[]>(GET_STAFED_FILES, { repo }) 
+}
+
+export const addFileToStage = (repo: RepoPath, path: string) => {
+  return bus.invoke(ADD_TO_STAGE, { repo, path }) 
+}
+
+export const removeFileFromStage = (repo: RepoPath, path: string) => {
+  return bus.invoke(REMOVE_FROM_STAGE, { repo, path }) 
+}
+
+export const checkoutFile = (repo: RepoPath, path: string) => {
+  return bus.invoke(CHECKOUT_FILE, { repo, path }) 
 }

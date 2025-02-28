@@ -32,5 +32,8 @@ make_serializable! {
         GetRepoAuthorError(String),     // 获取仓库作者失败
         GetChangedFilesError(String),   // 获取变更文件失败
         GetStagedFilesError(String),    // 获取暂存文件失败
+        AddToStageError(String),        // 添加到暂存区失败
+        RemoveFromStageError(String),   // 从暂存区移除失败
+        CheckoutFileError(String),      // 检出文件失败
     }
 }

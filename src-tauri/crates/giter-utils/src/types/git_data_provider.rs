@@ -4,7 +4,8 @@ use crate::util::is_binary_file;
 use crate::util::is_binary_file_content;
 use crate::util::size_by_path;
 use crate::util::stamp_to_ymd;
-use anyhow::Result;
+use anyhow::{ Context, Result };
+use git2::build::CheckoutBuilder;
 use git2::TreeWalkMode;
 use git2::{BranchType, Oid, Repository, Revwalk, Status};
 use log::error;
@@ -153,21 +154,25 @@ impl GitDataProvider {
         Ok(false)
     }
 
+    /// 先从当前的树中查找，再从索引中查找，没有的话，再去index中查找
     pub fn get_path_oid(&self, path: &PathBuf) -> Result<Oid> {
         // 获取 HEAD 引用
         let reference = self.repository.head()?;
-
         // 剥离引用为 Commit
         let commit = reference.peel_to_commit()?;
-
         // 获取 Commit 的树对象
         let tree = commit.tree()?;
-
         // 从树对象中查找路径对应的条目
-        let entry = tree.get_path(&path)?;
-
-        // 返回条目的 Oid
-        Ok(entry.id())
+        let entry = tree.get_path(&path);
+        if let Err(_) = entry {
+           let index = self.repository.index()?; 
+           for item in index.iter() {
+                if String::from_utf8(item.path.to_vec()).unwrap() == path.to_str().unwrap().to_string() {
+                    return Ok(item.id);
+                }
+           }
+        }
+        Ok(entry?.id())
     }
 
     fn status_to_changed_status(&self, status: Status) -> FileStatus {
@@ -187,7 +192,7 @@ impl GitDataProvider {
         }
         let blob = blob.unwrap();
         let content = blob.content();
-        let is = is_binary_file_content(content.to_vec())?;
+        let is = is_binary_file_content(content.to_vec());
         Ok(is)
 
     }
@@ -203,21 +208,10 @@ impl GitDataProvider {
                 | Status::INDEX_RENAMED.bits()
                 | Status::INDEX_TYPECHANGE.bits();
             if (bits & index_status) > 0 {
-                let abs_path = self.blob_path(item.path().unwrap());
                 let path = PathBuf::from(item.path().unwrap());
                 let oid = self.get_path_oid(&path).unwrap_or(Oid::from_str("0").unwrap());
-                let size;
-                let is_binary;
-                if item.status() == Status::INDEX_DELETED || item.status() == Status::WT_DELETED {
-                    size = 0;
-                    is_binary = false;
-                } else {
-                    size = size_by_path(&abs_path)? as usize;
-                    is_binary = is_binary_file(&abs_path)?;
-                }
-                let old_is_binary = self.blob_is_binary(oid)?;
                 let status = self.status_to_changed_status(item.status());
-                let changed_file = ChangedFile::new(abs_path, size, Some(is_binary), Some(old_is_binary), Some(oid), status);
+                let changed_file = ChangedFile::new(path, oid, status);
                 modified.push(changed_file); 
             } 
         } 
@@ -236,25 +230,80 @@ impl GitDataProvider {
             | Status::WT_TYPECHANGE.bits()
             | Status::WT_NEW.bits();
             if (bits & index_status) > 0 {
-                let abs_path = self.blob_path(item.path().unwrap());
                 let path = PathBuf::from(item.path().unwrap());
                 let oid = self.get_path_oid(&path).unwrap_or(Oid::from_str("0").unwrap());
-                let size;
-                let is_binary;
-                if item.status() == Status::WT_DELETED {
-                    size = 0;
-                    is_binary = false;
-                } else {
-                    size = size_by_path(&abs_path)? as usize;
-                    is_binary = is_binary_file(&abs_path)?;
-                }
-                let old_is_binary = self.blob_is_binary(oid)?;
                 let status = self.status_to_changed_status(item.status());
-                let changed_file = ChangedFile::new(abs_path, size, Some(is_binary), Some(old_is_binary), Some(oid), status);
+                let changed_file = ChangedFile::new(path, oid, status);
                 modified.push(changed_file);
             }
         }
         Ok(modified)
+    }
+
+    pub fn relative_path(&self, path: &PathBuf) -> Result<PathBuf> {
+        let workdir = self.workdir();
+        let relative_path = path.strip_prefix(workdir)?;
+        Ok(relative_path.to_path_buf()) 
+    }
+
+    pub fn add_to_stage(&self, path: &PathBuf) -> Result<()> {
+        let repo = &self.repository;
+        let mut index = repo.index()?;
+        let path = self.relative_path(path)?;
+        println!("add to stage: {:?}", path);
+        index.add_path(&path)?;
+        index.write()?;
+        Ok(()) 
+    }
+
+    pub fn remove_from_stage(&self, path: &PathBuf) -> Result<()> {
+        let repo = &self.repository;
+        let staged_files = self.staged_files()?;
+        let file = staged_files.iter().find(|f| f.path.to_str() == path.to_str());
+        if let Some(file) = file {
+            let mut index = repo.index()?;
+            if file.status == FileStatus::Added {
+                index.remove_path(path)?;
+
+            } else {
+                let head = repo.head()?.peel_to_commit()?;
+                let tree = head.tree()?;
+                let entry = tree.get_path(&path)?;
+                let blob = repo.find_blob(entry.id())?;
+                let entry = index.iter().find(|e| String::from_utf8(e.path.to_vec()).unwrap() == path.to_str().unwrap().to_string());
+                if let Some(entry) = entry {
+                    index.add_frombuffer(&entry, blob.content())?;
+                } else {
+                    index.remove_path(&path)?;
+                } 
+            }
+            index.write()?;
+            Ok(())
+        } else {
+            return Err(anyhow::anyhow!("File not found in stage"));
+        }
+    }
+
+    pub fn checkout_file (&self, path: &PathBuf) -> Result<()> {
+        let repo = &self.repository;
+        // 判断当前的文件是不是新加的
+        let status = self.changed_files()?;
+        let file = status.iter().find(|f| f.path.to_str() == path.to_str());
+        if let Some(file) = file {
+            if file.status == FileStatus::Added {
+                // 如果是新加的文件，添加到工作区
+                println!("checkout new file: {:?}", file);
+                Ok(())
+            }
+            else {
+                let mut checkout_opts = CheckoutBuilder::new();
+                checkout_opts.path(path).force();
+                repo.checkout_head(Some(&mut checkout_opts))?;
+                Ok(())
+            }
+        } else {
+            return Err(anyhow::anyhow!("File not found in stage"));
+        }
     }
 
     pub fn current_branch(&self) -> Result<Branch> {
@@ -547,12 +596,12 @@ impl GitDataProvider {
                 .to_string();
             // git2的is_blob函数好像有问题，直接用文件内容判断吧
             let is_binary = if delta.new_file().exists() {
-                is_binary_file_content(self.get_blob_content(delta.new_file().id())?)?
+                is_binary_file_content(self.get_blob_content(delta.new_file().id())?)
             } else {
                 false
             };
             let old_is_binary = if delta.old_file().exists() {
-                is_binary_file_content(self.get_blob_content(delta.old_file().id())?)?
+                is_binary_file_content(self.get_blob_content(delta.old_file().id())?)
             } else {
                 false
             };
