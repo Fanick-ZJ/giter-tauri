@@ -19,9 +19,9 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
   constructor(props: SourceConterolDialogProps) {
     super({
       containerName: className,
-      buttonBox: 'ok',
+      buttonBox: 'custom',
       title: '源码控制',
-      subTitle: props.repo.alias
+      subTitle: props.repo.alias,
     })
     this.props = props
   }
@@ -35,9 +35,23 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
       console.log(res)
     })
   }
+
+  public customFooter(): Component | undefined {
+    const self = this;
+    return () => (
+      <div class="flex justify-between">
+      <NButton type="primary">
+        推送
+      </NButton>
+      <NButton onClick={self.close.bind(self)}>
+        关闭
+      </NButton>
+    </div>
+    )
+  }
   
   public content(): Component {
-    let _this = this
+    let self = this
     return defineComponent({
       name: 'SourceControlDialog',
       setup() {
@@ -62,10 +76,10 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
         const changedFiles = ref<ChangedFile[]>([])
         const stagedFiles = ref<ChangedFile[]>([])
         const flush = () => {
-          getChangedFiles(_this.props.repo.path).then((files) => {
+          getChangedFiles(self.props.repo.path).then((files) => {
             changedFiles.value = files
           })
-          getStagedFiles(_this.props.repo.path).then((files) => {
+          getStagedFiles(self.props.repo.path).then((files) => {
             stagedFiles.value = files
           })
         }
@@ -73,7 +87,7 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
           flush() 
         })
         const unsubscrib = listen<StatusChangePayloadType>(STATUS_CHANGE, (event) => {
-          if (event.payload.path === _this.props.repo.path) {
+          if (event.payload.path === self.props.repo.path) {
             flush()
           }
         })
@@ -87,10 +101,10 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
           <div>
             {/* 头部commit书写区域 */}
             <div class='flex flex-col gap-2 mb-1'>
-              <NInput maxlength="200" v-model:value={_this.commitMsg.value} autosize={{minRows: 1, maxRows: 3}} type="textarea" placeholder="请输入提交内容">
+              <NInput maxlength="200" v-model:value={self.commitMsg.value} autosize={{minRows: 1, maxRows: 3}} type="textarea" placeholder="请输入提交内容">
               </NInput>
               <div class='flex h-[30px] bg-[#0078d4] text-white rounded-sm'>
-                <NButton class='flex-1' color='#026ec1' text textColor={'white'} onClick={_this.commit.bind(_this)}>
+                <NButton class='flex-1' color='#026ec1' text textColor={'white'} onClick={self.commit.bind(self)}>
                   提交
                 </NButton>
                 <NDropdown text trigger='click' options={commitOptions}>
@@ -106,7 +120,7 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
               {/* 变更的文件 */}
               {
                 stagedFiles.value.map((file) => {
-                  return <ChangedFileWidget repo={_this.props.repo} key={file.path} file={file} type='staged'/>
+                  return <ChangedFileWidget repo={self.props.repo} key={file.path} file={file} type='staged'/>
                 })
               }
               {/* divider */}
@@ -123,7 +137,7 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
               </div>
               {
                 changedFiles.value.map((file) => {
-                  return <ChangedFileWidget repo={_this.props.repo} key={file.path} file={file} type='changed'/> 
+                  return <ChangedFileWidget repo={self.props.repo} key={file.path} file={file} type='changed'/> 
                 })
               }
             </div>

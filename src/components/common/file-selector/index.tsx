@@ -36,7 +36,7 @@ export class FileSelectorDialog extends AbstractDialog<string | string[]> {
   }
 
   public content(): Component {
-    const _this = this
+    const self = this
     return defineComponent({
      name: 'FileSelectorDialog',
      setup () {
@@ -44,18 +44,18 @@ export class FileSelectorDialog extends AbstractDialog<string | string[]> {
       const selected = ref('')
       const changed = (val: string) => {
         selected.value = val
-        _this.setReturnData(val)
+        self.setReturnData(val)
       }
       watch(() => fileTreeRef.value?.checkedKeys, (val) => {
         if (val && val.length > 0) {
           selected.value = ''
-          _this.setReturnData(val)
+          self.setReturnData(val)
         }
       })
        return () => (
         <div>
           <NInput placeholder='请输入文件路径' type='text' size='tiny' v-model:value={selected.value}/>
-          <FileTree ref='fileTreeRef' {..._this.props} onChange={changed}/>
+          <FileTree ref='fileTreeRef' {...self.props} onChange={changed}/>
         </div>
        )
      } 

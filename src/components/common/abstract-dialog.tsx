@@ -38,7 +38,7 @@ export class AbstractDialog<R> {
   }
 
   public show() {
-    let _this = this;
+    let self = this;
     try {
       this.comp = createSingletonComponent({
         className: this.containerName,
@@ -50,8 +50,8 @@ export class AbstractDialog<R> {
      return 
     }
     this._promise = new Promise((resolve, reject) => {
-      _this._resolve = resolve;
-      _this._reject = reject;
+      self._resolve = resolve;
+      self._reject = reject;
     }); 
     this._show.value = true;
     return this._promise;
@@ -65,7 +65,7 @@ export class AbstractDialog<R> {
   public beforeOk() {}
 
   // OK按钮回调
-  private ok() {
+  protected ok() {
     this.beforeOk();
     this._resolve(this.returnData);
     if (this.comp) {
@@ -77,7 +77,7 @@ export class AbstractDialog<R> {
   
   public beforeClose() {}
 
-  private async close () {
+  protected async close () {
     // 调用关闭回调
     this.beforeClose()
     this._reject(); 
@@ -97,16 +97,16 @@ export class AbstractDialog<R> {
   }
 
   public header(): Component | undefined {
-    const _this = this;
+    const self = this;
     return () => (
       <div class='flex w-max gap-2 overflow-x-hidden'>
         <div class='flex-1'>
           <div class='text-lg font-bold'>
-            {_this.title}
+            {self.title}
           </div>
         </div>
         <div class='text-sm flex items-end'>
-          {_this.subTitle}
+          {self.subTitle}
         </div>
       </div> 
     )
@@ -117,11 +117,11 @@ export class AbstractDialog<R> {
   }
 
   private footer(): Component | undefined {
-    const _this = this;
+    const self = this;
     if (this.buttonBox === 'cancel') {
       return () => (
         <div class="flex justify-end">
-          <NButton onClick={_this.close.bind(_this)}>
+          <NButton onClick={self.close.bind(self)}>
             关闭
           </NButton>
         </div>
@@ -130,7 +130,7 @@ export class AbstractDialog<R> {
     else if (this.buttonBox === 'ok') {
       return () => (
         <div class="flex justify-end">
-          <NButton onClick={_this.ok.bind(_this)}>
+          <NButton onClick={self.ok.bind(self)}>
             确定
           </NButton>
         </div>
@@ -139,44 +139,45 @@ export class AbstractDialog<R> {
     else if (this.buttonBox === 'ok-cancel') {
       return () => (
         <div class="flex justify-end gap-2">
-          <NButton onClick={_this.ok.bind(_this)} type='primary'>
+          <NButton onClick={self.ok.bind(self)} type='primary'>
             确定
           </NButton>
-          <NButton onClick={_this.close.bind(_this)}>
+          <NButton onClick={self.close.bind(self)}>
             取消
           </NButton>
         </div>
       ) 
     } else {
-      return _this.customFooter()
+      console.log('custom footer')
+      return self.customFooter()
     }
   }
 
   private component (): Component {
-    const _this = this;
+    const self = this;
     return defineComponent({
       name: 'AbstractDialog',
       setup() {
-        const header = _this.header()
-        const footer = _this.footer()
+        const header = self.header()
+        const footer = self.footer()
         const slots = {
-          default: () => h(_this.content()),
+          default: () => h(self.content()),
           header: () => header ? h(header!) : undefined,
           footer: () => footer ? h(footer!) : undefined
         }
         const style = {
-          width: _this.width,
-          height: _this.height 
+          width: self.width,
+          height: self.height 
         }
         return () => (
         <>
         {
-          _this._show.value ? (
+          self._show.value ? (
             <div class='w-screen h-screen bg-slate-400/50 flex items-center justify-center fixed top-0 left-0 z-[3]'
-              onMousemove={_this.mouseMove.bind(_this)}>
+              onMousemove={self.mouseMove.bind(self)}>
               <NCard style={style}
                  closable 
-                 onClose={_this.close.bind(_this)} 
+                 onClose={self.close.bind(self)} 
                  v-slots={slots}
                  headerStyle={{'overflow-x': 'hidden', 'overflow-y': 'hidden'}}>
               </NCard>
