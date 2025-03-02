@@ -28,41 +28,41 @@ const contributionLoading = ref(true)
 const init = async () => {
   totalLoading.value = true
   let path = repo.value!.path
+  try {
+    branches.value = await getBranches(path)
+  } catch(err) {
+    window.$message.error('获取分支失败') 
+    return
+  }
   try{
     currentBranch.value = await getCurrentBranch(path)
   }
   catch(err) {
     window.$message.error('获取当前分支失败')
-    return
+    currentBranch.value = branches.value[0]
   }
-  const _getBranches = getBranches(path)
   const _getAuthor = getRepoAuthor(repo.value!.path)
   const _getGlobalAuthor = getGlobalAuthor()
   const _getAuthors = getAuthors(path, currentBranch.value!)
   const _getContribution = getBranchCommitContribution(path, currentBranch.value!)
-  Promise.allSettled([_getBranches, _getContribution, _getAuthor, _getGlobalAuthor, _getAuthors]).then((res) => {
-    if (res[0].status === 'rejected') {
-      window.$message.error('获取分支失败')
-      return
-    }
-    branches.value = res[0].value 
-    if (res[1].status ==='rejected') {
+  Promise.allSettled([_getContribution, _getAuthor, _getGlobalAuthor, _getAuthors]).then((res) => {
+    if (res[0].status ==='rejected') {
       window.$message.error('获取贡献失败')
       return
     }
-    contribution.value = res[1].value
-    if (res[4].status ==='rejected') {
+    contribution.value = res[0].value
+    if (res[3].status ==='rejected') {
       window.$message.error('获取作者失败')
       return 
     }
-    authors.value = res[4].value
+    authors.value = res[3].value
     let repoAuthor;
-    if (res[2].status === 'fulfilled') {
-      repoAuthor = res[2].value
+    if (res[1].status === 'fulfilled') {
+      repoAuthor = res[1].value
     }
     let globalAuthor;
-    if (res[3].status === 'fulfilled') {
-      globalAuthor = res[3].value
+    if (res[2].status === 'fulfilled') {
+      globalAuthor = res[2].value
     }
     // 设置默认显示的作者
     // 显示顺序为：仓库作者，全局作者，第一个作者

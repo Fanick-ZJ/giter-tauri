@@ -6,7 +6,7 @@ import { NButton, NDivider, NDropdown, NInput } from 'naive-ui'
 import { Icon } from '@iconify/vue/dist/iconify.js'
 import { listen } from '@tauri-apps/api/event'
 import { STATUS_CHANGE, StatusChangePayloadType } from '@/const/listen'
-import { getChangedFiles, getStagedFiles } from '@/utils/command'
+import { commit, getChangedFiles, getStagedFiles } from '@/utils/command'
 import { ChangedFile } from '@/types'
 
 import ChangedFileWidget from './components/changed-file-widget.vue'
@@ -31,7 +31,9 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
   }
 
   public commit () {
-    // 
+    commit(this.props.repo.path, this.commitMsg.value, undefined).then((res) => {
+      console.log(res)
+    })
   }
   
   public content(): Component {

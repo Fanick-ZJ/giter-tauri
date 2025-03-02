@@ -35,5 +35,6 @@ make_serializable! {
         AddToStageError(String),        // 添加到暂存区失败
         RemoveFromStageError(String),   // 从暂存区移除失败
         CheckoutFileError(String),      // 检出文件失败
+        CommitError(String),            // 提交失败
     }
 }

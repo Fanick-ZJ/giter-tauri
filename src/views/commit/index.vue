@@ -31,10 +31,24 @@ const authors = ref<Author[]>([])
 const commits = ref<Commit[]>([])
 const init = async () => {
   let path = repo.value!.path
-  branches.value = await getBranches(path)
-  curBranch.value = await getCurrentBranch(path)
+  const branchesPromise = getBranches(path)
+  const curBranchPromise = getCurrentBranch(path)
+  await Promise.allSettled([branchesPromise, curBranchPromise]).then(async (res) => {
+    if (res[0].status === 'fulfilled') {
+      branches.value = res[0].value
+    } else {
+      window.$message.error('获取分支失败')
+      return
+    }
+    if (res[1].status === 'fulfilled') {
+      curBranch.value = res[1].value
+    } else {
+      window.$message.error('获取当前分支失败')
+      curBranch.value = branches.value[0]
+    }
+      authors.value = await getAuthors(repo.value!.path, curBranch.value)
+  })
   getCommits()
-  authors.value = await getAuthors(repo.value!.path, curBranch.value)
 }
 
 const getCommits = _.debounce(async () => {
@@ -64,15 +78,15 @@ watch(()=> route.path, () => {
     id.value = parseInt(route.params.id as string)
     repo.value = repoStore.getRepoById(id.value)
     init().catch((err) => {
-      window.$message.error(err) 
-    }).then(() => {
+      window.$message.error(err.data) 
+    }).finally(() => {
       // 重置分页,筛选刷新
-     page.value = 1 
-     filterModel.value = {
-       author: null,
-       content: null,
-       timeRange: null
-     }
+      page.value = 1 
+      filterModel.value = {
+        author: null,
+        content: null,
+        timeRange: null
+      }
     })
   }
 }, {immediate: true})

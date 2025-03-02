@@ -6,6 +6,7 @@ use crate::util::size_by_path;
 use crate::util::stamp_to_ymd;
 use anyhow::{ Context, Result };
 use git2::build::CheckoutBuilder;
+use git2::Signature;
 use git2::TreeWalkMode;
 use git2::{BranchType, Oid, Repository, Revwalk, Status};
 use log::error;
@@ -20,6 +21,7 @@ use std::i32;
 use std::path;
 use std::path::Path;
 use std::path::PathBuf;
+use std::usize;
 use std::vec;
 use types::{author::Author, branch::Branch, commit::Commit, status::WorkStatus};
 
@@ -249,8 +251,6 @@ impl GitDataProvider {
     pub fn add_to_stage(&self, path: &PathBuf) -> Result<()> {
         let repo = &self.repository;
         let mut index = repo.index()?;
-        let path = self.relative_path(path)?;
-        println!("add to stage: {:?}", path);
         index.add_path(&path)?;
         index.write()?;
         Ok(()) 
@@ -311,6 +311,7 @@ impl GitDataProvider {
         let branches = repo.branches(None).unwrap();
         for branch in branches {
             let (branch, branch_type) = branch.unwrap();
+            println!("branch: {:?} is_head: {}", branch.name(), branch.is_head());
             if branch.is_head() {
                 let reference = branch.name().unwrap_or(Some("")).unwrap_or("").to_string();
                 let name = reference
@@ -774,6 +775,36 @@ impl GitDataProvider {
             commits.push(commit);
         }
         Ok(commits)
+    }
+
+    pub fn commit (&self, message: &str, update_ref: Option<&str>) -> Result<Oid> {
+        // 如果没有指定更新的分支，默认更新当前分支
+        let update_ref =  if update_ref.is_none() {
+           Some("HEAD")
+        } else  {
+            update_ref
+        };
+        let repo = &self.repository;
+        if repo.is_bare() {
+            return Err(anyhow::anyhow!(format!("{} Repository is bare", repo.path().to_str().unwrap())));
+        }
+        let mut index = repo.index()?;
+        let conflicts = index.conflicts()?;
+        if conflicts.into_iter().count() > 0 {
+            return Err(anyhow::anyhow!(format!("{} Repository has conflicts", repo.path().to_str().unwrap()))); 
+        }
+        let author = repo.signature();
+        if author.is_err() {
+            return Err(anyhow::anyhow!(format!("{}: Please configure the user.name and user.email about this repository", repo.path().to_str().unwrap())));
+        }
+        let author = author.unwrap();
+        let tree_oid = index.write_tree()?;
+        let tree = repo.find_tree(tree_oid)?;
+        let parents = &[&repo.head()?.peel_to_commit()?];
+        // 创建提交
+        let oid = repo.commit(update_ref, &author, &author, message, &tree, parents)?;
+        return Ok(oid);
+
     }
 
     /// 获取提交者缓存

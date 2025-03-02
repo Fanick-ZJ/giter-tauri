@@ -363,3 +363,13 @@ pub fn checkout_file(repo: RepoPath, path: String) -> Result<(), CommandError> {
     }
     Ok(())
 }
+
+#[tauri::command]
+pub fn commit(repo: RepoPath, message: &str, update_ref: Option<&str>) -> Result<(), CommandError> {
+    let provider = get_provider(&repo)?;
+    let result = provider.commit(message, update_ref);
+    if let Err(e) = result {
+        return Err(CommandError::CommitError(e.to_string()));
+    }
+    Ok(())
+}
