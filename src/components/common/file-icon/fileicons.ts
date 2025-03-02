@@ -303,6 +303,10 @@ export const fileIcons: FileIcons = {
       ],
     },
     {
+      name: 'typescript',
+      fileExtensions: ['ts', 'cts', 'mts'],
+    },
+    {
       name: 'typescript-def',
       fileExtensions: ['d.ts', 'd.cts', 'd.mts'],
     },
@@ -2557,7 +2561,6 @@ export const fileIcons: FileIcons = {
     },
     { name: 'ifanr-cloud', fileNames: ['.mincloudrc'] },
     { name: 'concourse', fileNames: ['concourse.yml'] },
-    { name: 'qwik', fileExtensions: ['tsx'] },
     { name: 'mermaid', fileExtensions: ['mmd', 'mermaid'] },
     {
       name: 'syncpack',

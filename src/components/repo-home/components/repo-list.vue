@@ -7,6 +7,7 @@ import { upToDataElement } from '@/utils/dom';
 import { useFileInfoDialog } from '@/components/common/info-dialog';
 import { openFileManager } from '@/utils/tool';
 import { FilterModel } from '../types';
+import { SourceControlDialog } from '@/components/common/source-control-dialog';
 
 defineOptions({
   name: 'RepoList'
@@ -34,6 +35,10 @@ const options = [
   {
     label: '更新',
     key: 'update' 
+  },
+  {
+    label: '源码控制',
+    key: 'source-control' 
   }
 ]
 
@@ -61,6 +66,7 @@ const onClickoutside = () => {
 const handleSelect = (key: string) => {
   showContext.value = false
   if (!contextSelectItem.value) return
+  let repo = repoStore.getRepoByPath(contextSelectItem.value.path)
   switch (key) {
     case 'update':
       const path = contextSelectItem.value.path
@@ -70,11 +76,19 @@ const handleSelect = (key: string) => {
       })
       break;
     case 'delete':
-      let repo = repoStore.getRepoByPath(contextSelectItem.value.path)
       repo && repoStore.remove(repo)
       break;
     case 'open':
       openFileManager(contextSelectItem.value.path)
+      break;
+    case 'source-control':
+      if (!repo) return
+      const dlg = new SourceControlDialog({
+        repo: repo
+      })
+      dlg.show()?.then((res) => {
+        console.log(res) 
+      })
       break;
   }
 }

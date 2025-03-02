@@ -86,7 +86,7 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
         return () => (
           <div>
             {/* 头部commit书写区域 */}
-            <div class='flex flex-col gap-2'>
+            <div class='flex flex-col gap-2 mb-1'>
               <NInput maxlength="200" v-model:value={_this.commitMsg.value} autosize={{minRows: 1, maxRows: 3}} type="textarea" placeholder="请输入提交内容">
               </NInput>
               <div class='flex h-[30px] bg-[#0078d4] text-white rounded-sm'>

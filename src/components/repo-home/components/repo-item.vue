@@ -10,8 +10,6 @@ import StatusLight from './status-light.vue';
 import { viewExtend } from '@/types/key';
 import { useRouter } from 'vue-router';
 import { SourceControlDialog } from '@/components/common/source-control-dialog/index';
-import { getBranchCommitContribution, getCurrentBranch } from '@/utils/command';
-// import { useSourceControlDialog } from '@/components/common/source-control-dialog';
 
 const props = defineProps({
   repo: {
