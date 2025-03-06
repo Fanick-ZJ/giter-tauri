@@ -1,21 +1,6 @@
-export enum CommandError {
-  RepositoryHasWatched = 'REPOSITORY_HAS_WATCHED',
-  AddWatcherError = 'AddWatcherError',
-  AddRepositoryStoreError = 'AddRepositoryStoreError',
-  InvalidRepository = 'InvalidRepository',
-  RepoHasnotOwnership = 'RepoHasnotOwnership',
-  FindAuthorsError = 'FindAuthorsError',
-  DataProviderBuildError = 'DataProviderBuildError',
-  BranchNotFound = 'BranchNotFound',
-  BranchesFindError = 'BranchesFindError',
-  GetAuthorError = 'GetAuthorError',
-  DbNotFound = 'DbNotFound',
-  GetFoldersError = 'GetFoldersError',
-  GetWorkStatusError = 'GetWorkStatusError',
-  SetRepoOwnershipError = 'SetRepoOwnershipError',
-}
+use std::fmt;
 
-export enum ReasonErrorCode {
+pub enum ErrorCode {
   AuthorNotValidUtf8 = 0,
   ReadFileError = 1,
   GetStatusError = 2,

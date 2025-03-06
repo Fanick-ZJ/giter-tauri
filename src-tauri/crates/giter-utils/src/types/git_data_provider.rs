@@ -4,9 +4,13 @@ use crate::util::is_binary_file;
 use crate::util::is_binary_file_content;
 use crate::util::size_by_path;
 use crate::util::stamp_to_ymd;
-use anyhow::{ Context, Result };
+use anyhow::Result;
 use git2::build::CheckoutBuilder;
-use git2::Signature;
+use git2::Config;
+use git2::Cred;
+use git2::CredentialType;
+use git2::PushOptions;
+use git2::RemoteCallbacks;
 use git2::TreeWalkMode;
 use git2::{BranchType, Oid, Repository, Revwalk, Status};
 use log::error;
@@ -33,6 +37,7 @@ use super::file::ChangedFile;
 use super::file::CommittedFile;
 use super::file::UntrackedFile;
 use super::status::FileStatus;
+use super::provider_error::ErrorCode as ProviderErrorCode;
 
 
 pub struct GitDataProvider {
@@ -251,6 +256,7 @@ impl GitDataProvider {
     pub fn add_to_stage(&self, path: &PathBuf) -> Result<()> {
         let repo = &self.repository;
         let mut index = repo.index()?;
+        // TODO:还差判断gitignore
         index.add_path(&path)?;
         index.write()?;
         Ok(()) 
@@ -311,7 +317,6 @@ impl GitDataProvider {
         let branches = repo.branches(None).unwrap();
         for branch in branches {
             let (branch, branch_type) = branch.unwrap();
-            println!("branch: {:?} is_head: {}", branch.name(), branch.is_head());
             if branch.is_head() {
                 let reference = branch.name().unwrap_or(Some("")).unwrap_or("").to_string();
                 let name = reference
@@ -350,6 +355,7 @@ impl GitDataProvider {
         Ok(_branches)
     }
 
+    /// 获取当前分支对应的远程分支
     pub fn current_remote_branch(&self) -> Result<Branch> {
         let current = self.current_branch()?;
         let remote = self
@@ -771,12 +777,12 @@ impl GitDataProvider {
             }
             if time < filter.start_time || time > filter.end_time {
                 continue; 
-            }
+            } 
             commits.push(commit);
         }
         Ok(commits)
     }
-
+ 
     pub fn commit (&self, message: &str, update_ref: Option<&str>) -> Result<Oid> {
         // 如果没有指定更新的分支，默认更新当前分支
         let update_ref =  if update_ref.is_none() {
@@ -797,6 +803,12 @@ impl GitDataProvider {
         if author.is_err() {
             return Err(anyhow::anyhow!(format!("{}: Please configure the user.name and user.email about this repository", repo.path().to_str().unwrap())));
         }
+        match self.staged_files() {
+            Ok(files) => if files.len() == 0 {
+                return Err(anyhow::anyhow!(format!("{}: No staged files", repo.path().to_str().unwrap())));
+            },
+            Err(_) => return Err(anyhow::anyhow!(format!("{}: get staged files error", repo.path().to_str().unwrap()))),
+        };
         let author = author.unwrap();
         let tree_oid = index.write_tree()?;
         let tree = repo.find_tree(tree_oid)?;
@@ -804,7 +816,73 @@ impl GitDataProvider {
         // 创建提交
         let oid = repo.commit(update_ref, &author, &author, message, &tree, parents)?;
         return Ok(oid);
+    }
 
+    pub fn push(&self, remote: &str, branch: &str, credentials: Option<(String, String)>) -> Result<()> {
+        let repo = &self.repository;
+        let mut remote = match repo.find_remote(remote) {
+            Ok(remote) => remote,
+            Err(_) => {
+                return Err(anyhow::anyhow!(format!("Remote {} not found", remote)));
+            }
+        };
+
+        // 判断分支是不是track的
+        let branch = match repo.find_branch(branch, BranchType::Local) {
+            Ok(branch) => {
+                if branch.upstream().is_err() {
+                    return Err(anyhow::anyhow!(format!("The Branch {} of repo {} is not track", branch.name()?.unwrap(), repo.path().to_str().unwrap())));
+                } else {
+                    branch
+                }
+            },
+            Err(_) =>  return Err(anyhow::anyhow!(format!("Branch {} not found", branch)))
+        };
+        // 准备认证回调函数
+        let mut callbacks = RemoteCallbacks::new();
+        let (username, password) = credentials.unwrap_or_default();
+        callbacks.credentials(move |url, username_from_url, allowed_types| {
+            match allowed_types {
+                CredentialType::USER_PASS_PLAINTEXT => {
+                    let config = Config::open_default()?;
+                    if username.is_empty() || password.is_empty() {
+                        let err = git2::Error::new(
+                            git2::ErrorCode::User,
+                            git2::ErrorClass::None,
+                            "Please configure the user.name and user.email about this repository",
+                        );
+                        return Err(err);
+                    }
+                    Cred::userpass_plaintext(&username, &password)
+                },
+                CredentialType::SSH_KEY => {
+                    Cred::ssh_key_from_agent(username_from_url.unwrap_or("git")) 
+                },
+                _ => {
+                    Cred::default()
+                }
+            }
+        });
+
+        // 配置推送选项
+        let mut push_options = PushOptions::new();
+        push_options.remote_callbacks(callbacks);
+        let branch_ref = branch.into_reference();
+        let branch_ref_name = branch_ref.name().unwrap();
+        repo.set_head(branch_ref_name)?;
+        let push_ret = remote.push(&[&branch_ref_name], Some(&mut push_options)); 
+        if push_ret.is_err() {
+            let code = push_ret.err().unwrap().code();
+            match code {
+                git2::ErrorCode::User => {
+                    return Err(anyhow::anyhow!(ProviderErrorCode::PushNeedNameAndPassword as i32));
+                }, 
+                _ => {
+                    return Err(anyhow::anyhow!(format!("Push failed")));
+                }
+            }
+        }
+        Ok(())
     }
 
     /// 获取提交者缓存

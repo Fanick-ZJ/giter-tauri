@@ -4,7 +4,7 @@ import { computed, PropType, ref } from 'vue';
 import { Icon } from '@iconify/vue'
 import FileIcon from '@/components/common/file-icon/index.vue';
 import { basename } from '@/utils/tool';
-import { NPopover } from 'naive-ui';
+import { NPopover, useDialog } from 'naive-ui';
 import { FileStatus } from '@/enum';
 import { addFileToStage, checkoutFile, removeFileFromStage } from '@/utils/command';
 import { ValidRepository } from '@/store/modules/repo';
@@ -31,11 +31,30 @@ const name = computed(() => {
   return basename(props.file.path)
 })
 
+const dialog = useDialog()
 const handleDiscard = () => {
   if (props.type === 'staged') {
-    removeFileFromStage(props.repo.path, props.file.path)
+    dialog.warning({
+      title: '警告',
+      content: '是否在暂存区移除该文件？',
+      positiveText: '确定',
+      negativeText: '不确定',
+      draggable: true,
+      onPositiveClick: () => {
+        removeFileFromStage(props.repo.path, props.file.path)
+      }
+    })
   } else if (props.type === 'changed') {
-    checkoutFile(props.repo.path, props.file.path)
+    dialog.warning({
+      title: '警告',
+      content: '是否在移除该文件的修改？',
+      positiveText: '确定',
+      negativeText: '不确定',
+      draggable: true,
+      onPositiveClick: () => {
+        checkoutFile(props.repo.path, props.file.path)
+      }
+    })
   }
 }
 

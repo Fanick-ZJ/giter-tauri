@@ -2,39 +2,50 @@ use crate::make_serializable;
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommandError {
+    pub message: String,
+    pub code: CommandErrorEnum,
+    // data 需要容纳函数的传入参数
+    pub data: Option<Vec<String>>,
+}
+
+
 make_serializable! {
     #[derive(Deserialize, Debug, Clone)]
-    pub enum CommandError {
-        RepositoryHasWatched(String),   // 仓库已经被监听
-        AddWatcherError(String),        // 添加监听失败
-        AddRepositoryStoreError(String),// 添加仓库失败
-        InvalidRepository(String),      // 无效的仓库
-        RepoHasnotOwnership(String),    // 仓库没有所有权
-        FindAuthorsError(String),       // 查找作者失败
-        DataProviderBuildError(String), // 构建数据提供者失败
-        BranchNotFound(String),         // 分支不存在
-        BranchesFindError(String),      // 查找分支失败
-        GetAuthorError(String),         // 获取作者失败
-        DbNotFound(String),             // 数据库不存在
-        GetFoldersError(String),        // 获取文件夹失败
-        GetWorkStatusError(String),     // 获取工作状态失败
-        SetRepoOwnershipError(String),  // 设置仓库所有权失败
-        RemoveWatcherError(String),     // 移除监听失败
-        GetBranchCommitsError(String),  // 获取提交失败
-        GetCurrentBranchError(String),  // 获取当前分支失败
-        ConvertOidError(String),        // 转换OID失败
-        GetCommitContentError(String),  // 获取提交内容失败
-        GetFileDiffError(String),       // 获取文件差异失败
-        GetFileContentError(String),    // 获取文件内容失败
-        GetCommitError(String),         // 获取提交失败
-        GetBranchCommitContributionError(String), // 获取分支提交贡献失败
-        GetGlobalAuthorError(String),   // 获取全局作者失败
-        GetRepoAuthorError(String),     // 获取仓库作者失败
-        GetChangedFilesError(String),   // 获取变更文件失败
-        GetStagedFilesError(String),    // 获取暂存文件失败
-        AddToStageError(String),        // 添加到暂存区失败
-        RemoveFromStageError(String),   // 从暂存区移除失败
-        CheckoutFileError(String),      // 检出文件失败
-        CommitError(String),            // 提交失败
+    pub enum CommandErrorEnum {
+        RepositoryHasWatched,   // 仓库已经被监听
+        AddWatcherError,        // 添加监听失败
+        AddRepositoryStoreError,// 添加仓库失败
+        InvalidRepository,      // 无效的仓库
+        RepoHasnotOwnership,    // 仓库没有所有权
+        FindAuthorsError,       // 查找作者失败
+        DataProviderBuildError, // 构建数据提供者失败
+        BranchNotFound,         // 分支不存在
+        BranchesFindError,      // 查找分支失败
+        GetAuthorError,         // 获取作者失败
+        DbNotFound,             // 数据库不存在
+        GetFoldersError,        // 获取文件夹失败
+        GetWorkStatusError,     // 获取工作状态失败
+        SetRepoOwnershipError,  // 设置仓库所有权失败
+        RemoveWatcherError,     // 移除监听失败
+        GetBranchCommitsError,  // 获取提交失败
+        GetCurrentBranchError,  // 获取当前分支失败
+        ConvertOidError,        // 转换OID失败
+        GetCommitContentError,  // 获取提交内容失败
+        GetFileDiffError,       // 获取文件差异失败
+        GetFileContentError,    // 获取文件内容失败
+        GetCommitError,         // 获取提交失败
+        GetBranchCommitContributionError, // 获取分支提交贡献失败
+        GetGlobalAuthorError,   // 获取全局作者失败
+        GetRepoAuthorError,     // 获取仓库作者失败
+        GetChangedFilesError,   // 获取变更文件失败
+        GetStagedFilesError,    // 获取暂存文件失败
+        AddToStageError,        // 添加到暂存区失败
+        RemoveFromStageError,   // 从暂存区移除失败
+        CheckoutFileError,      // 检出文件失败
+        CommitError,            // 提交失败
+        GetCurrentRemoteBranchError, // 获取当前远程分支失败
+        PushError,              // 推送失败
     }
 }

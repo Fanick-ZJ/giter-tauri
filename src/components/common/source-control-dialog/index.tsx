@@ -1,21 +1,28 @@
 // 使用组件，通过函数调用的方式，将组件附着在root上
-import {Component, defineComponent, nextTick, onBeforeMount, onBeforeUnmount, ref, watch } from 'vue'
+import {Component, computed, defineComponent, nextTick, onBeforeMount, onBeforeUnmount, ref, watch } from 'vue'
 import { SourceConterolDialogProps } from './types'
 import { AbstractDialog } from '../abstract-dialog'
 import { NButton, NDivider, NDropdown, NInput } from 'naive-ui'
 import { Icon } from '@iconify/vue/dist/iconify.js'
 import { listen } from '@tauri-apps/api/event'
 import { STATUS_CHANGE, StatusChangePayloadType } from '@/const/listen'
-import { commit, getChangedFiles, getStagedFiles } from '@/utils/command'
-import { ChangedFile } from '@/types'
+import { commit, currentRemoteBranch, getBranches, getChangedFiles, getCurrentBranch, getStagedFiles, push } from '@/utils/command'
+import { Branch, ChangedFile } from '@/types'
 
 import ChangedFileWidget from './components/changed-file-widget.vue'
 
 const className = '__source__control__container'
 
+const branchKeyPrefix = '__BRANCH__:'
+
 export class SourceControlDialog extends AbstractDialog<undefined> {
   private commitMsg = ref('')
   private props: SourceConterolDialogProps
+  private changedFiles = ref<ChangedFile[]>([])
+  private stagedFiles = ref<ChangedFile[]>([])
+  private branches = ref<Branch[]>([])
+  private currentBranch = ref<Branch>()
+  private currentRemoteBranch = ref<Branch | undefined>()
   constructor(props: SourceConterolDialogProps) {
     super({
       containerName: className,
@@ -38,11 +45,66 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
 
   public customFooter(): Component | undefined {
     const self = this;
+    const computedOption = computed(() => {
+      const options = [] as any
+      if (self.currentRemoteBranch.value) {
+        options.push({
+          label: '推送',
+          key: 'push' 
+        })
+      }
+      options.push({
+        label: '切换分支',
+        key: 'switch-branch',
+        children: self.branches.value.map((branch) => {
+          return {
+            label: branch.name,
+            key: branchKeyPrefix + branch.name
+          }
+        })
+      })
+      return options
+    })
+    const menuProps = (e) => {
+      if ( e && e.key === 'switch-branch') {
+        return {
+          style: {
+            'max-height': '200px'
+          }
+        }
+      }
+    }
+    const handleSelect = (e) => {
+      if (e === 'push') {
+        if (self.currentRemoteBranch.value) {
+          console.log('push')
+          // 获取remoteRef
+          const remoteRef = self.currentRemoteBranch.value.reference.split('/')[0]
+          console.log(self.props.repo.path, remoteRef, this.currentBranch.value!.name)
+          push(self.props.repo.path, remoteRef, this.currentBranch.value!.name, undefined).then((res) => {
+            window.$message.success('推送成功')
+          }).catch((e) => {
+            // if ()
+            console.log(e)
+          })
+        }
+      }
+    }
     return () => (
       <div class="flex justify-between">
-      <NButton type="primary">
-        推送
-      </NButton>
+      <NDropdown trigger='click' 
+        overlap 
+        scrollable 
+        options={computedOption.value} 
+        menu-props={menuProps}
+        on-select={handleSelect}
+        arrow-wrapper-style={{
+          'overflow-x': 'hidden'
+        }}>
+        <NButton type="primary">
+          更多
+        </NButton>
+      </NDropdown>
       <NButton onClick={self.close.bind(self)}>
         关闭
       </NButton>
@@ -73,14 +135,23 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
             key: 'commit-sync'
           }
         ]
-        const changedFiles = ref<ChangedFile[]>([])
-        const stagedFiles = ref<ChangedFile[]>([])
         const flush = () => {
           getChangedFiles(self.props.repo.path).then((files) => {
-            changedFiles.value = files
+            self.changedFiles.value = files
           })
           getStagedFiles(self.props.repo.path).then((files) => {
-            stagedFiles.value = files
+            self.stagedFiles.value = files
+          })
+          getBranches(self.props.repo.path).then((branches) => {
+            self.branches.value = branches 
+          })
+          currentRemoteBranch(self.props.repo.path).then((branch) => {
+            self.currentRemoteBranch.value = branch
+          }).catch((e) => {
+            self.currentRemoteBranch.value = undefined
+          })
+          getCurrentBranch(self.props.repo.path).then((branch) => {
+            self.currentBranch.value = branch 
           })
         }
         onBeforeMount(() => {
@@ -119,7 +190,7 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
             <div>
               {/* 变更的文件 */}
               {
-                stagedFiles.value.map((file) => {
+                self.stagedFiles.value.map((file) => {
                   return <ChangedFileWidget repo={self.props.repo} key={file.path} file={file} type='staged'/>
                 })
               }
@@ -129,14 +200,14 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
               after:border-b after:flex-1 after:block
               after:h-full'>
                 {
-                  stagedFiles.value.length > 0 && <div class='px-1 text-xs text-gray-600'>暂存↑</div>
+                  self.stagedFiles.value.length > 0 && <div class='px-1 text-xs text-gray-600'>暂存↑</div>
                 }
                 {
-                  changedFiles.value.length > 0 && <div class='px-1 text-xs text-gray-600'>修改↓</div>
+                  self.changedFiles.value.length > 0 && <div class='px-1 text-xs text-gray-600'>修改↓</div>
                 }
               </div>
               {
-                changedFiles.value.map((file) => {
+                self.changedFiles.value.map((file) => {
                   return <ChangedFileWidget repo={self.props.repo} key={file.path} file={file} type='changed'/> 
                 })
               }

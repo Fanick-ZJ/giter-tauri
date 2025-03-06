@@ -19,6 +19,8 @@ const homeRef = ref<InstanceType<typeof RepoHome>>()
 const naviDarkTheme = computed(() => (themeStore.isDark ? darkTheme : undefined))
 
 onMounted(() => {
+  // 禁止右键菜单、滚动条
+  document.body.style.overflowX = 'hidden'
   document.addEventListener('contextmenu', (e: any) => {
     e.preventDefault() 
   })

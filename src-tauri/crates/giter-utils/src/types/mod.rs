@@ -8,3 +8,4 @@ pub mod commit_filter;
 pub mod status;
 pub mod diff;
 pub mod contribution;
+pub mod provider_error;

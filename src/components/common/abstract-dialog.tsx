@@ -1,5 +1,5 @@
 import { createSingletonComponent, InstanceManager, InstanceProps } from "@/utils/tool";
-import { NButton, NCard } from "naive-ui";
+import { NButton, NCard, NDialogProvider } from "naive-ui";
 import { Component, defineComponent, h, nextTick, ref, Ref } from "vue";
 
 type DialogOptions = {
@@ -175,12 +175,14 @@ export class AbstractDialog<R> {
           self._show.value ? (
             <div class='w-screen h-screen bg-slate-400/50 flex items-center justify-center fixed top-0 left-0 z-[3]'
               onMousemove={self.mouseMove.bind(self)}>
-              <NCard style={style}
-                 closable 
-                 onClose={self.close.bind(self)} 
-                 v-slots={slots}
-                 headerStyle={{'overflow-x': 'hidden', 'overflow-y': 'hidden'}}>
-              </NCard>
+              <NDialogProvider>
+                <NCard style={style}
+                  closable 
+                  onClose={self.close.bind(self)} 
+                  v-slots={slots}
+                  headerStyle={{'overflow-x': 'hidden', 'overflow-y': 'hidden'}}>
+                </NCard>
+              </NDialogProvider>
             </div>
           ) : null
         }
