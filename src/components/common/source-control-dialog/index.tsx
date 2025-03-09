@@ -10,6 +10,8 @@ import { commit, currentRemoteBranch, getBranches, getChangedFiles, getCurrentBr
 import { Branch, ChangedFile } from '@/types'
 
 import ChangedFileWidget from './components/changed-file-widget.vue'
+import { ReasonErrorCode } from '@/enum/error'
+import { RemoteUserPwdDialog } from '../remote-user-pwd-dialog'
 
 const className = '__source__control__container'
 
@@ -84,7 +86,22 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
           push(self.props.repo.path, remoteRef, this.currentBranch.value!.name, undefined).then((res) => {
             window.$message.success('推送成功')
           }).catch((e) => {
-            // if ()
+            if (e.message == ReasonErrorCode.PushNeedNameAndPassword) {
+              window.$message.error('请输入远程仓库的用户名和密码')
+              const dlg = new RemoteUserPwdDialog({
+                remote: ''
+              })
+              dlg.setZIndex(self.zIndex.value + 1)
+              dlg.show()?.then((res) => {
+                if (res) {
+                  push(self.props.repo.path, remoteRef, this.currentBranch.value!.name, [res.username, res.password]).then((res) => {
+                    window.$message.success('推送成功')
+                  }).catch((e) => {
+                    window.$message.error('推送失败')
+                  })
+                } 
+              })
+            }
             console.log(e)
           })
         }

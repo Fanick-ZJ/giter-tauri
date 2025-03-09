@@ -22,6 +22,7 @@ export class AbstractDialog<R> {
   private title: String | Ref<String>;  // 界面标题
   private subTitle: String | Ref<String>; // 界面副标题
   private comp?: InstanceManager<Component> // 界面实例
+  protected zIndex = ref(3); // 界面层级
   private buttonBox: 'cancel' | 'ok' | 'ok-cancel' | 'custom'; // 按钮框
   private width: string; // 界面宽度
   private height: string; // 界面高度
@@ -94,6 +95,10 @@ export class AbstractDialog<R> {
 
   public content(): Component { 
     return () => <></>
+  }
+
+  public setZIndex(zIndex: number) {
+    this.zIndex.value = zIndex; 
   }
 
   public header(): Component | undefined {
@@ -173,7 +178,9 @@ export class AbstractDialog<R> {
         <>
         {
           self._show.value ? (
-            <div class='w-screen h-screen bg-slate-400/50 flex items-center justify-center fixed top-0 left-0 z-[3]'
+            <div 
+              style={{zIndex: self.zIndex.value}}
+              class='w-screen h-screen bg-slate-400/50 flex items-center justify-center fixed top-0 left-0'
               onMousemove={self.mouseMove.bind(self)}>
               <NDialogProvider>
                 <NCard style={style}
