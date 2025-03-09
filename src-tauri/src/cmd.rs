@@ -1,20 +1,15 @@
 use crate::{
-    core::handle, 
-    emit::emit_branch_contribution, 
-    types::{
+    core::handle, emit::emit_branch_contribution, types::{
         cache::RepoPath, 
-        error::{
-            CommandErrorEnum as CEE,
-            CommandError as CE,
-        },
+        error::{CommandError as CE, CommandErrorEnum as CEE},
         fs::Dir, store
-    }, 
-    utils::{
+    }, utils::{
         dirs,
         fs::{get_first_level_dirs, get_logical_driver},
     }
 };
 use git2::Oid;
+use giter_macros::command_result;
 use giter_utils::{
     types::{
         author::Author, branch::Branch, cache::Cache, commit::Commit,  diff::ContentDiff, file::{ChangedFile, CommittedFile}, git_data_provider::GitDataProvider, status::WorkStatus
@@ -120,6 +115,7 @@ pub fn authors(repo: RepoPath, branch: Branch) -> Result<Vec<Author>, CE> {
 }
 
 #[tauri::command]
+// #[command_result(CEE::BranchesFindError)]
 pub fn branches(repo: RepoPath) -> Result<Vec<Branch>, CE> {
     let provider = get_provider(&repo)?;
     let branches = provider.branches();
@@ -151,7 +147,7 @@ pub fn get_db_path(db: String) -> Result<String, CE> {
         "store" => Ok(dirs::store_file().unwrap().to_str().unwrap().to_string()),
         "cache" => Ok(dirs::cache_file().unwrap().to_str().unwrap().to_string()),
         "config" => Ok(dirs::config_file().unwrap().to_str().unwrap().to_string()),
-        e => Err(CE {
+        _ => Err(CE {
             message: "invalid db".to_string(),
             code: CEE::DbNotFound,
             data: Some(vec![db]),

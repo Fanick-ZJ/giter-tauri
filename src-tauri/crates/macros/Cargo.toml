@@ -1,0 +1,10 @@
+[package]
+name = "giter-macros"
+version = "0.0.1"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = "1.0.57"
+quote = "1.0.22"

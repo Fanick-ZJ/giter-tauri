@@ -2,7 +2,7 @@ use crate::{
     types::cache::{AuthorCache, BranchAuthorCache, BranchName, RepoPath},
     utils::{
         db::conn_db,
-        dirs::{cache_file, repo_default_alias},
+        dirs::cache_file,
     },
 };
 use git2::Oid;

@@ -1,8 +1,8 @@
-use crate::{core::handle, types::error::CommandError};
+use crate::core::handle;
 use giter_utils::types::{contribution::CommitStatistic, git_data_provider::GitDataProvider, status::WorkStatus};
 use giter_watcher::types::modify_watcher::ModifyWatcher;
 use notify::Event;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::{collections::hash_set::HashSet, sync::Arc};
 use std::path::PathBuf;
 use std::sync::Mutex;

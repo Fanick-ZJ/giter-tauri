@@ -1,5 +1,3 @@
-use serde::{Serialize, Serializer};
-
 #[macro_export]
 macro_rules! make_serializable {
   (
@@ -22,11 +20,14 @@ macro_rules! make_serializable {
           where
               S: serde::Serializer,
           {
+              // 引入trait到作用域
+              use serde::ser::SerializeStruct;
+              
               let mut s = serializer.serialize_struct(stringify!($enum_name), 1)?;
               match self {
                   $(
-                      $enum_name => {
-                          s.serialize_field("type", stringify!($variant))?;
+                      $enum_name::$variant => {
+                         s.serialize_field("type", stringify!($variant))?;
                       }
                   )*
               }

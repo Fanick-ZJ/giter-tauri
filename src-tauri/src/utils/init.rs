@@ -100,7 +100,7 @@ pub fn init_store() -> Result<()> {
     )
     .unwrap_or_else(|e| {
         println!("{}", e);
-        (1)
+        1
     });
     Ok(())
 }
@@ -125,7 +125,7 @@ pub fn init_config() -> Result<()> {
     )
     .unwrap_or_else(|e| {
         println!("{}", e);
-        (1)
+        1
     });
     Ok(())
 }

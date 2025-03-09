@@ -1,9 +1,6 @@
 use crate::{
     core::handle,
-    types::{
-        cache::RepoPath,
-        fs::{Catalog, Dir, File},
-    },
+    types::cache::RepoPath
 };
 use anyhow::Result;
 use std::path::PathBuf;
