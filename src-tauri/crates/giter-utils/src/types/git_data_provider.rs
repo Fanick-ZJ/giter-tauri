@@ -844,7 +844,6 @@ impl GitDataProvider {
         callbacks.credentials(move |url, username_from_url, allowed_types| {
             match allowed_types {
                 CredentialType::USER_PASS_PLAINTEXT => {
-                    let config = Config::open_default()?;
                     if username.is_empty() || password.is_empty() {
                         let err = git2::Error::new(
                             git2::ErrorCode::User,
@@ -877,8 +876,9 @@ impl GitDataProvider {
                 git2::ErrorCode::User => {
                     return Err(anyhow::anyhow!(ProviderErrorCode::PushNeedNameAndPassword as i32));
                 }, 
-                _ => {
-                    return Err(anyhow::anyhow!(format!("Push failed")));
+                e => {
+                    log::error!("Push error: {:?}", e);
+                    return Err(anyhow::anyhow!(ProviderErrorCode::PushOtherError as i32));
                 }
             }
         }

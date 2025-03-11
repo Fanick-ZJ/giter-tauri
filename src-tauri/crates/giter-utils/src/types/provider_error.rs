@@ -19,5 +19,6 @@ pub enum ErrorCode {
   SshAuthorizeError = 15,     // SSH认证授权错误
   UserAuthorizeError = 16,     // 用户认证授权错误
   PushNeedNameAndPassword = 17, // 推送需要用户名和密码
+  PushOtherError = 18,     // 推送其他错误
   OtherError = 99999,
 }
