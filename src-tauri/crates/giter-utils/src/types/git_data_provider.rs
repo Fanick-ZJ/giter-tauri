@@ -9,6 +9,7 @@ use git2::build::CheckoutBuilder;
 use git2::Config;
 use git2::Cred;
 use git2::CredentialType;
+use git2::FetchOptions;
 use git2::PushOptions;
 use git2::RemoteCallbacks;
 use git2::TreeWalkMode;
@@ -25,6 +26,7 @@ use std::i32;
 use std::path;
 use std::path::Path;
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::usize;
 use std::vec;
 use types::{author::Author, branch::Branch, commit::Commit, status::WorkStatus};
@@ -37,7 +39,7 @@ use super::file::ChangedFile;
 use super::file::CommittedFile;
 use super::file::UntrackedFile;
 use super::status::FileStatus;
-use super::provider_error::ErrorCode as ProviderErrorCode;
+use super::git_error::ErrorCode as GitError;
 
 
 pub struct GitDataProvider {
@@ -818,30 +820,17 @@ impl GitDataProvider {
         return Ok(oid);
     }
 
-    pub fn push(&self, remote: &str, branch: &str, credentials: Option<(String, String)>) -> Result<()> {
-        let repo = &self.repository;
-        let mut remote = match repo.find_remote(remote) {
-            Ok(remote) => remote,
-            Err(_) => {
-                return Err(anyhow::anyhow!(format!("Remote {} not found", remote)));
-            }
-        };
+    pub fn has_tracking(&self, branch: &git2::Branch) -> bool {
+        let tracking = branch.upstream();
+        match tracking {
+            Ok(_) => true,
+            Err(_) => false,
+        }
+    }
 
-        // 判断分支是不是track的
-        let branch = match repo.find_branch(branch, BranchType::Local) {
-            Ok(branch) => {
-                if branch.upstream().is_err() {
-                    return Err(anyhow::anyhow!(format!("The Branch {} of repo {} is not track", branch.name()?.unwrap(), repo.path().to_str().unwrap())));
-                } else {
-                    branch
-                }
-            },
-            Err(_) =>  return Err(anyhow::anyhow!(format!("Branch {} not found", branch)))
-        };
-        // 准备认证回调函数
-        let mut callbacks = RemoteCallbacks::new();
-        let (username, password) = credentials.unwrap_or_default();
-        callbacks.credentials(move |url, username_from_url, allowed_types| {
+    fn build_remote_credentials_cb(&self, credentials: &Option<(String, String)>) -> impl Fn(&str, Option<&str>, CredentialType) -> Result<Cred, git2::Error> {
+        let (username, password) = credentials.clone().unwrap_or((String::new(), String::new()));
+        return move |url: &str, username_from_url: Option<&str>, allowed_types: CredentialType| {
             match allowed_types {
                 CredentialType::USER_PASS_PLAINTEXT => {
                     if username.is_empty() || password.is_empty() {
@@ -861,27 +850,65 @@ impl GitDataProvider {
                     Cred::default()
                 }
             }
-        });
-
-        // 配置推送选项
-        let mut push_options = PushOptions::new();
-        push_options.remote_callbacks(callbacks);
-        let branch_ref = branch.into_reference();
-        let branch_ref_name = branch_ref.name().unwrap();
-        repo.set_head(branch_ref_name)?;
-        let push_ret = remote.push(&[&branch_ref_name], Some(&mut push_options)); 
-        if push_ret.is_err() {
-            let code = push_ret.err().unwrap().code();
-            match code {
-                git2::ErrorCode::User => {
-                    return Err(anyhow::anyhow!(ProviderErrorCode::PushNeedNameAndPassword as i32));
-                }, 
-                e => {
-                    log::error!("Push error: {:?}", e);
-                    return Err(anyhow::anyhow!(ProviderErrorCode::PushOtherError as i32));
-                }
-            }
         }
+    }
+
+
+    pub fn push(&self, remote: &str, branch: &str, credentials: Option<(String, String)>) -> Result<()> {
+        let repo = &self.repository;
+        
+        // 提取远程获取和分支验证逻辑
+        let mut remote = repo.find_remote(remote)
+            .map_err(|_| anyhow::anyhow!(GitError::RemoteNotFound as i32))?;
+
+        let branch = repo.find_branch(branch, BranchType::Local)
+            .map_err(|_| anyhow::anyhow!(GitError::BranchNotFind as i32))?;
+        
+        // 验证分支跟踪状态
+        if !self.has_tracking(&branch) {
+            return Err(anyhow::anyhow!(GitError::BranchNotTrackAny as i32));
+        }
+
+        // 提取公共回调配置
+        let build_callbacks = || {
+            let mut cbs = RemoteCallbacks::new();
+            cbs.credentials(self.build_remote_credentials_cb(&credentials));
+            cbs
+        };
+
+        // 统一错误处理函数
+        let handle_error = |e: git2::Error| {
+            log::error!("Git operation error: {:?}", e);
+            match e.code() {
+                git2::ErrorCode::User => anyhow::anyhow!("{}", GitError::PushNeedNameAndPassword as i32),
+                _ => anyhow::anyhow!("{}", GitError::PushOtherError as i32)
+            }
+        };
+
+        // 获取必要分支信息
+        let remote_branch = branch.upstream()?;
+        let branch_ref = branch.into_reference();
+        let branch_ref_name = branch_ref.name().ok_or(anyhow::anyhow!("Invalid branch name"))?;
+        let head_id = branch_ref.peel_to_commit()?.id();
+
+        // 执行fetch操作
+        let mut fetch_opt = FetchOptions::new();
+        fetch_opt.remote_callbacks(build_callbacks());
+        remote.fetch(&[branch_ref_name], Some(&mut fetch_opt), None)
+            .map_err(handle_error)?;
+
+        // 验证祖先关系
+        let remote_commit = remote_branch.into_reference().peel_to_commit()?;
+        if !remote_commit.parent_ids().any(|id| id == head_id) {
+            return Err(anyhow::anyhow!(GitError::RemoteHeadHasNotInLocal as i32));
+        }
+
+        // 执行push操作
+        let mut push_opt = PushOptions::new();
+        push_opt.remote_callbacks(build_callbacks());
+        remote.push(&[branch_ref_name], Some(&mut push_opt))
+            .map_err(handle_error)?;
+
         Ok(())
     }
 

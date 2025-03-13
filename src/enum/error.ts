@@ -30,9 +30,12 @@ export enum ReasonErrorCode {
   UnStagedFile = 11,      // 未暂存的文件
   TreeNotFound = 12,      // tree未找到
   RemoteNotFound = 13,     // remote未找到
-  BranchNotTrackAny = 14,   // 分支未跟踪任何远程分支
-  SshAuthorizeError = 15,     // SSH认证授权错误
-  UserAuthorizeError = 16,     // 用户认证授权错误
-  PushNeedNameAndPassword = 17, // 推送需要用户名和密码
+  BranchNotFind = 14,      // 分支未找到
+  BranchNotTrackAny = 15,   // 分支未跟踪任何远程分支
+  SshAuthorizeError = 16,     // SSH认证授权错误
+  UserAuthorizeError = 17,     // 用户认证授权错误
+  RemoteHeadHasNotInLocal = 18,// 远程HEAD未在本地
+  PushNeedNameAndPassword = 19, // 推送需要用户名和密码
+  PushOtherError = 20,     // 推送其他错误
   OtherError = 99999,
 }

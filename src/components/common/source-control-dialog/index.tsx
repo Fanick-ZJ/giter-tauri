@@ -97,6 +97,7 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
                   push(self.props.repo.path, remoteRef, this.currentBranch.value!.name, [res.username, res.password]).then((res) => {
                     window.$message.success('推送成功')
                   }).catch((e) => {
+                    console.log(e)
                     window.$message.error('推送失败')
                   })
                 } 
