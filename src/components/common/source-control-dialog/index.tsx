@@ -2,7 +2,7 @@
 import {Component, computed, defineComponent, nextTick, onBeforeMount, onBeforeUnmount, ref, watch } from 'vue'
 import { SourceConterolDialogProps } from './types'
 import { AbstractDialog } from '../abstract-dialog'
-import { NButton, NDivider, NDropdown, NInput } from 'naive-ui'
+import { NButton, NDivider, NDropdown, NInput, NLayout, NLayoutContent, NLayoutSider, NScrollbar } from 'naive-ui'
 import { Icon } from '@iconify/vue/dist/iconify.js'
 import { listen } from '@tauri-apps/api/event'
 import { STATUS_CHANGE, StatusChangePayloadType } from '@/const/listen'
@@ -86,6 +86,7 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
           push(self.props.repo.path, remoteRef, this.currentBranch.value!.name, undefined).then((res) => {
             window.$message.success('推送成功')
           }).catch((e) => {
+            // 如果是需要用户名密码的错误，弹出对话框
             if (e.message == ReasonErrorCode.PushNeedNameAndPassword) {
               window.$message.error('请输入远程仓库的用户名和密码')
               const dlg = new RemoteUserPwdDialog({
@@ -97,13 +98,13 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
                   push(self.props.repo.path, remoteRef, this.currentBranch.value!.name, [res.username, res.password]).then((res) => {
                     window.$message.success('推送成功')
                   }).catch((e) => {
-                    console.log(e)
-                    window.$message.error('推送失败')
+                    if (e.message == ReasonErrorCode.RemoteHeadHasNotInLocal) {
+                      window.$message.error('远程仓库的HEAD不在本地，请先拉取')
+                    }
                   })
                 } 
               })
             }
-            console.log(e)
           })
         }
       }
@@ -187,7 +188,7 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
           }) 
         })
         return () => (
-          <div>
+          <div class='grid grid-cols-1 grid-rows-[75px_1fr] max-h-full'>
             {/* 头部commit书写区域 */}
             <div class='flex flex-col gap-2 mb-1'>
               <NInput maxlength="200" v-model:value={self.commitMsg.value} autosize={{minRows: 1, maxRows: 3}} type="textarea" placeholder="请输入提交内容">
@@ -205,31 +206,38 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
                 </NDropdown>
               </div>
             </div>
-            <div>
-              {/* 变更的文件 */}
-              {
-                self.stagedFiles.value.map((file) => {
-                  return <ChangedFileWidget repo={self.props.repo} key={file.path} file={file} type='staged'/>
-                })
-              }
-              {/* divider */}
-              <div class='flex justify-center items-center
-              before:border-b before:flex-1 before:block
-              after:border-b after:flex-1 after:block
-              after:h-full'>
-                {
-                  self.stagedFiles.value.length > 0 && <div class='px-1 text-xs text-gray-600'>暂存↑</div>
-                }
-                {
-                  self.changedFiles.value.length > 0 && <div class='px-1 text-xs text-gray-600'>修改↓</div>
-                }
-              </div>
-              {
-                self.changedFiles.value.map((file) => {
-                  return <ChangedFileWidget repo={self.props.repo} key={file.path} file={file} type='changed'/> 
-                })
-              }
-            </div>
+            {/* 变更的文件 */}
+            <NLayout 
+              nativeScrollbar={false}>
+              <NLayoutContent>
+                <div>
+                  {
+                    self.stagedFiles.value.map((file) => {
+                      return <ChangedFileWidget repo={self.props.repo} key={file.path} file={file} type='staged'/>
+                    })
+                  }
+                </div>
+                {/* divider */}
+                <div class='flex justify-center items-center
+                before:border-b before:flex-1 before:block
+                after:border-b after:flex-1 after:block
+                after:h-full'>
+                  {
+                    self.stagedFiles.value.length > 0 && <div class='px-1 text-xs text-gray-600'>暂存↑</div>
+                  }
+                  {
+                    self.changedFiles.value.length > 0 && <div class='px-1 text-xs text-gray-600'>修改↓</div>
+                  }
+                </div>
+                <div class="flex-1">
+                  {
+                    self.changedFiles.value.map((file) => {
+                      return <ChangedFileWidget repo={self.props.repo} key={file.path} file={file} type='changed'/> 
+                    })
+                  } 
+                </div>
+              </NLayoutContent>
+            </NLayout>
           </div>
         )
       }

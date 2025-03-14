@@ -1,7 +1,7 @@
 use crate::{
     core::handle, emit::emit_branch_contribution, types::{
         cache::RepoPath, 
-        error::{CommandError as CE, CommandErrorEnum as CEE},
+        error::CommandError as CE,
         fs::Dir, store
     }, utils::{
         dirs,
@@ -9,7 +9,6 @@ use crate::{
     }
 };
 use git2::Oid;
-use giter_macros::command_result;
 use giter_utils::{
     types::{
         author::Author, branch::Branch, cache::Cache, commit::Commit,  diff::ContentDiff, file::{ChangedFile, CommittedFile}, git_data_provider::GitDataProvider, status::WorkStatus
@@ -33,12 +32,12 @@ fn get_provider(repo: &str) -> Result<GitDataProvider, CE> {
         Err(err) => match err.code() {
             git2::ErrorCode::Owner => Err(CE {
                 message: err.message().to_string(),
-                code: CEE::RepoHasnotOwnership,
+                func: stringify!(get_provider).to_string(),
                 data: Some(vec![repo.to_string()]),
             }),
             _ => Err(CE {
                 message: err.message().to_string(),
-                code: CEE::DataProviderBuildError,
+                func: stringify!(get_provider).to_string(),
                 data: Some(vec![repo.to_string()]),
             }),
         },
@@ -56,7 +55,7 @@ fn watch(repo: RepoPath) -> Result<(), CE> {
         },
         Err(e) => Err(CE {
             message: e.to_string(),
-            code: CEE::AddWatcherError,
+            func: stringify!(watch).to_string(),
             data: Some(vec![repo.to_string()]),
         }), 
     }
@@ -74,7 +73,7 @@ pub fn remove_watch(repo: RepoPath) -> Result<(), CE> {
         },
         Err(e) => Err(CE {
             message: e.to_string(),
-            code: CEE::RemoveWatcherError,
+            func: stringify!(remove_watch).to_string(),
             data: Some(vec![repo.to_string()]),
         }), 
     }
@@ -89,7 +88,7 @@ pub fn repos() -> Result<Vec<store::Repository>, CE> {
         Ok(repos) => Ok(repos),
         Err(e) => Err(CE {
             message: e.to_string(),
-            code: CEE::AddRepositoryStoreError,
+            func: stringify!(repos).to_string(),
             data: None,
         }),
     }
@@ -107,7 +106,7 @@ pub fn authors(repo: RepoPath, branch: Branch) -> Result<Vec<Author>, CE> {
     if let Err(_) = authors {
         return Err(CE {
             message: "get authors error".to_string(),
-            code: CEE::GetAuthorError,
+            func: stringify!(authors).to_string(),
             data: Some(vec![repo.to_string(), branch.name]),
         });
     }
@@ -123,7 +122,7 @@ pub fn branches(repo: RepoPath) -> Result<Vec<Branch>, CE> {
         Ok(branches) => Ok(branches),
         Err(e) => Err(CE {
             message: e.to_string(),
-            code: CEE::BranchesFindError,
+            func: stringify!(branches).to_string(),
             data: Some(vec![repo.to_string()]),
         }), 
     }
@@ -149,7 +148,7 @@ pub fn get_db_path(db: String) -> Result<String, CE> {
         "config" => Ok(dirs::config_file().unwrap().to_str().unwrap().to_string()),
         _ => Err(CE {
             message: "invalid db".to_string(),
-            code: CEE::DbNotFound,
+            func: stringify!(get_db_path).to_string(),
             data: Some(vec![db]),
         }),
     }
@@ -188,7 +187,7 @@ pub fn get_folders(path: String) -> Result<Vec<Dir>, CE> {
         }
         Err(e) => Err(CE {
             message: e.to_string(),
-            code: CEE::GetFoldersError,
+            func: stringify!(get_folders).to_string(),
             data: Some(vec![path]),
         }),
     }
@@ -212,7 +211,7 @@ pub async fn work_status(repo: RepoPath) -> Result<WorkStatus, CE> {
         Ok(statuses) => Ok(statuses),
         Err(e) => Err(CE {
             message: e.to_string(),
-            code: CEE::GetWorkStatusError,
+            func: stringify!(work_status).to_string(),
             data: Some(vec![repo.to_string()]),
         }), 
     }
@@ -227,7 +226,7 @@ pub fn set_repo_ownership(repo: RepoPath) -> Result<bool, CE> {
             Ok(_) => Ok(true),
             Err(err) => Err(CE {
                 message: err.to_string(),
-                code: CEE::SetRepoOwnershipError,
+                func: stringify!(set_repo_ownership).to_string(),
                 data: Some(vec![repo.to_string()]),
             }),
         },
@@ -242,7 +241,7 @@ pub fn branch_commits(repo: RepoPath, branch: Branch, count: i32) -> Result<Vec<
         Ok(commits) => Ok(commits),
         Err(e) => Err(CE {
             message: e.to_string(),
-            code: CEE::GetBranchCommitsError,
+            func: stringify!(branch_commits).to_string(),
             data: Some(vec![repo.to_string(), branch.name]),
         }), 
     }
@@ -256,7 +255,7 @@ pub fn current_branch(repo: RepoPath) -> Result<Branch, CE> {
         Ok(branch) => Ok(branch),
         Err(e) => Err(CE {
             message: e.to_string(),
-            code: CEE::GetCurrentBranchError,
+            func: stringify!(current_branch).to_string(),
             data: Some(vec![repo.to_string()]),
         }), 
     }
@@ -270,7 +269,7 @@ pub fn current_remote_branch(repo: RepoPath) -> Result<Branch, CE> {
         Ok(branch) => Ok(branch),
         Err(e) => Err(CE {
             message: e.to_string(),
-            code: CEE::GetCurrentRemoteBranchError,
+            func: stringify!(current_remote_branch).to_string(),
             data: Some(vec![repo.to_string()]),
         }), 
     }
@@ -283,7 +282,7 @@ pub fn commit_content (repo: RepoPath, cid: String) -> Result<Vec<CommittedFile>
     if let Err(e) = oid {
         return Err(CE{
             message: e.to_string(),
-            code: CEE::ConvertOidError,
+            func: stringify!(commit_content).to_string(),
             data: Some(vec![repo.to_string()]),
         });
     }
@@ -293,7 +292,7 @@ pub fn commit_content (repo: RepoPath, cid: String) -> Result<Vec<CommittedFile>
         Ok(content) => Ok(content),
         Err(e) => Err(CE {
             message: e.to_string(),
-            code: CEE::GetCommitContentError,
+            func: stringify!(commit_content).to_string(),
             data: Some(vec![repo.to_string()]),
         }), 
     }
@@ -303,20 +302,21 @@ pub fn commit_content (repo: RepoPath, cid: String) -> Result<Vec<CommittedFile>
 pub fn file_diff(repo: RepoPath, old: String, new: String) -> Result<ContentDiff, CE> {
     let provider = get_provider(&repo)?;
     let old_id = Oid::from_str(&old);
+    let error_func = stringify!(file_diff).to_string();
     if let Err(e) = old_id {
-        return Err(CE { message: e.to_string(), code: CEE::ConvertOidError, data: Some(vec![repo.to_string(), old, new]) });
+        return Err(CE { message: e.to_string(), func: error_func, data: Some(vec![repo.to_string(), old, new]) });
     }
     let old_id = old_id.unwrap();
     let new_id = Oid::from_str(&new);
     if let Err(e) = new_id {
-        return Err(CE { message: e.to_string(), code: CEE::ConvertOidError, data: Some(vec![repo.to_string(), old, new]) });
+        return Err(CE { message: e.to_string(), func: error_func, data: Some(vec![repo.to_string(), old, new]) });
     }
     let new_id = new_id.unwrap();
     let diff = provider.get_file_content_diff(old_id, new_id);
     if let Err(e) = diff {
         return Err(CE {
             message: e.to_string(),
-            code: CEE::GetFileDiffError,
+            func: error_func,
             data: Some(vec![repo.to_string(), old, new]),
         });
     }
@@ -330,7 +330,7 @@ pub fn blob_content(repo: RepoPath, cid: String) -> Result<Vec<u8>, CE> {
     if let Err(e) = oid {
         return Err(CE {
             message: e.to_string(),
-            code: CEE::ConvertOidError,
+            func: stringify!(blob_content).to_string(),
             data: Some(vec![repo.to_string(), cid]),
         });
     }
@@ -340,7 +340,7 @@ pub fn blob_content(repo: RepoPath, cid: String) -> Result<Vec<u8>, CE> {
         Ok(content) => Ok(content),
         Err(e) => Err(CE {
             message: e.to_string(),
-            code: CEE::GetFileContentError,
+            func: stringify!(blob_content).to_string(),
             data: Some(vec![repo.to_string(), cid]),
         }), 
     }
@@ -353,7 +353,7 @@ pub fn get_commit(repo: RepoPath, cid: String) -> Result<Commit, CE> {
     if let Err(e) = oid {
         return Err(CE {
             message: e.to_string(),
-            code: CEE::ConvertOidError,
+            func: stringify!(get_commit).to_string(),
             data: Some(vec![repo.to_string(), cid]),
         });
     }
@@ -362,7 +362,7 @@ pub fn get_commit(repo: RepoPath, cid: String) -> Result<Commit, CE> {
     if let Err(e) = commit {
         return Err(CE {
             message: e.to_string(),
-            code: CEE::GetCommitError,
+            func: stringify!(get_commit).to_string(),
             data: Some(vec![repo.to_string(), cid]),
         });
     }
@@ -387,7 +387,7 @@ pub fn get_global_author() -> Result<Author, CE> {
         Ok(author) => Ok(author),
         Err(e) => Err(CE {
             message: e.to_string(),
-            code: CEE::GetGlobalAuthorError,
+            func: stringify!(get_global_author).to_string(),
             data: None,
         }), 
     }
@@ -400,7 +400,7 @@ pub fn get_repo_author(repo: RepoPath) -> Result<Author, CE> {
     if let Err(e) = author {
         return Err(CE {
             message: e.to_string(),
-            code: CEE::GetRepoAuthorError,
+            func: stringify!(get_repo_author).to_string(),
             data: Some(vec![repo.to_string()]),
         });
     }
@@ -414,7 +414,7 @@ pub fn get_branch_commits_after_filter(repo: RepoPath, branch: Branch, filter: H
     if let Err(e) = commits {
         return Err(CE {
             message: e.to_string(),
-            code: CEE::GetBranchCommitsError,
+            func: stringify!(get_branch_commits_after_filter).to_string(),
             data: Some(vec![repo.to_string(), branch.name]),
         });
     }
@@ -429,7 +429,7 @@ pub fn get_changed_files(repo: RepoPath) -> Result<Vec<ChangedFile>, CE> {
         Ok(files) => Ok(files),
         Err(e) => Err(CE {
             message: e.to_string(),
-            code: CEE::GetChangedFilesError,
+            func: stringify!(get_changed_files).to_string(),
             data: Some(vec![repo.to_string()]),
         }), 
     }
@@ -439,14 +439,7 @@ pub fn get_changed_files(repo: RepoPath) -> Result<Vec<ChangedFile>, CE> {
 pub fn get_staged_files(repo: RepoPath) -> Result<Vec<ChangedFile>, CE> {
     let provider = get_provider(&repo)?;
     let files = provider.staged_files();
-    if let Err(e) = files {
-        return Err(CE {
-            message: e.to_string(),
-            code: CEE::GetStagedFilesError,
-            data: Some(vec![repo.to_string()]),
-        });
-    }
-    Ok(files.unwrap())
+    Ok(files)
 }
 
 #[tauri::command]
@@ -457,7 +450,7 @@ pub fn add_to_stage(repo: RepoPath, path: String) -> Result<(), CE> {
         Ok(_) => Ok(()),
         Err(e) => Err(CE {
             message: e.to_string(),
-            code: CEE::AddToStageError,
+            func: stringify!(add_to_stage).to_string(),
             data: Some(vec![repo.to_string(), path]),
         }), 
     }
@@ -471,7 +464,7 @@ pub fn remove_from_stage(repo: RepoPath, path: String) -> Result<(), CE> {
         Ok(_) => Ok(()),
         Err(e) => Err(CE {
             message: e.to_string(),
-            code: CEE::RemoveFromStageError,
+            func: stringify!(remove_from_stage).to_string(),
             data: Some(vec![repo.to_string(), path]),
         }), 
     }
@@ -485,7 +478,7 @@ pub fn checkout_file(repo: RepoPath, path: String) -> Result<(), CE> {
         Ok(_) => Ok(()),
         Err(e) => Err(CE {
             message: e.to_string(),
-            code: CEE::CheckoutFileError,
+            func: stringify!(checkout_file).to_string(),
             data: Some(vec![repo.to_string(), path]),
         }), 
     }
@@ -499,7 +492,7 @@ pub fn commit(repo: RepoPath, message: &str, update_ref: Option<&str>) -> Result
         Ok(_) => Ok(()),
         Err(e) => Err(CE {
             message: e.to_string(),
-            code: CEE::CommitError,
+            func: stringify!(commit).to_string(),
             data: Some(vec![repo.to_string(), message.to_string()]),
         }), 
     }
@@ -513,7 +506,7 @@ pub fn push(repo: RepoPath, remote: String, branch: String, credentials: Option<
         Ok(_) => Ok(()),
         Err(e) => Err(CE {
             message: e.to_string(),
-            code: CEE::PushError,
+            func: stringify!(push).to_string(),
             data: Some(vec![repo.to_string(), remote, branch]),
         }), 
     }

@@ -5,8 +5,8 @@ import { Component, defineComponent, h, nextTick, ref, Ref } from "vue";
 type DialogOptions = {
   buttonBox?: 'cancel' | 'ok' | 'ok-cancel' | 'custom',
   containerName: string,
-  title?: String | Ref<String>,
-  subTitle?: String | Ref<String>,
+  title?: string | Ref<string>,
+  subTitle?: string | Ref<string>,
   width?: string,
   height?: string
 }
@@ -14,13 +14,13 @@ type DialogOptions = {
 // R 组件返回类型
 // P 组件props类型
 export class AbstractDialog<R> {
-  private containerName;
+  private containerName: string;
   private _promise?: Promise<R>;  // 界面显示时的promise
   private _resolve: Function = () => undefined; // 界面显示时的resolve
   private _reject: Function = () => undefined;  // 界面显示时的reject
   private _show: Ref<boolean>;  // 界面是否显示
-  private title: String | Ref<String>;  // 界面标题
-  private subTitle: String | Ref<String>; // 界面副标题
+  private title: string | Ref<string>;  // 界面标题
+  private subTitle: string | Ref<string>; // 界面副标题
   private comp?: InstanceManager<Component> // 界面实例
   protected zIndex = ref(3); // 界面层级
   private buttonBox: 'cancel' | 'ok' | 'ok-cancel' | 'custom'; // 按钮框
@@ -187,7 +187,8 @@ export class AbstractDialog<R> {
                   closable 
                   onClose={self.close.bind(self)} 
                   v-slots={slots}
-                  headerStyle={{'overflow-x': 'hidden', 'overflow-y': 'hidden'}}>
+                  headerStyle={{'overflow-x': 'hidden', 'overflow-y': 'hidden'}}
+                  contentStyle={{'overflow-y': 'hidden'}}>
                 </NCard>
               </NDialogProvider>
             </div>

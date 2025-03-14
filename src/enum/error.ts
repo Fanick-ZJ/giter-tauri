@@ -16,26 +16,32 @@ export enum CommandError {
 }
 
 export enum ReasonErrorCode {
-  AuthorNotValidUtf8 = 0,
-  ReadFileError = 1,
-  GetStatusError = 2,
-  IndexIsDetached = 3,    // 索引已经与HEAD分离
-  BlobNotFound = 4,       // blob未找到
-  NotRepoPathPrefix = 5,  // 路径不是仓库路径前缀
-  RepoIsBare = 6,         // 仓库是裸仓库
-  BranchNotFound = 7,      // 分支不存在
-  CommitNotFound = 8,     // commit未找到
-  HasConflicts = 9,       // 有冲突
-  UserUnConfigured = 10,  // 用户未配置
-  UnStagedFile = 11,      // 未暂存的文件
-  TreeNotFound = 12,      // tree未找到
-  RemoteNotFound = 13,     // remote未找到
-  BranchNotFind = 14,      // 分支未找到
-  BranchNotTrackAny = 15,   // 分支未跟踪任何远程分支
-  SshAuthorizeError = 16,     // SSH认证授权错误
-  UserAuthorizeError = 17,     // 用户认证授权错误
-  RemoteHeadHasNotInLocal = 18,// 远程HEAD未在本地
-  PushNeedNameAndPassword = 19, // 推送需要用户名和密码
-  PushOtherError = 20,     // 推送其他错误
-  OtherError = 99999,
+  AuthorNotValidUtf8,
+  ReadFileError ,
+  GetStatusError ,
+  IndexIsDetached ,    // 索引已经与HEAD分离
+  BlobNotFound ,       // blob未找到
+  NotRepoPathPrefix ,  // 路径不是仓库路径前缀
+  RepoIsBare,         // 仓库是裸仓库
+  BranchNotFound ,      // 分支不存在
+  CommitNotFound ,     // commit未找到
+  HasConflicts ,       // 有冲突
+  UserUnConfigured ,  // 用户未配置
+  UnStagedFile ,      // 未暂存的文件
+  TreeNotFound ,      // tree未找到
+  RemoteNotFound ,     // remote未找到
+  BranchNameInvalid,  // 分支名称无效
+  BranchNotFind ,      // 分支未找到
+  BranchNotTrackAny ,   // 分支未跟踪任何远程分支
+  SshAuthorizeError ,     // SSH认证授权错误
+  UserAuthorizeError ,     // 用户认证授权错误
+  RemoteHeadHasNotInLocal ,// 远程HEAD未在本地
+  PushNeedNameAndPassword , // 推送需要用户名和密码
+  RepoAuthorNoConfig, // 仓库作者未配置
+  RepoHasConflicts, // 仓库有冲突
+  NoStagedFile,     // 没有暂存的文件
+  PushOtherError ,     // 推送其他错误
+  InvalidFilePaht, // 无效的文件路径
+  NotUtf8Path, // 不是UTF-8路径
+  OtherError ,
 }

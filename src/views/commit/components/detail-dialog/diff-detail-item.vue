@@ -256,7 +256,7 @@ const applyEditorStyle = () => {
         <div v-if="success && !props.file.isBinary" ref="editorContainer"></div>
         <div v-else-if="props.file.isBinary">
           <NFlex>
-            <di class="flex-1 gap-2">
+            <div class="flex-1 gap-2">
               <NWatermark 
                 content="NEW" 
                 selectable 
@@ -272,7 +272,7 @@ const applyEditorStyle = () => {
                   新的数据没有了喔😊
                 </div>
               </NWatermark>
-            </di>
+            </div>
             <div class="flex-1">
               <NWatermark 
                 content="OLD" 

@@ -206,8 +206,8 @@ impl GitDataProvider {
 
     }
 
-    pub fn staged_files(&self) -> Result<Vec<ChangedFile>> {
-        let status = self.repository.statuses(None)?;
+    pub fn staged_files(&self) -> Vec<ChangedFile> {
+        let status = self.repository.statuses(None).unwrap();
         let mut modified: Vec<ChangedFile> = Vec::new();
         for item in &status {
             let bits = item.status().bits();
@@ -224,7 +224,7 @@ impl GitDataProvider {
                 modified.push(changed_file); 
             } 
         } 
-        Ok(modified)
+        modified
     }
 
     pub fn changed_files(&self) -> Result<Vec<ChangedFile>> {
@@ -266,7 +266,7 @@ impl GitDataProvider {
 
     pub fn remove_from_stage(&self, path: &PathBuf) -> Result<()> {
         let repo = &self.repository;
-        let staged_files = self.staged_files()?;
+        let staged_files = self.staged_files();
         let file = staged_files.iter().find(|f| f.path.to_str() == path.to_str());
         if let Some(file) = file {
             let mut index = repo.index()?;
@@ -320,12 +320,8 @@ impl GitDataProvider {
         for branch in branches {
             let (branch, branch_type) = branch.unwrap();
             if branch.is_head() {
-                let reference = branch.name().unwrap_or(Some("")).unwrap_or("").to_string();
-                let name = reference
-                    .split(path::MAIN_SEPARATOR)
-                    .last()
-                    .unwrap_or("")
-                    .to_string();
+                let reference = branch.name()?.unwrap_or_default().to_string();
+                let name = reference.rsplitn(3, "/").next().unwrap_or_default().to_string();
                 return Ok(Branch {
                     name,
                     is_remote: branch_type == BranchType::Remote,
@@ -342,12 +338,9 @@ impl GitDataProvider {
         let mut _branches: Vec<Branch> = Vec::new();
         for branch in branches {
             let (branch, branch_type) = branch.unwrap();
-            let reference = branch.name().unwrap_or(Some("")).unwrap_or("").to_string();
-            let name = reference
-                .split(path::MAIN_SEPARATOR)
-                .last()
-                .unwrap_or("")
-                .to_string();
+            let reference = branch.name()?.unwrap_or_default().to_string();
+            // refs/remotes/origin/main -> ["main", "origin", "remotes,refs"] -> "main"
+            let name = reference.rsplitn(3, "/").next().unwrap_or_default().to_string();
             _branches.push(Branch {
                 name,
                 is_remote: branch_type == BranchType::Remote,
@@ -366,15 +359,15 @@ impl GitDataProvider {
             .upstream();
         match remote {
             Ok(remote) => {
-                let remote_name = remote.name().unwrap_or(Some("")).unwrap().to_string();
-                let reference = remote.name().unwrap_or(Some("")).unwrap().to_string();
+                let reference = remote.name()?.unwrap_or_default().to_string();
+                let name = reference.rsplitn(3, "/").next().unwrap_or_default().to_string();
                 Ok(Branch {
-                    name: remote_name,
+                    name,
                     is_remote: true,
                     reference,
                 })
             }
-            Err(_) => Err(anyhow::anyhow!("No remote branch")),
+            Err(_) => Err(GitError::RemoteNotFound.into()),
         }
     }
 
@@ -386,7 +379,7 @@ impl GitDataProvider {
             .upstream();
         match remote {
             Ok(remote) => Ok(remote),
-            Err(_) => Err(anyhow::anyhow!("No remote branch")),
+            Err(_) => Err(GitError::RemoteNotFound.into()),
         }
     }
 
@@ -481,12 +474,12 @@ impl GitDataProvider {
                 return Ok(branch);
             }
         }
-        Err(anyhow::anyhow!("Branch not found"))
+        Err(GitError::BranchNotFound.into())
     }
 
     pub fn build_commits(&self, revwalk: &mut Revwalk, count: i32) -> Result<Vec<Commit>> {
         let mut commits: Vec<Commit> = Vec::new();
-        for (i, id) in revwalk.by_ref().take(count as usize).enumerate() {
+        for (_, id) in revwalk.by_ref().take(count as usize).enumerate() {
             let id = id?;
             let commit = self.repository.find_commit(id)?;
             let commit = build_commit(&commit, &self.repository);
@@ -528,12 +521,12 @@ impl GitDataProvider {
         };
         let branch_reference = self.repository.find_branch(&branch.reference, b_type);
         if let Err(_) = branch_reference {
-            return Err(anyhow::anyhow!("Branch not found"));
+            return Err(GitError::BranchNotFound.into());
         }
         let branch_reference = branch_reference?;
         let branch_commit = branch_reference.get().peel_to_commit();
         if let Err(_) = branch_commit {
-            return Err(anyhow::anyhow!("Branch not found"));
+            return Err(GitError::BranchNotFound.into());
         }
         Ok(branch_commit?)
     }
@@ -596,29 +589,22 @@ impl GitDataProvider {
         let deltas = diff.deltas();
         // 遍历差异, 获取差异的文件
         for delta in deltas {
-            let path = delta
-                .new_file()
-                .path()
-                .unwrap()
+            let (old_file, new_file) = (delta.old_file(), delta.new_file());
+            let path = new_file.path()
+                .ok_or_else(|| anyhow::anyhow!(GitError::InvalidFilePaht))?
                 .to_str()
-                .unwrap()
+                .ok_or_else(|| anyhow::anyhow!(GitError::InvalidFilePaht))?
                 .to_string();
             // git2的is_blob函数好像有问题，直接用文件内容判断吧
-            let is_binary = if delta.new_file().exists() {
-                is_binary_file_content(self.get_blob_content(delta.new_file().id())?)
-            } else {
-                false
-            };
-            let old_is_binary = if delta.old_file().exists() {
-                is_binary_file_content(self.get_blob_content(delta.old_file().id())?)
-            } else {
-                false
-            };
-            let size = delta.new_file().size();
+            let (is_binary, old_is_binary) = (
+                self.blob_is_binary(new_file.id())?,
+                self.blob_is_binary(old_file.id())?,
+            );
+            let size = new_file.size();
             let status = change_status_to_file_status(&delta.status());
             let new_blob = repo.find_blob(delta.new_file().id());
-            let new_id = delta.new_file().id().to_string();
-            let old_id = delta.old_file().id().to_string();
+            let new_id = new_file.id().to_string();
+            let old_id = old_file.id().to_string();
             let (exist, _) = match new_blob {
                 Ok(blob) => (true, blob.content().to_vec()),
                 Err(_) => (false, Vec::new()),
@@ -635,7 +621,7 @@ impl GitDataProvider {
         let oid = oid.into();
         let blob = self.repository.find_blob(oid);
         if blob.is_err() {
-            return Err(anyhow::anyhow!("Blob not found"));
+            return Err(GitError::BlobNotFound.into());
         }
         let blob = blob.unwrap();
         Ok(blob.content().to_vec())
@@ -651,10 +637,10 @@ impl GitDataProvider {
         let old_blob = self.repository.find_blob(old);
         let new_blob = self.repository.find_blob(new);
         if old_blob.is_err() {
-            return Err(anyhow::anyhow!("Old blob not found"));
+            return Err(GitError::BlobNotFound.into());
         }
         if new_blob.is_err() {
-            return Err(anyhow::anyhow!("New blob not found"));
+            return Err(GitError::BlobNotFound.into());
         }
         let old_blob = old_blob.unwrap();
         let new_blob = new_blob.unwrap();
@@ -794,23 +780,20 @@ impl GitDataProvider {
         };
         let repo = &self.repository;
         if repo.is_bare() {
-            return Err(anyhow::anyhow!(format!("{} Repository is bare", repo.path().to_str().unwrap())));
+            return Err(GitError::RepoIsBare.into());
         }
         let mut index = repo.index()?;
         let conflicts = index.conflicts()?;
         if conflicts.into_iter().count() > 0 {
-            return Err(anyhow::anyhow!(format!("{} Repository has conflicts", repo.path().to_str().unwrap()))); 
+            return Err(GitError::RepoHasConflicts.into()); 
         }
         let author = repo.signature();
         if author.is_err() {
-            return Err(anyhow::anyhow!(format!("{}: Please configure the user.name and user.email about this repository", repo.path().to_str().unwrap())));
+            return Err(GitError::RepoAuthorNoConfig.into());
         }
-        match self.staged_files() {
-            Ok(files) => if files.len() == 0 {
-                return Err(anyhow::anyhow!(format!("{}: No staged files", repo.path().to_str().unwrap())));
-            },
-            Err(_) => return Err(anyhow::anyhow!(format!("{}: get staged files error", repo.path().to_str().unwrap()))),
-        };
+        if self.staged_files().len() == 0 {
+            return Err(GitError::NoStagedFile.into());
+        }
         let author = author.unwrap();
         let tree_oid = index.write_tree()?;
         let tree = repo.find_tree(tree_oid)?;
@@ -866,7 +849,7 @@ impl GitDataProvider {
         
         // 验证分支跟踪状态
         if !self.has_tracking(&branch) {
-            return Err(anyhow::anyhow!(GitError::BranchNotTrackAny as i32));
+            return Err(GitError::BranchNotTrackAny.into());
         }
 
         // 提取公共回调配置
@@ -880,15 +863,15 @@ impl GitDataProvider {
         let handle_error = |e: git2::Error| {
             log::error!("Git operation error: {:?}", e);
             match e.code() {
-                git2::ErrorCode::User => anyhow::anyhow!("{}", GitError::PushNeedNameAndPassword as i32),
-                _ => anyhow::anyhow!("{}", GitError::PushOtherError as i32)
+                git2::ErrorCode::User => anyhow::anyhow!(GitError::PushNeedNameAndPassword),
+                _ => return GitError::PushOtherError.into()
             }
         };
 
         // 获取必要分支信息
         let remote_branch = branch.upstream()?;
         let branch_ref = branch.into_reference();
-        let branch_ref_name = branch_ref.name().ok_or(anyhow::anyhow!("Invalid branch name"))?;
+        let branch_ref_name = branch_ref.name().ok_or(anyhow::anyhow!(GitError::BranchNameInvalid))?;
         let head_id = branch_ref.peel_to_commit()?.id();
 
         // 执行fetch操作
@@ -900,7 +883,7 @@ impl GitDataProvider {
         // 验证祖先关系
         let remote_commit = remote_branch.into_reference().peel_to_commit()?;
         if !remote_commit.parent_ids().any(|id| id == head_id) {
-            return Err(anyhow::anyhow!(GitError::RemoteHeadHasNotInLocal as i32));
+            return Err(GitError::RemoteHeadHasNotInLocal.into());
         }
 
         // 执行push操作
