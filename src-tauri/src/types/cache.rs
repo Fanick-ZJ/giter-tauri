@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use giter_utils::types::author::Author;
 use serde::{Deserialize, Serialize};
 
-type RepoAlias = String;
 pub type RepoPath = String;
 pub type BranchName = String;
 

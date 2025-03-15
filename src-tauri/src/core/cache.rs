@@ -307,4 +307,78 @@ impl ProviderCache for GitCache {
             }
         }
     }
+    
+    fn get_credential(&self, host: &str) -> Option<giter_utils::types::credential::Credential> {
+        let sql = "select username, password from credentials where host=?1";
+        let conn = self.conn();
+        let mut stmt = conn.prepare(sql).unwrap();
+        let res = stmt.query_row([host], |row| {
+            match (row.get::<_, String>(0), row.get::<_, String>(1)) {
+                (Ok(username), Ok(password)) => {
+                    Ok(giter_utils::types::credential::Credential::UsernamePassword(username, password))
+                },
+                _ => Err(rusqlite::Error::QueryReturnedNoRows),
+            }
+        });
+        if let Err(e) = res {
+            log::error!("get cache error: {:?}", e);
+            return None; 
+        }
+        Some(res.unwrap())
+    }
+    
+    fn set_credential(&mut self, host: &str, credential: &giter_utils::types::credential::Credential) {
+        println!("set credential: {:?}", credential);
+        // 提取 SQL 语句为常量
+        const SELECT_SQL: &str = "SELECT COUNT(*) FROM credentials WHERE host=?1";
+        const INSERT_SQL: &str = "INSERT INTO credentials (host, token, username, password) VALUES (?1, ?2, ?3, ?4)";
+        const UPDATE_SQL: &str = "UPDATE credentials SET username=?1, password=?2 WHERE host=?3";
+        
+        let mut conn = self.conn();
+        
+        // 使用事务保证原子性
+        let tx = match conn.transaction() {
+            Ok(t) => t,
+            Err(e) => {
+                log::error!("开启事务失败: {:?}", e);
+                return;
+            }
+        };
+
+        // 统一错误处理逻辑
+        let count: i32 = tx.query_row(SELECT_SQL, [host], |row| row.get(0))
+            .unwrap_or_else(|e| {
+                log::error!("查询凭证失败: {:?}", e);
+                0
+            });
+
+        let result = match credential {
+            giter_utils::types::credential::Credential::UsernamePassword(username, password) => {
+                if count > 0 {
+                    tx.execute(UPDATE_SQL, [username, "", password, host])
+                } else {
+                    println!("{}", INSERT_SQL);
+                    tx.execute(INSERT_SQL, (host, "", username, password))
+                }
+            }
+            giter_utils::types::credential::Credential::Token(token) => todo!()
+        };
+        println!("{:?}", result);
+        // 统一处理执行结果
+        match result {
+            Ok(_) => {
+                tx.commit().unwrap_or_else(|e| {
+                    log::error!("提交事务失败: {:?}", e);
+                });
+                println!("{}", host);
+                log::info!("凭证已更新: {}", host);
+            }
+            Err(e) => {
+                log::error!("操作失败: {:?}", e);
+                tx.rollback().unwrap_or_else(|e| {
+                    log::error!("回滚事务失败: {:?}", e);
+                });
+            }
+        }
+    }  // 移除 todo!()
 }

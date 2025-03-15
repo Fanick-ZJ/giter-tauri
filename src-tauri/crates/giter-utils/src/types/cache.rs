@@ -4,7 +4,7 @@ use crate::types::branch::Branch;
 use git2::Oid;
 use types::author::Author;
 
-use super::contribution::CommitStatistic;
+use super::{contribution::CommitStatistic, credential::Credential};
 
 pub trait Cache {
     fn authors(&self, repo: &str) -> Option<Vec<Author>>;
@@ -37,4 +37,7 @@ pub trait Cache {
     fn clear(&mut self, repo: &str);
 
     fn clear_all(&mut self);
+
+    fn get_credential(&self, repo: &str) -> Option<Credential>;
+    fn set_credential(&mut self, repo: &str, credential: &Credential);
 }

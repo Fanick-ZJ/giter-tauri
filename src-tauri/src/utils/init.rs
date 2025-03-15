@@ -70,6 +70,13 @@ pub fn init_cache() -> Result<()> {
         contributors text not null,
         last_commit_id varchar(20) not null
       );
+      create table if not exists credentials (
+        id integer primary key autoincrement,
+        host text not null,
+        token text not null,
+        username text not null,
+        password text not null
+      );
       "
     )?;
     Ok(())

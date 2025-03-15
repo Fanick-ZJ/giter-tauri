@@ -9,6 +9,7 @@ use git2::build::CheckoutBuilder;
 use git2::Config;
 use git2::Cred;
 use git2::CredentialType;
+use git2::Credentials;
 use git2::FetchOptions;
 use git2::PushOptions;
 use git2::RemoteCallbacks;
@@ -34,6 +35,7 @@ use types::{author::Author, branch::Branch, commit::Commit, status::WorkStatus};
 use super::cache::Cache;
 use super::commit_filter::FilterConditions;
 use super::contribution::CommitStatistic;
+use super::credential::Credential;
 use super::diff::ContentDiff;
 use super::file::ChangedFile;
 use super::file::CommittedFile;
@@ -811,27 +813,36 @@ impl GitDataProvider {
         }
     }
 
-    fn build_remote_credentials_cb(&self, credentials: &Option<(String, String)>) -> impl Fn(&str, Option<&str>, CredentialType) -> Result<Cred, git2::Error> {
-        let (username, password) = credentials.clone().unwrap_or((String::new(), String::new()));
-        return move |url: &str, username_from_url: Option<&str>, allowed_types: CredentialType| {
-            match allowed_types {
-                CredentialType::USER_PASS_PLAINTEXT => {
-                    if username.is_empty() || password.is_empty() {
-                        let err = git2::Error::new(
-                            git2::ErrorCode::User,
-                            git2::ErrorClass::None,
-                            "Please configure the user.name and user.email about this repository",
-                        );
-                        return Err(err);
-                    }
-                    Cred::userpass_plaintext(&username, &password)
-                },
-                CredentialType::SSH_KEY => {
-                    Cred::ssh_key_from_agent(username_from_url.unwrap_or("git")) 
-                },
-                _ => {
-                    Cred::default()
+    fn build_remote_credentials_cb(&self, credentials: &Option<(String, String)>) -> impl Fn(&str, Option<&str>, CredentialType) -> Result<Cred, git2::Error> + '_ {
+        let (username, password) = credentials.as_ref()
+            .map(|(u, p)| (u.clone(), p.clone()))
+            .unwrap_or_default();
+    
+        move |url: &str, username_from_url: Option<&str>, allowed_types: CredentialType| {
+            let cache = self.remote_credential(url);
+            if let Some(cache) = cache {
+               match cache {
+                Credential::UsernamePassword(username, password) => {
+                    return Cred::userpass_plaintext(&username, &password);
                 }
+                Credential::Token(_) => todo!(),
+                } 
+            }
+            if let CredentialType::USER_PASS_PLAINTEXT = allowed_types {
+                if username.is_empty() || password.is_empty() {
+                    return Err(git2::Error::new(
+                        git2::ErrorCode::User,
+                        git2::ErrorClass::None,
+                        "Credentials required for remote operation",
+                    ));
+                }
+                return Cred::userpass_plaintext(&username, &password);
+            }
+    
+            match allowed_types {
+                CredentialType::SSH_KEY => 
+                    Cred::ssh_key_from_agent(username_from_url.unwrap_or("git")),
+                _ => Cred::default()
             }
         }
     }
@@ -882,7 +893,9 @@ impl GitDataProvider {
 
         // 验证祖先关系
         let remote_commit = remote_branch.into_reference().peel_to_commit()?;
-        if !remote_commit.parent_ids().any(|id| id == head_id) {
+        let remote_head = remote_commit.id();
+        let local_commit = branch_ref.peel_to_commit()?;
+        if !local_commit.parent_ids().any(|id| id == remote_head) {
             return Err(GitError::RemoteHeadHasNotInLocal.into());
         }
 
@@ -891,7 +904,12 @@ impl GitDataProvider {
         push_opt.remote_callbacks(build_callbacks());
         remote.push(&[branch_ref_name], Some(&mut push_opt))
             .map_err(handle_error)?;
-
+        // 设置远程凭据缓存
+        if credentials.is_some() {
+            let (username, password) = credentials.unwrap();
+            self.set_remote_credential(remote.url().unwrap(), &Credential::UsernamePassword(username, password));
+        }
+        println!("Push successful!");
         Ok(())
     }
 
@@ -941,6 +959,19 @@ impl GitDataProvider {
                 lasted_id,
             );
         }
+    }
+
+    pub fn remote_credential(&self, remote_url: &str) -> Option<Credential> {
+        if let Some(cache) = self.cache.borrow().as_ref() {
+            return cache.get_credential(remote_url);
+        }
+        None
+    }
+
+    pub fn set_remote_credential(&self, remote_url: &str, credential: &Credential) {
+        if let Some(cache) = self.cache.borrow_mut().as_mut() {
+            cache.set_credential(remote_url, credential);
+        } 
     }
 }
 

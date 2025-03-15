@@ -9,3 +9,4 @@ pub mod status;
 pub mod diff;
 pub mod contribution;
 pub mod git_error;
+pub mod credential;

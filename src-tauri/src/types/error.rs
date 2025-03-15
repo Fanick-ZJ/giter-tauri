@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-use crate::make_serializable;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandError {
