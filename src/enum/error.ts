@@ -43,5 +43,9 @@ export enum ReasonErrorCode {
   PushOtherError ,     // 推送其他错误
   InvalidFilePaht, // 无效的文件路径
   NotUtf8Path, // 不是UTF-8路径
+  TargetReferenceNotDirect, // 目标引用不是直接引用
+  BuildMergeCommitError, // 构建合并提交错误
+  CommitBeforePullWouldBeOverwrittenByMerge, // 提交将被合并覆盖
+  CantPull, // 不能拉取
   OtherError ,
 }

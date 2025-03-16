@@ -18,6 +18,7 @@ export enum FileStatus {
   Deleted = 'Deleted',
   Modified = 'Modified',
   Renamed = 'Renamed',
+  Conflicted = 'Conflicted',
   Ok = 'Ok',
 }
 

@@ -1,3 +1,5 @@
+import { RemoteUserPwdDialog } from "@/components/common/remote-user-pwd-dialog";
+import { RemoteUserPwdDialogProps } from "@/components/common/remote-user-pwd-dialog/types";
 import { SEPERATOR } from "@/const"
 import { open as openShell } from '@tauri-apps/plugin-shell';
 import { Component, ComponentPublicInstance, createVNode, render, VNode, VNodeProps } from "vue";

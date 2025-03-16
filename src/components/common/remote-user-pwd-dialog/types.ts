@@ -1,5 +1,5 @@
 export type RemoteUserPwdDialogProps = {
-  remote: string
+  subtitle: string
 }
 
 export type DialogReturnType = {

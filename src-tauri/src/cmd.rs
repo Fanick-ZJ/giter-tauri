@@ -511,3 +511,16 @@ pub fn push(repo: RepoPath, remote: String, branch: String, credentials: Option<
         }), 
     }
 }
+#[tauri::command]
+pub fn pull(repo: RepoPath, remote: String, branch: String, credentials: Option<(String, String)>) -> Result<(), CE> {
+    let provider = get_provider(&repo)?;
+    let result = provider.pull(&remote, &branch, credentials);
+    match result {
+        Ok(_) => Ok(()),
+        Err(e) => Err(CE {
+            message: e.to_string(),
+            func: stringify!(pull).to_string(),
+            data: Some(vec![repo.to_string(), remote, branch]),
+        }), 
+    }
+}

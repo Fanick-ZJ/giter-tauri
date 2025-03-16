@@ -11,6 +11,7 @@ use git2::Cred;
 use git2::CredentialType;
 use git2::Credentials;
 use git2::FetchOptions;
+use git2::MergeAnalysis;
 use git2::PushOptions;
 use git2::RemoteCallbacks;
 use git2::TreeWalkMode;
@@ -19,11 +20,13 @@ use log::error;
 use serde_json::Value;
 use similar::DiffOp;
 use similar::TextDiff;
+use std::cell;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Pointer;
 use std::i32;
+use std::ops::DerefMut;
 use std::path;
 use std::path::Path;
 use std::path::PathBuf;
@@ -192,6 +195,7 @@ impl GitDataProvider {
             Status::WT_MODIFIED | Status::INDEX_MODIFIED => FileStatus::Modified,
             Status::WT_DELETED | Status::INDEX_DELETED => FileStatus::Deleted, 
             Status::WT_RENAMED | Status::INDEX_RENAMED => FileStatus::Renamed,
+            Status::CONFLICTED => FileStatus::Conflicted,
             _ => FileStatus::Ok,
         }
     }
@@ -236,6 +240,7 @@ impl GitDataProvider {
             let bits = item.status().bits();
             let index_status = Status::WT_DELETED.bits()
             | Status::WT_MODIFIED.bits()
+            | Status::CONFLICTED.bits()
             | Status::WT_NEW.bits()
             | Status::WT_RENAMED.bits()
             | Status::WT_TYPECHANGE.bits()
@@ -813,16 +818,16 @@ impl GitDataProvider {
         }
     }
 
-    fn build_remote_credentials_cb(&self, credentials: &Option<(String, String)>) -> impl Fn(&str, Option<&str>, CredentialType) -> Result<Cred, git2::Error> + '_ {
+    fn build_remote_credentials_cb(&self, credentials: &Option<(String, String)>, use_cache: Rc<RefCell<bool>>) -> impl Fn(&str, Option<&str>, CredentialType) -> Result<Cred, git2::Error> + '_ {
         let (username, password) = credentials.as_ref()
             .map(|(u, p)| (u.clone(), p.clone()))
             .unwrap_or_default();
-    
         move |url: &str, username_from_url: Option<&str>, allowed_types: CredentialType| {
             let cache = self.remote_credential(url);
             if let Some(cache) = cache {
                match cache {
                 Credential::UsernamePassword(username, password) => {
+                    *use_cache.borrow_mut() = false;
                     return Cred::userpass_plaintext(&username, &password);
                 }
                 Credential::Token(_) => todo!(),
@@ -864,9 +869,10 @@ impl GitDataProvider {
         }
 
         // 提取公共回调配置
+        let use_cache = Rc::new(RefCell::new(true));
         let build_callbacks = || {
             let mut cbs = RemoteCallbacks::new();
-            cbs.credentials(self.build_remote_credentials_cb(&credentials));
+            cbs.credentials(self.build_remote_credentials_cb(&credentials, use_cache.clone()));
             cbs
         };
 
@@ -883,7 +889,6 @@ impl GitDataProvider {
         let remote_branch = branch.upstream()?;
         let branch_ref = branch.into_reference();
         let branch_ref_name = branch_ref.name().ok_or(anyhow::anyhow!(GitError::BranchNameInvalid))?;
-        let head_id = branch_ref.peel_to_commit()?.id();
 
         // 执行fetch操作
         let mut fetch_opt = FetchOptions::new();
@@ -905,11 +910,96 @@ impl GitDataProvider {
         remote.push(&[branch_ref_name], Some(&mut push_opt))
             .map_err(handle_error)?;
         // 设置远程凭据缓存
-        if credentials.is_some() {
+        if credentials.is_some() && *use_cache.borrow() {
             let (username, password) = credentials.unwrap();
             self.set_remote_credential(remote.url().unwrap(), &Credential::UsernamePassword(username, password));
         }
         println!("Push successful!");
+        Ok(())
+    }
+
+    pub fn pull(&self, remote: &str, branch: &str, credentials: Option<(String, String)>) -> Result<()> {
+        let repo = &self.repository;
+    
+        // 1. 获取远程引用
+        let mut remote = repo.find_remote(remote)
+            .map_err(|e| {
+                log::error!("Find remote error: {:?}", e);
+                anyhow::anyhow!(GitError::RemoteNotFound as i32)
+            })?;
+        // 2. 配置回调（复用已有的凭证处理逻辑）
+        let use_cache = Rc::new(RefCell::new(true));
+        let callbacks = self.build_remote_credentials_cb(&credentials, use_cache.clone());
+        // 3. 执行 fetch 操作
+        let mut fetch_opts = FetchOptions::new();
+        fetch_opts.remote_callbacks({
+            let mut cb = RemoteCallbacks::new();
+            cb.credentials(callbacks);
+            cb
+        });
+        // 获取本地分支
+        let local_branch = repo.find_branch(branch, BranchType::Local)
+            .map_err(|_| anyhow::anyhow!(GitError::BranchNotFind as i32))?;
+        let local_branch_ref = local_branch.into_reference();
+
+        // 4. 获取FETCH_HEAD 提交
+        remote.fetch(&[local_branch_ref.name().unwrap()], Some(&mut fetch_opts), None)
+           .map_err(|e| {
+            log::error!("Fetch error: {:?}", e);
+            anyhow::anyhow!(GitError::PushOtherError as i32)
+        })?;
+        let fetch_head = repo.find_reference("FETCH_HEAD")?;
+        let fetch_commit = repo.reference_to_annotated_commit(&fetch_head)?;
+        // 5. 执行合并操作
+        let analysis = repo.merge_analysis(&[&fetch_commit])?;
+        if analysis.0.is_up_to_date() {
+            return Ok(());
+        }
+        else if analysis.0.is_fast_forward() {
+            let mut reference = local_branch_ref;
+            /*
+             * set_target 核心功能：
+             * 原子性更新引用：将本地分支引用指向 fetch_commit.id() 对应的提交
+             * 实现快进合并：当远程分支是本地分支的直接祖先时，直接移动分支指针
+             * 写入引用日志：第二个参数 "Fast-Forward" 会写入 .git/logs 中的引用日志
+             */
+            let _ = reference.set_target(fetch_commit.id(), "Fast-Forward").map_err(|e| {
+                log::error!("Set target error: {:?}", e);
+                anyhow::anyhow!(GitError::TargetReferenceNotDirect as i32)
+            })?;
+            repo.checkout_head(Some(CheckoutBuilder::default().force()))?;
+            return Ok(());
+        }
+        else if analysis.0.is_normal() {
+            // 创建提交的合并
+            let head_commit = repo.head()?.peel_to_commit()?;
+            repo.merge(&[&fetch_commit], None, None).map_err(|e| {
+                log::error!("Merge error: {:?}", e);
+                anyhow::anyhow!(GitError::CommitBeforePullWouldBeOverwrittenByMerge as i32)
+            })?;
+            // 创建合并提交
+            let signature = repo.signature().map_err(|e| {anyhow::anyhow!(GitError::UserUnConfigured as i32)})?;
+            let tree_id = repo.index()?.write_tree()?;
+            let tree = repo.find_tree(tree_id)?;
+            let _ = repo.commit(
+                Some("HEAD"),
+                &signature, 
+                &signature, 
+                "Merge commit", 
+                &tree, 
+                &[&head_commit, &fetch_head.peel_to_commit()?])
+                .map_err(|e| {
+                    log::error!("Commit error: {:?}", e);
+                    anyhow::anyhow!(GitError::BuildMergeCommitError as i32)
+                })?;
+        }
+        else if analysis.0.is_none() {
+            return Err(GitError::CantPull.into());
+        }
+        if credentials.is_some() && *use_cache.borrow() {
+            let (username, password) = credentials.unwrap();
+            self.set_remote_credential(remote.url().unwrap(), &Credential::UsernamePassword(username, password));
+        }
         Ok(())
     }
 

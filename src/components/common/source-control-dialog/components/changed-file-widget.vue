@@ -86,6 +86,7 @@ const hover = ref(false)
               <Icon icon="mingcute:add-line" width="18" height="18" v-if="type === 'changed'" @click="handleAdd"/>
             </div>
             <div>
+              <span class="inline-block align-middle text-red-600" v-if="file.status == FileStatus.Conflicted">C</span>
               <span class="inline-block align-middle text-orange-600" v-if="file.status == FileStatus.Modified">M</span>
               <span class="inline-block align-middle text-green-400" v-if="file.status == FileStatus.Added">A</span>
               <span class="inline-block align-middle text-red-400" v-if="file.status == FileStatus.Deleted">D</span>

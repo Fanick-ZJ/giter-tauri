@@ -6,12 +6,27 @@ import { NButton, NDivider, NDropdown, NInput, NLayout, NLayoutContent, NLayoutS
 import { Icon } from '@iconify/vue/dist/iconify.js'
 import { listen } from '@tauri-apps/api/event'
 import { STATUS_CHANGE, StatusChangePayloadType } from '@/const/listen'
-import { commit, currentRemoteBranch, getBranches, getChangedFiles, getCurrentBranch, getStagedFiles, push } from '@/utils/command'
+import { commit, currentRemoteBranch, getBranches, getChangedFiles, getCurrentBranch, getStagedFiles, pull, push } from '@/utils/command'
 import { Branch, ChangedFile } from '@/types'
 
 import ChangedFileWidget from './components/changed-file-widget.vue'
 import { ReasonErrorCode } from '@/enum/error'
 import { RemoteUserPwdDialog } from '../remote-user-pwd-dialog'
+import { RemoteUserPwdDialogProps } from '../remote-user-pwd-dialog/types'
+
+const userAuthorRetry = (zindex: number, param: RemoteUserPwdDialogProps, cb?: (res) => void, ecb?: (e) => void) => {
+  const dlg = new RemoteUserPwdDialog(param)
+  dlg.setZIndex(zindex)
+  dlg.show()?.then(async (res) => {
+    cb && await cb(res)
+  }).then((e) => {
+    if (ecb) {
+      ecb(e) 
+    } else {
+     throw e 
+    }
+  })
+}
 
 const className = '__source__control__container'
 
@@ -49,11 +64,15 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
   public customFooter(): Component | undefined {
     const self = this;
     const computedOption = computed(() => {
-      const options = [] as any
+      const options: any[] = []
       if (self.currentRemoteBranch.value) {
         options.push({
           label: '推送',
           key: 'push' 
+        },
+        {
+          label: '拉取',
+          key: 'pull'
         })
       }
       options.push({
@@ -80,31 +99,61 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
     const handleSelect = (e) => {
       if (e === 'push') {
         if (self.currentRemoteBranch.value) {
-          console.log('push')
           // 获取remoteRef
           const remoteRef = self.currentRemoteBranch.value.reference.split('/')[0]
-          console.log(self.props.repo.path, remoteRef, this.currentBranch.value!.name)
           push(self.props.repo.path, remoteRef, this.currentBranch.value!.name, undefined).then((res) => {
             window.$message.success('推送成功')
           }).catch((e) => {
             // 如果是需要用户名密码的错误，弹出对话框
             if (e.message == ReasonErrorCode.PushNeedNameAndPassword) {
               window.$message.error('请输入远程仓库的用户名和密码')
-              const dlg = new RemoteUserPwdDialog({
-                remote: ''
-              })
-              dlg.setZIndex(self.zIndex.value + 1)
-              dlg.show()?.then((res) => {
-                if (res) {
-                  push(self.props.repo.path, remoteRef, this.currentBranch.value!.name, [res.username, res.password]).then((res) => {
-                    window.$message.success('推送成功')
-                  }).catch((e) => {
-                    if (e.message == ReasonErrorCode.RemoteHeadHasNotInLocal) {
-                      window.$message.error('远程仓库的HEAD不在本地，请先拉取')
-                    }
-                  })
-                } 
-              })
+              userAuthorRetry(
+                self.zIndex.value + 1, 
+                {subtitle: self.props.repo.alias}, 
+                (res) => {
+                  if (res) {
+                    push(self.props.repo.path, remoteRef, this.currentBranch.value!.name, [res.username, res.password]).then((res) => {
+                      window.$message.success('推送成功')
+                    }).catch((e) => {
+                      if (e.message == ReasonErrorCode.RemoteHeadHasNotInLocal) {
+                        window.$message.error('远程仓库的HEAD不在本地，请先拉取')
+                      }
+                    })
+                  }
+                }
+              )
+            } else {
+              window.$message.error(`推送失败 ${e.message}`)
+            }
+          })
+        }
+      }
+      if (e === 'pull') {
+        if (self.currentRemoteBranch.value) {
+          const remoteRef = self.currentRemoteBranch.value.reference.split('/')[0]
+          pull(self.props.repo.path, remoteRef, this.currentBranch.value!.name, undefined).then((res) => {
+            window.$message.success('拉取成功')
+          }).catch(e => {
+            console.log(e)
+            if (e.message == ReasonErrorCode.PushNeedNameAndPassword) {
+              window.$message.error('请输入远程仓库的用户名和密码')
+              userAuthorRetry(
+                self.zIndex.value + 1, 
+                {subtitle: self.props.repo.alias}, 
+                (res) => {
+                  if (res) {
+                    pull(self.props.repo.path, remoteRef, this.currentBranch.value!.name, [res.username, res.password]).then((res) => {
+                      window.$message.success('拉取成功')
+                    }).catch((e) => {
+                      if (e.message == ReasonErrorCode.HasConflicts) {
+                        window.$message.error('拉取后存在冲突，请手动解决')
+                      }
+                    })
+                  }
+                }
+              )
+            } else if (e.message == ReasonErrorCode.CommitBeforePullWouldBeOverwrittenByMerge) {
+              window.$message.error('拉取文件与本地存在冲突，请提交并在拉取后手动解决')
             }
           })
         }
