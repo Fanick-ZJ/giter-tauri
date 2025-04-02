@@ -13,7 +13,6 @@ use git2::PushOptions;
 use git2::RemoteCallbacks;
 use git2::TreeWalkMode;
 use git2::{BranchType, Oid, Repository, Revwalk, Status};
-use log::error;
 use serde_json::Value;
 use similar::DiffOp;
 use similar::TextDiff;
@@ -37,6 +36,7 @@ use super::diff::ContentDiff;
 use super::file::ChangedFile;
 use super::file::CommittedFile;
 use super::file::UntrackedFile;
+use super::status::status_to_changed_status;
 use super::status::FileStatus;
 use super::git_error::ErrorCode as GitError;
 
@@ -183,18 +183,6 @@ impl GitDataProvider {
         Ok(entry?.id())
     }
 
-    /// git2中的状态转化为文件状态（是否添加、修改删除）
-    fn status_to_changed_status(&self, status: Status) -> FileStatus {
-        match status {
-            Status::WT_NEW | Status::INDEX_NEW => FileStatus::Added,
-            Status::WT_MODIFIED | Status::INDEX_MODIFIED => FileStatus::Modified,
-            Status::WT_DELETED | Status::INDEX_DELETED => FileStatus::Deleted, 
-            Status::WT_RENAMED | Status::INDEX_RENAMED => FileStatus::Renamed,
-            Status::CONFLICTED => FileStatus::Conflicted,
-            _ => FileStatus::Ok,
-        }
-    }
-
     fn blob_is_binary(&self, oid: Oid) -> Result<bool, GitError> {
         let blob = self.repository
             .find_blob(oid)
@@ -218,7 +206,7 @@ impl GitDataProvider {
             if (bits & index_status) > 0 {
                 let path = PathBuf::from(item.path().unwrap());
                 let oid = self.get_path_oid(&path).unwrap_or(Oid::from_str("0").unwrap());
-                let status = self.status_to_changed_status(item.status());
+                let status = status_to_changed_status(item.status());
                 let changed_file = ChangedFile::new(path, oid, status);
                 modified.push(changed_file); 
             } 
@@ -241,7 +229,7 @@ impl GitDataProvider {
             if (bits & index_status) > 0 {
                 let path = PathBuf::from(item.path().unwrap());
                 let oid = self.get_path_oid(&path).unwrap_or(Oid::from_str("0").unwrap());
-                let status = self.status_to_changed_status(item.status());
+                let status = status_to_changed_status(item.status());
                 let changed_file = ChangedFile::new(path, oid, status);
                 modified.push(changed_file);
             }
