@@ -6,12 +6,9 @@ use crate::util::size_by_path;
 use crate::util::stamp_to_ymd;
 use anyhow::Result;
 use git2::build::CheckoutBuilder;
-use git2::Config;
 use git2::Cred;
 use git2::CredentialType;
-use git2::Credentials;
 use git2::FetchOptions;
-use git2::MergeAnalysis;
 use git2::PushOptions;
 use git2::RemoteCallbacks;
 use git2::TreeWalkMode;
@@ -20,14 +17,11 @@ use log::error;
 use serde_json::Value;
 use similar::DiffOp;
 use similar::TextDiff;
-use std::cell;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Pointer;
 use std::i32;
-use std::ops::DerefMut;
-use std::path;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -168,7 +162,7 @@ impl GitDataProvider {
         Ok(false)
     }
 
-    /// 先从当前的树中查找，再从索引中查找，没有的话，再去index中查找
+    /// 根据路径获取文件的 Oid， 先从当前的树中查找，再从索引中查找，没有的话，再去index中查找
     pub fn get_path_oid(&self, path: &PathBuf) -> Result<Oid> {
         // 获取 HEAD 引用
         let reference = self.repository.head()?;
@@ -181,7 +175,7 @@ impl GitDataProvider {
         if let Err(_) = entry {
            let index = self.repository.index()?; 
            for item in index.iter() {
-                if String::from_utf8(item.path.to_vec()).unwrap() == path.to_str().unwrap().to_string() {
+                if String::from_utf8(item.path.to_vec())? == path.to_str().unwrap().to_string() {
                     return Ok(item.id);
                 }
            }
@@ -189,6 +183,7 @@ impl GitDataProvider {
         Ok(entry?.id())
     }
 
+    /// git2中的状态转化为文件状态（是否添加、修改删除）
     fn status_to_changed_status(&self, status: Status) -> FileStatus {
         match status {
             Status::WT_NEW | Status::INDEX_NEW => FileStatus::Added,
@@ -200,20 +195,18 @@ impl GitDataProvider {
         }
     }
 
-    fn blob_is_binary(&self, oid: Oid) -> Result<bool> {
-        let blob = self.repository.find_blob(oid);
-        if let Err(_) = blob {
-            return Ok(false);
-        }
-        let blob = blob.unwrap();
+    fn blob_is_binary(&self, oid: Oid) -> Result<bool, GitError> {
+        let blob = self.repository
+            .find_blob(oid)
+            .map_err(|_| GitError::BlobNotFound)?;
         let content = blob.content();
         let is = is_binary_file_content(content.to_vec());
         Ok(is)
 
     }
 
-    pub fn staged_files(&self) -> Vec<ChangedFile> {
-        let status = self.repository.statuses(None).unwrap();
+    pub fn staged_files(&self) -> Result<Vec<ChangedFile>> {
+        let status = self.repository.statuses(None)?;
         let mut modified: Vec<ChangedFile> = Vec::new();
         for item in &status {
             let bits = item.status().bits();
@@ -230,7 +223,7 @@ impl GitDataProvider {
                 modified.push(changed_file); 
             } 
         } 
-        modified
+        Ok(modified)
     }
 
     pub fn changed_files(&self) -> Result<Vec<ChangedFile>> {
@@ -273,52 +266,50 @@ impl GitDataProvider {
 
     pub fn remove_from_stage(&self, path: &PathBuf) -> Result<()> {
         let repo = &self.repository;
-        let staged_files = self.staged_files();
-        let file = staged_files.iter().find(|f| f.path.to_str() == path.to_str());
-        if let Some(file) = file {
-            let mut index = repo.index()?;
-            if file.status == FileStatus::Added {
-                index.remove_path(path)?;
-
-            } else {
+        let staged_files = self.staged_files()?;
+        let file = staged_files
+            .iter()
+            .find(|f| f.path.to_str() == path.to_str())
+            .ok_or_else(|| anyhow::anyhow!("File not found in stage"))?;
+        let mut index = repo.index()?;
+        match file.status {
+            // 如果是删除的，就直接删除
+            FileStatus::Added => index.remove_path(&path)?,
+            _ => {
                 let head = repo.head()?.peel_to_commit()?;
                 let tree = head.tree()?;
                 let entry = tree.get_path(&path)?;
                 let blob = repo.find_blob(entry.id())?;
+                // 如果能在索引库中找到文件，就把HEAD库中的文件添加到索引库中，以实现移除索引的效果
                 let entry = index.iter().find(|e| String::from_utf8(e.path.to_vec()).unwrap() == path.to_str().unwrap().to_string());
                 if let Some(entry) = entry {
                     index.add_frombuffer(&entry, blob.content())?;
                 } else {
-                    index.remove_path(&path)?;
-                } 
-            }
-            index.write()?;
-            Ok(())
-        } else {
-            return Err(anyhow::anyhow!("File not found in stage"));
+                    return Err(anyhow::anyhow!("File not found in index"))
+                }
+            } 
         }
+        index.write()?;
+        Ok(())
     }
 
+    /// 暂存区文件恢复到工作区
     pub fn checkout_file (&self, path: &PathBuf) -> Result<()> {
         let repo = &self.repository;
         // 判断当前的文件是不是新加的
         let status = self.changed_files()?;
-        let file = status.iter().find(|f| f.path.to_str() == path.to_str());
-        if let Some(file) = file {
-            if file.status == FileStatus::Added {
-                // 如果是新加的文件，添加到工作区
-                println!("checkout new file: {:?}", file);
-                Ok(())
-            }
-            else {
-                let mut checkout_opts = CheckoutBuilder::new();
-                checkout_opts.path(path).force();
-                repo.checkout_head(Some(&mut checkout_opts))?;
-                Ok(())
-            }
-        } else {
-            return Err(anyhow::anyhow!("File not found in stage"));
+        let file = status
+            .iter()
+            .find(|f| f.path.to_str() == path.to_str())
+            .ok_or_else(|| anyhow::anyhow!("File not found in stage"))?;
+        // 如果是新加的，就直接忽略
+        if matches!(file.status, FileStatus::Added) {
+            return Ok(());
         }
+        let mut checkout_opts = CheckoutBuilder::new();
+        checkout_opts.path(path).force();
+        repo.checkout_head(Some(&mut checkout_opts))?;
+        Ok(())
     }
 
     pub fn current_branch(&self) -> Result<Branch> {
@@ -428,49 +419,41 @@ impl GitDataProvider {
 
     /// 获取仓库的文件状态
     pub fn work_status(&self) -> Result<WorkStatus> {
-        let path = self.repository.path().to_str().unwrap();
-        let mut statuses: WorkStatus = WorkStatus::None;
-        match self.untracked_files() {
-            Ok(untracks) => {
-                if !untracks.is_empty() {
-                    statuses |= WorkStatus::Untracked;
-                }
-            }
-            _ => {
-                error!("No untracked files found {}", path);
-            }
-        }
-        match self.workspace_change() {
-            Ok(workspace_change) => {
-                if !workspace_change.is_empty() {
-                    statuses |= WorkStatus::Modified;
-                }
-            }
-            _ => {
-                error!("No modified files found {}", path);
-            }
-        }
-        match self.uncommitted() {
-            Ok(uncommited) => {
-                if uncommited {
-                    statuses |= WorkStatus::Uncommitted;
-                }
-            }
-            Err(_) => {}
-        }
-        match self.unpushed_commits() {
-            Ok(unpushed) => {
-                if unpushed {
-                    statuses |= WorkStatus::Unpushed;
-                }
-            }
-            _ => {
-                error!("No unpushed commits found {}", path);
+        let path = self.repository.path();
+        let mut statuses = WorkStatus::None;
+
+        // 统一错误处理，使用 map_err 转换错误类型
+        let untracked = self.untracked_files()
+            .map(|v| !v.is_empty())
+            .map_err(|e| anyhow::anyhow!(e).context("Failed to get untracked files"))?;
+
+        let modified = self.workspace_change()
+            .map(|v| !v.is_empty())
+            .map_err(|e| anyhow::anyhow!(e).context("Failed to get workspace changes"))?;
+
+        let uncommitted = self.uncommitted()
+            .map_err(|e| anyhow::anyhow!(e).context("Failed to check uncommitted changes"))?;
+
+        let unpushed = self.unpushed_commits()
+            .map_err(|e| anyhow::anyhow!(e).context("Failed to check unpushed commits"))?;
+        // 使用组合的 Result 处理
+        let results = vec![
+            (untracked, WorkStatus::Untracked), 
+            (modified, WorkStatus::Modified), 
+            (uncommitted, WorkStatus::Uncommitted), 
+            (unpushed, WorkStatus::Unpushed)
+        ];
+        for (result, status) in results {
+            match result {
+                true => statuses |= status,
+                false => {}
             }
         }
+        // 简化最终状态判断
         if statuses.is_empty() {
             statuses |= WorkStatus::Ok;
         }
+
         Ok(statuses)
     }
 
@@ -583,16 +566,17 @@ impl GitDataProvider {
         // 获取父提交
         let commit = repo.find_commit(commit_id.into())?;
         let now_tree = commit.tree()?;
-        let old_tree = commit.parents().next();
+        let old_tree = commit.parents()
+            .next()
+            .and_then(|parent| parent.tree().ok());
         // 当没找到父提交时，说明是第一个提交，单独处理
         if old_tree.is_none() {
             let files = self.tree_walk(&now_tree)?;
             return Ok(files);
         }
-        let old_tree = old_tree.unwrap().tree()?;
         let mut files: Vec<CommittedFile> = Vec::new();
         // 对比两个树的差异
-        let diff = repo.diff_tree_to_tree(Some(&old_tree), Some(&now_tree), None)?;
+        let diff = repo.diff_tree_to_tree(old_tree.as_ref(), Some(&now_tree), None)?;
         let deltas = diff.deltas();
         // 遍历差异, 获取差异的文件
         for delta in deltas {
@@ -759,20 +743,15 @@ impl GitDataProvider {
         let mut commits = Vec::<Commit>::new();
         // 遍历提交
         for commit in branch_commits.into_iter() {
-            if commit.commit_id == last_id {
+            if commit.commit_id == last_id || commits.len() >= filter.count {
                 break; 
-            }
-            if commits.len() >= filter.count {
-                break;
             }
             let author = &filter.author;
             let time = commit.datetime;
-            if !author.is_default() && author.email != commit.author_email && author.name != commit.author_name {
+            if (!author.is_default() && author.email != commit.author_email && author.name != commit.author_name)
+                || time < filter.start_time || time > filter.end_time {
                 continue; 
             }
-            if time < filter.start_time || time > filter.end_time {
-                continue; 
-            } 
             commits.push(commit);
         }
         Ok(commits)
@@ -798,7 +777,7 @@ impl GitDataProvider {
         if author.is_err() {
             return Err(GitError::RepoAuthorNoConfig.into());
         }
-        if self.staged_files().len() == 0 {
+        if self.staged_files()?.len() == 0 {
             return Err(GitError::NoStagedFile.into());
         }
         let author = author.unwrap();
@@ -826,11 +805,11 @@ impl GitDataProvider {
             let cache = self.remote_credential(url);
             if let Some(cache) = cache {
                match cache {
-                Credential::UsernamePassword(username, password) => {
-                    *use_cache.borrow_mut() = false;
-                    return Cred::userpass_plaintext(&username, &password);
-                }
-                Credential::Token(_) => todo!(),
+                    Credential::UsernamePassword(username, password) => {
+                        *use_cache.borrow_mut() = false;
+                        return Cred::userpass_plaintext(&username, &password);
+                    }
+                    Credential::Token(_) => todo!(),
                 } 
             }
             if let CredentialType::USER_PASS_PLAINTEXT = allowed_types {

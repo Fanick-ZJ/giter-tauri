@@ -439,7 +439,10 @@ pub fn get_changed_files(repo: RepoPath) -> Result<Vec<ChangedFile>, CE> {
 pub fn get_staged_files(repo: RepoPath) -> Result<Vec<ChangedFile>, CE> {
     let provider = get_provider(&repo)?;
     let files = provider.staged_files();
-    Ok(files)
+    match files {
+        Ok(files) => Ok(files),
+        Err(e) => Err(CE { message: e.to_string(), func: stringify!(get_staged_files).to_string(), data: Some(vec![repo.to_string()]) }), 
+    }
 }
 
 #[tauri::command]
