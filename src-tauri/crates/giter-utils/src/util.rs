@@ -1,13 +1,10 @@
 use std::collections::HashMap;
-use std::fmt::Debug;
 use std::io::Read;
 use std::path::Path;
-use std::time::UNIX_EPOCH;
 
 use anyhow::Result;
 use git2::{Commit as Git2Commit, Config, Delta, Oid, Repository};
-use chrono::{DateTime, Utc, TimeZone};
-use serde::de::Error;
+use chrono::{Utc, TimeZone};
 use serde::Deserialize;
 use serde_json::Value;
 

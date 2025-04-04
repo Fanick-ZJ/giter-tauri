@@ -2,11 +2,11 @@ use std::{fmt, path::{Path, PathBuf}};
 
 use git2::Oid;
 use serde::{
-    de::{Error as DeError, SeqAccess, Visitor},
+    de::{Error as DeError, Visitor},
     ser::SerializeStruct,
     Deserialize, Deserializer, Serialize, Serializer,
 };
-use types::status::FileStatus;
+use super::status::FileStatus;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]

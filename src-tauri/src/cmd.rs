@@ -11,7 +11,7 @@ use crate::{
 use git2::Oid;
 use giter_utils::{
     types::{
-        author::Author, branch::Branch, cache::Cache, commit::Commit,  diff::ContentDiff, file::{ChangedFile, CommittedFile}, git_data_provider::GitDataProvider, status::WorkStatus
+        author::Author, branch::Branch, cache::Cache, commit::Commit, diff::ContentDiff, error::ErrorCode, file::{ChangedFile, CommittedFile}, git_data_provider::GitDataProvider, status::WorkStatus
     },
     util::{is_git_repo, set_owner},
 };
@@ -29,17 +29,13 @@ fn get_provider(repo: &str) -> Result<GitDataProvider, CE> {
             provider.set_cache(cache);
             Ok(provider)
         }
-        Err(err) => match err.code() {
-            git2::ErrorCode::Owner => Err(CE {
-                message: err.message().to_string(),
+        Err(err) => {
+            Err(CE {
+                code: err.code(),
+                message: err.to_string(),
                 func: stringify!(get_provider).to_string(),
                 data: Some(vec![repo.to_string()]),
-            }),
-            _ => Err(CE {
-                message: err.message().to_string(),
-                func: stringify!(get_provider).to_string(),
-                data: Some(vec![repo.to_string()]),
-            }),
+            })
         },
     }
 }
@@ -54,6 +50,7 @@ fn watch(repo: RepoPath) -> Result<(), CE> {
             Ok(())
         },
         Err(e) => Err(CE {
+            code: 90,   // 暂时定为90，后续再定义
             message: e.to_string(),
             func: stringify!(watch).to_string(),
             data: Some(vec![repo.to_string()]),
@@ -72,6 +69,7 @@ pub fn remove_watch(repo: RepoPath) -> Result<(), CE> {
             Ok(())
         },
         Err(e) => Err(CE {
+            code: 90,   // 暂时定为90，后续再定义
             message: e.to_string(),
             func: stringify!(remove_watch).to_string(),
             data: Some(vec![repo.to_string()]),
@@ -87,6 +85,7 @@ pub fn repos() -> Result<Vec<store::Repository>, CE> {
     match repos {
         Ok(repos) => Ok(repos),
         Err(e) => Err(CE {
+            code: 90,   // 暂时定为90，后续再定义
             message: e.to_string(),
             func: stringify!(repos).to_string(),
             data: None,
@@ -103,8 +102,9 @@ pub fn add_watch(repo: RepoPath) -> Result<(), CE> {
 pub fn authors(repo: RepoPath, branch: Branch) -> Result<Vec<Author>, CE> {
     let provider = get_provider(&repo)?;
     let authors = provider.authors(&branch);
-    if let Err(_) = authors {
+    if let Err(e) = authors {
         return Err(CE {
+            code: e.code(),
             message: "get authors error".to_string(),
             func: stringify!(authors).to_string(),
             data: Some(vec![repo.to_string(), branch.name]),
@@ -121,6 +121,7 @@ pub fn branches(repo: RepoPath) -> Result<Vec<Branch>, CE> {
     match branches {
         Ok(branches) => Ok(branches),
         Err(e) => Err(CE {
+            code: e.code(),
             message: e.to_string(),
             func: stringify!(branches).to_string(),
             data: Some(vec![repo.to_string()]),
@@ -147,6 +148,7 @@ pub fn get_db_path(db: String) -> Result<String, CE> {
         "cache" => Ok(dirs::cache_file().unwrap().to_str().unwrap().to_string()),
         "config" => Ok(dirs::config_file().unwrap().to_str().unwrap().to_string()),
         _ => Err(CE {
+            code: 90,   // 暂时定为90，后续再定义
             message: "invalid db".to_string(),
             func: stringify!(get_db_path).to_string(),
             data: Some(vec![db]),
@@ -186,6 +188,7 @@ pub fn get_folders(path: String) -> Result<Vec<Dir>, CE> {
             Ok(folders)
         }
         Err(e) => Err(CE {
+            code: 90,   // 暂时定为90，后续再定义
             message: e.to_string(),
             func: stringify!(get_folders).to_string(),
             data: Some(vec![path]),
@@ -210,6 +213,7 @@ pub async fn work_status(repo: RepoPath) -> Result<WorkStatus, CE> {
     match statuses {
         Ok(statuses) => Ok(statuses),
         Err(e) => Err(CE {
+            code: e.code(),
             message: e.to_string(),
             func: stringify!(work_status).to_string(),
             data: Some(vec![repo.to_string()]),
@@ -224,11 +228,15 @@ pub fn set_repo_ownership(repo: RepoPath) -> Result<bool, CE> {
         Ok(_) => Ok(true),
         Err(_) => match set_owner(&repo) {
             Ok(_) => Ok(true),
-            Err(err) => Err(CE {
-                message: err.to_string(),
-                func: stringify!(set_repo_ownership).to_string(),
-                data: Some(vec![repo.to_string()]),
-            }),
+            Err(err) => {
+                let e = ErrorCode::Git2Error(err);
+                Err(CE {
+                    code: e.code(),
+                    message: e.to_string(),
+                    func: stringify!(set_repo_ownership).to_string(),
+                    data: Some(vec![repo.to_string()]),
+                })
+            }
         },
     }
 }
@@ -240,6 +248,7 @@ pub fn branch_commits(repo: RepoPath, branch: Branch, count: i32) -> Result<Vec<
     match commits {
         Ok(commits) => Ok(commits),
         Err(e) => Err(CE {
+            code: e.code(),
             message: e.to_string(),
             func: stringify!(branch_commits).to_string(),
             data: Some(vec![repo.to_string(), branch.name]),
@@ -254,6 +263,7 @@ pub fn current_branch(repo: RepoPath) -> Result<Branch, CE> {
     match branch {
         Ok(branch) => Ok(branch),
         Err(e) => Err(CE {
+            code: e.code(),
             message: e.to_string(),
             func: stringify!(current_branch).to_string(),
             data: Some(vec![repo.to_string()]),
@@ -268,6 +278,7 @@ pub fn current_remote_branch(repo: RepoPath) -> Result<Branch, CE> {
     match branch {
         Ok(branch) => Ok(branch),
         Err(e) => Err(CE {
+            code: e.code(),
             message: e.to_string(),
             func: stringify!(current_remote_branch).to_string(),
             data: Some(vec![repo.to_string()]),
@@ -280,7 +291,9 @@ pub fn commit_content (repo: RepoPath, cid: String) -> Result<Vec<CommittedFile>
     let provider = get_provider(&repo)?;
     let oid = Oid::from_str(&cid);
     if let Err(e) = oid {
+        let e = ErrorCode::OtherError(format!("invalid commit id: {}", cid));
         return Err(CE{
+            code: e.code(),
             message: e.to_string(),
             func: stringify!(commit_content).to_string(),
             data: Some(vec![repo.to_string()]),
@@ -291,6 +304,7 @@ pub fn commit_content (repo: RepoPath, cid: String) -> Result<Vec<CommittedFile>
     match content {
         Ok(content) => Ok(content),
         Err(e) => Err(CE {
+            code: e.code(),
             message: e.to_string(),
             func: stringify!(commit_content).to_string(),
             data: Some(vec![repo.to_string()]),
@@ -304,17 +318,30 @@ pub fn file_diff(repo: RepoPath, old: String, new: String) -> Result<ContentDiff
     let old_id = Oid::from_str(&old);
     let error_func = stringify!(file_diff).to_string();
     if let Err(e) = old_id {
-        return Err(CE { message: e.to_string(), func: error_func, data: Some(vec![repo.to_string(), old, new]) });
+        let e = ErrorCode::OtherError(format!("invalid commit id: {}", old));
+        return Err(CE { 
+            code: e.code(),
+            message: e.to_string(), 
+            func: error_func, 
+            data: Some(vec![repo.to_string(), old, new]) 
+        });
     }
     let old_id = old_id.unwrap();
     let new_id = Oid::from_str(&new);
     if let Err(e) = new_id {
-        return Err(CE { message: e.to_string(), func: error_func, data: Some(vec![repo.to_string(), old, new]) });
+        let e = ErrorCode::OtherError(format!("invalid commit id: {}", new));
+        return Err(CE { 
+            code: e.code(),
+            message: e.to_string(), 
+            func: error_func, 
+            data: Some(vec![repo.to_string(), old, new]) 
+        });
     }
     let new_id = new_id.unwrap();
     let diff = provider.get_file_content_diff(old_id, new_id);
     if let Err(e) = diff {
         return Err(CE {
+            code: e.code(),
             message: e.to_string(),
             func: error_func,
             data: Some(vec![repo.to_string(), old, new]),
@@ -328,7 +355,9 @@ pub fn blob_content(repo: RepoPath, cid: String) -> Result<Vec<u8>, CE> {
     let provider = get_provider(&repo)?;
     let oid = Oid::from_str(&cid);
     if let Err(e) = oid {
+        let e = ErrorCode::OtherError(format!("invalid commit id: {}", cid));
         return Err(CE {
+            code: e.code(),
             message: e.to_string(),
             func: stringify!(blob_content).to_string(),
             data: Some(vec![repo.to_string(), cid]),
@@ -339,6 +368,7 @@ pub fn blob_content(repo: RepoPath, cid: String) -> Result<Vec<u8>, CE> {
     match content {
         Ok(content) => Ok(content),
         Err(e) => Err(CE {
+            code: e.code(),
             message: e.to_string(),
             func: stringify!(blob_content).to_string(),
             data: Some(vec![repo.to_string(), cid]),
@@ -351,7 +381,9 @@ pub fn get_commit(repo: RepoPath, cid: String) -> Result<Commit, CE> {
     let provider = get_provider(&repo)?;
     let oid = Oid::from_str(&cid);
     if let Err(e) = oid {
+        let e = ErrorCode::OtherError(format!("invalid commit id: {}", cid));
         return Err(CE {
+            code: e.code(),
             message: e.to_string(),
             func: stringify!(get_commit).to_string(),
             data: Some(vec![repo.to_string(), cid]),
@@ -361,6 +393,7 @@ pub fn get_commit(repo: RepoPath, cid: String) -> Result<Commit, CE> {
     let commit = provider.get_commit(commit_id);
     if let Err(e) = commit {
         return Err(CE {
+            code: e.code(),
             message: e.to_string(),
             func: stringify!(get_commit).to_string(),
             data: Some(vec![repo.to_string(), cid]),
@@ -386,6 +419,7 @@ pub fn get_global_author() -> Result<Author, CE> {
     match author {
         Ok(author) => Ok(author),
         Err(e) => Err(CE {
+            code: 90,   // 暂时定为90，后续再定义
             message: e.to_string(),
             func: stringify!(get_global_author).to_string(),
             data: None,
@@ -399,6 +433,7 @@ pub fn get_repo_author(repo: RepoPath) -> Result<Author, CE> {
     let author = provider.author();
     if let Err(e) = author {
         return Err(CE {
+            code: e.code(),
             message: e.to_string(),
             func: stringify!(get_repo_author).to_string(),
             data: Some(vec![repo.to_string()]),
@@ -413,6 +448,7 @@ pub fn get_branch_commits_after_filter(repo: RepoPath, branch: Branch, filter: H
     let commits = provider.get_branch_commits_after_filter(&branch, &filter);
     if let Err(e) = commits {
         return Err(CE {
+            code: e.code(),
             message: e.to_string(),
             func: stringify!(get_branch_commits_after_filter).to_string(),
             data: Some(vec![repo.to_string(), branch.name]),
@@ -428,6 +464,7 @@ pub fn get_changed_files(repo: RepoPath) -> Result<Vec<ChangedFile>, CE> {
     match files {
         Ok(files) => Ok(files),
         Err(e) => Err(CE {
+            code: e.code(),
             message: e.to_string(),
             func: stringify!(get_changed_files).to_string(),
             data: Some(vec![repo.to_string()]),
@@ -441,7 +478,12 @@ pub fn get_staged_files(repo: RepoPath) -> Result<Vec<ChangedFile>, CE> {
     let files = provider.staged_files();
     match files {
         Ok(files) => Ok(files),
-        Err(e) => Err(CE { message: e.to_string(), func: stringify!(get_staged_files).to_string(), data: Some(vec![repo.to_string()]) }), 
+        Err(e) => Err(CE { 
+            code: e.code(),
+            message: e.to_string(), 
+            func: stringify!(get_staged_files).to_string(), 
+            data: Some(vec![repo.to_string()]) 
+        }), 
     }
 }
 
@@ -452,6 +494,7 @@ pub fn add_to_stage(repo: RepoPath, path: String) -> Result<(), CE> {
     match result {
         Ok(_) => Ok(()),
         Err(e) => Err(CE {
+            code: e.code(),
             message: e.to_string(),
             func: stringify!(add_to_stage).to_string(),
             data: Some(vec![repo.to_string(), path]),
@@ -466,6 +509,7 @@ pub fn remove_from_stage(repo: RepoPath, path: String) -> Result<(), CE> {
     match result {
         Ok(_) => Ok(()),
         Err(e) => Err(CE {
+            code: e.code(),
             message: e.to_string(),
             func: stringify!(remove_from_stage).to_string(),
             data: Some(vec![repo.to_string(), path]),
@@ -480,6 +524,7 @@ pub fn checkout_file(repo: RepoPath, path: String) -> Result<(), CE> {
     match result {
         Ok(_) => Ok(()),
         Err(e) => Err(CE {
+            code: e.code(),
             message: e.to_string(),
             func: stringify!(checkout_file).to_string(),
             data: Some(vec![repo.to_string(), path]),
@@ -494,6 +539,7 @@ pub fn commit(repo: RepoPath, message: &str, update_ref: Option<&str>) -> Result
     match result {
         Ok(_) => Ok(()),
         Err(e) => Err(CE {
+            code: e.code(),
             message: e.to_string(),
             func: stringify!(commit).to_string(),
             data: Some(vec![repo.to_string(), message.to_string()]),
@@ -508,6 +554,7 @@ pub fn push(repo: RepoPath, remote: String, branch: String, credentials: Option<
     match result {
         Ok(_) => Ok(()),
         Err(e) => Err(CE {
+            code: e.code(),
             message: e.to_string(),
             func: stringify!(push).to_string(),
             data: Some(vec![repo.to_string(), remote, branch]),
@@ -521,6 +568,7 @@ pub fn pull(repo: RepoPath, remote: String, branch: String, credentials: Option<
     match result {
         Ok(_) => Ok(()),
         Err(e) => Err(CE {
+            code: e.code(),
             message: e.to_string(),
             func: stringify!(pull).to_string(),
             data: Some(vec![repo.to_string(), remote, branch]),

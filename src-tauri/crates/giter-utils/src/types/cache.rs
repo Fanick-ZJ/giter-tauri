@@ -2,9 +2,11 @@ use std::collections::HashMap;
 
 use crate::types::branch::Branch;
 use git2::Oid;
-use types::author::Author;
-
-use super::{contribution::CommitStatistic, credential::Credential};
+use super::{
+    author::Author,
+    contribution::CommitStatistic, 
+    credential::Credential
+};
 
 pub trait Cache {
     fn authors(&self, repo: &str) -> Option<Vec<Author>>;
