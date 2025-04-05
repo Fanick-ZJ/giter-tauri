@@ -1,4 +1,5 @@
 use std::string::FromUtf8Error;
+use giter_traits::ExposeError;
 use strum_macros::{EnumDiscriminants, EnumIter};
 
 use thiserror::Error;
@@ -107,8 +108,12 @@ pub enum ErrorCode {
   
 }
 
-impl ErrorCode {
-    pub fn code(&self) -> u32 {
+impl ExposeError for ErrorCode {
+    fn code(&self) -> u32 {
        ErrorCodeDiscriminants::from(self) as u32
+    }
+    
+    fn module(&self) -> &str {
+        return "giter-utils"
     }
 }

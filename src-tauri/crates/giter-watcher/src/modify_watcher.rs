@@ -9,6 +9,8 @@ use std::sync::{
 };
 use std::time::Duration;
 
+use crate::error::ErrorCode;
+
 pub struct ModifyWatcher {
     pub name: String,
     pub repos: Arc<RwLock<Vec<PathBuf>>>,
@@ -63,25 +65,26 @@ impl ModifyWatcher {
         Ok(())
     }
 
-    pub fn add_watch(&mut self, p: impl Into<PathBuf>) -> notify::Result<()> {
+    pub fn add_watch(&mut self, p: impl Into<PathBuf>) -> Result<(), ErrorCode> {
         let path = p.into();
         let mut repos = self.repos.write();
         if !repos.contains(&path) {
             repos.push(path.clone());
             if let Some(watcher) = &mut self.watcher {
-                watcher.watch(&path, notify::RecursiveMode::Recursive)?;
+                watcher.watch(&path, notify::RecursiveMode::Recursive)
+                    .map_err(|e| ErrorCode::AddWatcherFailed(e.to_string()))?;
             }
         }
         Ok(())
     }
 
-    pub fn remove_watch(&mut self, p: impl Into<PathBuf>) -> notify::Result<()> {
+    pub fn remove_watch(&mut self, p: impl Into<PathBuf>) -> Result<(), ErrorCode> {
         let path = p.into();
         let mut repos = self.repos.write();
         if let Some(index) = repos.iter().position(|x| x == &path) {
             repos.remove(index);
             if let Some(watcher) = &mut self.watcher {
-                watcher.unwatch(&path)?;
+                watcher.unwatch(&path).map_err(|e| ErrorCode::RemoveWatcherFailed(e.to_string()))?;
             }
         }
         Ok(())

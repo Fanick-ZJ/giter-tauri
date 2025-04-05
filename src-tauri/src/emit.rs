@@ -1,6 +1,6 @@
 use crate::core::handle;
 use giter_utils::types::{contribution::CommitStatistic, git_data_provider::GitDataProvider, status::WorkStatus};
-use giter_watcher::types::modify_watcher::ModifyWatcher;
+use giter_watcher::modify_watcher::ModifyWatcher;
 use notify::Event;
 use serde::Serialize;
 use std::{collections::hash_set::HashSet, sync::Arc};

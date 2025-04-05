@@ -1540,6 +1540,7 @@ dependencies = [
  "dashmap",
  "git2",
  "giter-macros",
+ "giter-traits",
  "giter-utils",
  "giter-watcher",
  "log",
@@ -1552,6 +1553,8 @@ dependencies = [
  "serde",
  "serde_json",
  "similar",
+ "strum",
+ "strum_macros",
  "syn 1.0.109",
  "tauri",
  "tauri-build",
@@ -1559,8 +1562,13 @@ dependencies = [
  "tauri-plugin-shell",
  "tauri-plugin-sql",
  "tauri-plugin-store",
+ "thiserror 2.0.12",
  "windows 0.59.0",
 ]
+
+[[package]]
+name = "giter-traits"
+version = "0.1.0"
 
 [[package]]
 name = "giter-utils"
@@ -1570,6 +1578,7 @@ dependencies = [
  "bitflags 2.9.0",
  "chrono",
  "git2",
+ "giter-traits",
  "imara-diff",
  "log",
  "parking_lot",
@@ -1586,11 +1595,16 @@ dependencies = [
 name = "giter-watcher"
 version = "0.0.1"
 dependencies = [
+ "anyhow",
  "dashmap",
+ "giter-traits",
  "log",
  "notify",
  "parking_lot",
  "rayon",
+ "strum",
+ "strum_macros",
+ "thiserror 2.0.12",
 ]
 
 [[package]]

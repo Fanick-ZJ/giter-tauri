@@ -10,12 +10,13 @@ bitflags = "2.9.0"
 similar = { version = "2.7.0", features = ["serde"]}
 regex = "1"
 chrono = "0.4"
-thiserror = "2.0.12"
 git2 = "0.20.0"
 serde = { version = "1.0.216", features = ["derive"] }
 serde_json = "1"
 imara-diff = "0.1.7"
 log = "0.4.22"
 anyhow = "1.0"
+thiserror = "2.0.12"
 strum = "0.27.1"
 strum_macros = "0.27.1"
+giter-traits = { version = "0.1.0", path = "../giter-traits" }

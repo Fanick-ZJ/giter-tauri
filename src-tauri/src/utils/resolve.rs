@@ -2,7 +2,7 @@ use crate::{core::handle, emit::changed_emit};
 use crate::emit::satatus_change_emit;
 use crate::utils::init;
 use anyhow::Result;
-use giter_watcher::types::modify_watcher::ModifyWatcher;
+use giter_watcher::modify_watcher::ModifyWatcher;
 use std::sync::Mutex;
 use tauri::{App, Manager};
 

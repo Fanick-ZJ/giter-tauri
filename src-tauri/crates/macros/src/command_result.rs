@@ -15,14 +15,9 @@ pub fn wrapper(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let expanded = quote! {
         #(#attrs)*
         #vis fn #func_name(#inputs) #output {
-            let __result: Result<_, ErrorCode> = (|| #block)();
-            
-            __result.map_err(|e| CE {
-                code: e.code(),
-                message: e.to_string(),
-                func: stringify!(#func_name).to_string(),
-                data: None,
-            })
+            let __result: Result<_, _> = (|| #block)();
+            use types::error::CommandError;
+            __result.map_err(|e| CommandError::new(stringify!(#func_name), e))
         }
     };
     

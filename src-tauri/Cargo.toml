@@ -15,10 +15,12 @@ name = "giter_tauri_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [workspace]
-members = [
+members = [ 
+    "crates/giter-traits",
     "crates/giter-utils",
-    "crates/giter-watcher", 
-    "crates/macros"]
+    "crates/giter-watcher",
+    "crates/macros"
+]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -42,6 +44,9 @@ chrono = "0.4"
 git2 = "0.20.0"
 rusqlite = { version = "0.32.0", features = ["bundled"] }
 parking_lot = "0.12.3"
+thiserror = "2.0.12"
+strum = "0.27.1"
+strum_macros = "0.27.1"
 
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
@@ -52,3 +57,4 @@ giter-utils = { path = "crates/giter-utils", version = "0.0.1"}
 giter-watcher = { path = "crates/giter-watcher", version = "0.0.1"}
 giter-macros = { path = "crates/macros", version = "0.0.1"}
 tauri-plugin-shell = "2"
+giter-traits = { version = "0.1.0", path = "crates/giter-traits" }
