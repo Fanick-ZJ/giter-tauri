@@ -25,7 +25,6 @@ use std::i32;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::string::FromUtf8Error;
 use std::usize;
 use std::vec;
 use super::{author::Author, branch::Branch, commit::Commit, status::WorkStatus};

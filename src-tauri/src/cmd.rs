@@ -9,6 +9,7 @@ use crate::{
     }
 };
 use git2::Oid;
+use giter_macros::command_result;
 use giter_utils::{
     types::{
         author::Author, branch::Branch, cache::Cache, commit::Commit, diff::ContentDiff, error::ErrorCode, file::{ChangedFile, CommittedFile}, git_data_provider::GitDataProvider, status::WorkStatus
@@ -20,24 +21,20 @@ use serde_json::Value;
 use std::{collections::HashMap, path::PathBuf, sync::Mutex, thread};
 use tauri::Manager;
 
-fn get_provider(repo: &str) -> Result<GitDataProvider, CE> {
-    let handle = handle::Handle::global();
-    let provider = GitDataProvider::new(repo);
-    match provider {
-        Ok(mut provider) => {
-            let cache = handle.cache().unwrap();
-            provider.set_cache(cache);
-            Ok(provider)
-        }
-        Err(err) => {
-            Err(CE {
-                code: err.code(),
-                message: err.to_string(),
-                func: stringify!(get_provider).to_string(),
-                data: Some(vec![repo.to_string()]),
-            })
-        },
+fn str_to_oid(str: &str) -> Result<Oid, ErrorCode> {
+    let oid = Oid::from_str(str);
+    match oid {
+        Ok(oid) => Ok(oid),
+        Err(e) => Err(ErrorCode::OtherError(format!("invalid object id: {}", str))), 
     }
+}
+
+fn get_provider(repo: &str) -> Result<GitDataProvider, ErrorCode> {
+    let handle = handle::Handle::global();
+    let mut provider = GitDataProvider::new(repo)?;
+    let cache = handle.cache().unwrap();
+    provider.set_cache(cache);
+    Ok(provider)
 }
 
 fn watch(repo: RepoPath) -> Result<(), CE> {
@@ -99,35 +96,34 @@ pub fn add_watch(repo: RepoPath) -> Result<(), CE> {
 }
 
 #[tauri::command]
+#[command_result]
 pub fn authors(repo: RepoPath, branch: Branch) -> Result<Vec<Author>, CE> {
     let provider = get_provider(&repo)?;
     let authors = provider.authors(&branch);
-    if let Err(e) = authors {
-        return Err(CE {
-            code: e.code(),
-            message: "get authors error".to_string(),
-            func: stringify!(authors).to_string(),
-            data: Some(vec![repo.to_string(), branch.name]),
-        });
-    }
-    Ok(authors.unwrap())
+    authors
 }
 
 #[tauri::command]
-// #[command_result(CEE::BranchesFindError)]
+#[command_result]
 pub fn branches(repo: RepoPath) -> Result<Vec<Branch>, CE> {
     let provider = get_provider(&repo)?;
-    let branches = provider.branches();
-    match branches {
-        Ok(branches) => Ok(branches),
-        Err(e) => Err(CE {
-            code: e.code(),
-            message: e.to_string(),
-            func: stringify!(branches).to_string(),
-            data: Some(vec![repo.to_string()]),
-        }), 
-    }
+    provider.branches()
 }
+// #[tauri::command]
+// // #[command_result(CEE::BranchesFindError)]
+// pub fn branches(repo: RepoPath) -> Result<Vec<Branch>, CE> {
+//     let provider = get_provider(&repo)?;
+//     let branches = provider.branches();
+//     match branches {
+//         Ok(branches) => Ok(branches),
+//         Err(e) => Err(CE {
+//             code: e.code(),
+//             message: e.to_string(),
+//             func: stringify!(branches).to_string(),
+//             data: Some(vec![repo.to_string()]),
+//         }), 
+//     }
+// }
 
 #[tauri::command]
 pub fn clear_cache(repo: RepoPath) {
@@ -207,18 +203,10 @@ pub async fn is_repo(repo: RepoPath) -> bool {
 }
 
 #[tauri::command]
+#[command_result]
 pub async fn work_status(repo: RepoPath) -> Result<WorkStatus, CE> {
     let provider = get_provider(&repo)?;
-    let statuses = provider.work_status();
-    match statuses {
-        Ok(statuses) => Ok(statuses),
-        Err(e) => Err(CE {
-            code: e.code(),
-            message: e.to_string(),
-            func: stringify!(work_status).to_string(),
-            data: Some(vec![repo.to_string()]),
-        }), 
-    }
+    provider.work_status()
 }
 
 #[tauri::command]
@@ -242,167 +230,61 @@ pub fn set_repo_ownership(repo: RepoPath) -> Result<bool, CE> {
 }
 
 #[tauri::command]
+#[command_result]
 pub fn branch_commits(repo: RepoPath, branch: Branch, count: i32) -> Result<Vec<Commit>, CE> {
     let provider = get_provider(&repo)?;
-    let commits = provider.get_branch_commits(&branch, count);
-    match commits {
-        Ok(commits) => Ok(commits),
-        Err(e) => Err(CE {
-            code: e.code(),
-            message: e.to_string(),
-            func: stringify!(branch_commits).to_string(),
-            data: Some(vec![repo.to_string(), branch.name]),
-        }), 
-    }
+    provider.get_branch_commits(&branch, count)
 } 
 
 #[tauri::command]
+#[command_result]
 pub fn current_branch(repo: RepoPath) -> Result<Branch, CE> {
     let provider = get_provider(&repo)?;
-    let branch = provider.current_branch();
-    match branch {
-        Ok(branch) => Ok(branch),
-        Err(e) => Err(CE {
-            code: e.code(),
-            message: e.to_string(),
-            func: stringify!(current_branch).to_string(),
-            data: Some(vec![repo.to_string()]),
-        }), 
-    }
+    provider.current_branch()
 }
 
 #[tauri::command] 
+#[command_result]
 pub fn current_remote_branch(repo: RepoPath) -> Result<Branch, CE> {
     let provider = get_provider(&repo)?;
-    let branch = provider.current_remote_branch();
-    match branch {
-        Ok(branch) => Ok(branch),
-        Err(e) => Err(CE {
-            code: e.code(),
-            message: e.to_string(),
-            func: stringify!(current_remote_branch).to_string(),
-            data: Some(vec![repo.to_string()]),
-        }), 
-    }
+    provider.current_remote_branch()
 }
 
 #[tauri::command]
+#[command_result]
 pub fn commit_content (repo: RepoPath, cid: String) -> Result<Vec<CommittedFile>, CE> {
     let provider = get_provider(&repo)?;
-    let oid = Oid::from_str(&cid);
-    if let Err(e) = oid {
-        let e = ErrorCode::OtherError(format!("invalid commit id: {}", cid));
-        return Err(CE{
-            code: e.code(),
-            message: e.to_string(),
-            func: stringify!(commit_content).to_string(),
-            data: Some(vec![repo.to_string()]),
-        });
-    }
-    let commit_id = oid.unwrap();
-    let content = provider.commit_content(commit_id);
-    match content {
-        Ok(content) => Ok(content),
-        Err(e) => Err(CE {
-            code: e.code(),
-            message: e.to_string(),
-            func: stringify!(commit_content).to_string(),
-            data: Some(vec![repo.to_string()]),
-        }), 
-    }
+    let oid = str_to_oid(&cid)?;
+    provider.commit_content(oid)
 }
 
 #[tauri::command]
+#[command_result]
 pub fn file_diff(repo: RepoPath, old: String, new: String) -> Result<ContentDiff, CE> {
     let provider = get_provider(&repo)?;
-    let old_id = Oid::from_str(&old);
-    let error_func = stringify!(file_diff).to_string();
-    if let Err(e) = old_id {
-        let e = ErrorCode::OtherError(format!("invalid commit id: {}", old));
-        return Err(CE { 
-            code: e.code(),
-            message: e.to_string(), 
-            func: error_func, 
-            data: Some(vec![repo.to_string(), old, new]) 
-        });
-    }
-    let old_id = old_id.unwrap();
-    let new_id = Oid::from_str(&new);
-    if let Err(e) = new_id {
-        let e = ErrorCode::OtherError(format!("invalid commit id: {}", new));
-        return Err(CE { 
-            code: e.code(),
-            message: e.to_string(), 
-            func: error_func, 
-            data: Some(vec![repo.to_string(), old, new]) 
-        });
-    }
-    let new_id = new_id.unwrap();
-    let diff = provider.get_file_content_diff(old_id, new_id);
-    if let Err(e) = diff {
-        return Err(CE {
-            code: e.code(),
-            message: e.to_string(),
-            func: error_func,
-            data: Some(vec![repo.to_string(), old, new]),
-        });
-    }
-    Ok(diff.unwrap())
+    let old_id = str_to_oid(&old)?;
+    let new_id = str_to_oid(&new)?;
+    provider.get_file_content_diff(old_id, new_id)
 }
 
 #[tauri::command]
+#[command_result]
 pub fn blob_content(repo: RepoPath, cid: String) -> Result<Vec<u8>, CE> {
     let provider = get_provider(&repo)?;
-    let oid = Oid::from_str(&cid);
-    if let Err(e) = oid {
-        let e = ErrorCode::OtherError(format!("invalid commit id: {}", cid));
-        return Err(CE {
-            code: e.code(),
-            message: e.to_string(),
-            func: stringify!(blob_content).to_string(),
-            data: Some(vec![repo.to_string(), cid]),
-        });
-    }
-    let commit_id = oid.unwrap();
-    let content = provider.get_blob_content(commit_id);
-    match content {
-        Ok(content) => Ok(content),
-        Err(e) => Err(CE {
-            code: e.code(),
-            message: e.to_string(),
-            func: stringify!(blob_content).to_string(),
-            data: Some(vec![repo.to_string(), cid]),
-        }), 
-    }
+    let oid = str_to_oid(&cid)?;
+    provider.get_blob_content(oid)
 }
 
 #[tauri::command]
+#[command_result]
 pub fn get_commit(repo: RepoPath, cid: String) -> Result<Commit, CE> {
     let provider = get_provider(&repo)?;
-    let oid = Oid::from_str(&cid);
-    if let Err(e) = oid {
-        let e = ErrorCode::OtherError(format!("invalid commit id: {}", cid));
-        return Err(CE {
-            code: e.code(),
-            message: e.to_string(),
-            func: stringify!(get_commit).to_string(),
-            data: Some(vec![repo.to_string(), cid]),
-        });
-    }
-    let commit_id = oid.unwrap();
-    let commit = provider.get_commit(commit_id);
-    if let Err(e) = commit {
-        return Err(CE {
-            code: e.code(),
-            message: e.to_string(),
-            func: stringify!(get_commit).to_string(),
-            data: Some(vec![repo.to_string(), cid]),
-        });
-    }
-    Ok(commit.unwrap())
+    let commit_id = str_to_oid(&cid)?;
+    provider.get_commit(commit_id)
 }
 
 #[tauri::command]
+#[command_result]
 pub fn get_branch_commit_contribution(key: String, repo: RepoPath, branch: Branch) -> Result<(), CE> {
     let provider = get_provider(&repo)?;
     // 由于第一次执行时间很长，所以开一个线程执行
@@ -428,150 +310,71 @@ pub fn get_global_author() -> Result<Author, CE> {
 }
 
 #[tauri::command]
+#[command_result]
 pub fn get_repo_author(repo: RepoPath) -> Result<Author, CE> {
     let provider = get_provider(&repo)?;
-    let author = provider.author();
-    if let Err(e) = author {
-        return Err(CE {
-            code: e.code(),
-            message: e.to_string(),
-            func: stringify!(get_repo_author).to_string(),
-            data: Some(vec![repo.to_string()]),
-        });
-    }
-    Ok(author.unwrap())
+    provider.author()
 }
 
 #[tauri::command]
+#[command_result]
 pub fn get_branch_commits_after_filter(repo: RepoPath, branch: Branch, filter: HashMap<String, Value>) -> Result<Vec<Commit>, CE> {
     let provider = get_provider(&repo)?;
-    let commits = provider.get_branch_commits_after_filter(&branch, &filter);
-    if let Err(e) = commits {
-        return Err(CE {
-            code: e.code(),
-            message: e.to_string(),
-            func: stringify!(get_branch_commits_after_filter).to_string(),
-            data: Some(vec![repo.to_string(), branch.name]),
-        });
-    }
-    Ok(commits.unwrap())
+    provider.get_branch_commits_after_filter(&branch, &filter)
 }
 
 #[tauri::command]
+#[command_result]
 pub fn get_changed_files(repo: RepoPath) -> Result<Vec<ChangedFile>, CE> {
     let provider = get_provider(&repo)?;
-    let files = provider.changed_files();
-    match files {
-        Ok(files) => Ok(files),
-        Err(e) => Err(CE {
-            code: e.code(),
-            message: e.to_string(),
-            func: stringify!(get_changed_files).to_string(),
-            data: Some(vec![repo.to_string()]),
-        }), 
-    }
+    provider.changed_files()
 }
 
 #[tauri::command]
+#[command_result]
 pub fn get_staged_files(repo: RepoPath) -> Result<Vec<ChangedFile>, CE> {
     let provider = get_provider(&repo)?;
-    let files = provider.staged_files();
-    match files {
-        Ok(files) => Ok(files),
-        Err(e) => Err(CE { 
-            code: e.code(),
-            message: e.to_string(), 
-            func: stringify!(get_staged_files).to_string(), 
-            data: Some(vec![repo.to_string()]) 
-        }), 
-    }
+    provider.staged_files()
 }
 
 #[tauri::command]
+#[command_result]
 pub fn add_to_stage(repo: RepoPath, path: String) -> Result<(), CE> {
     let provider = get_provider(&repo)?;
-    let result = provider.add_to_stage(&PathBuf::from(&path)); 
-    match result {
-        Ok(_) => Ok(()),
-        Err(e) => Err(CE {
-            code: e.code(),
-            message: e.to_string(),
-            func: stringify!(add_to_stage).to_string(),
-            data: Some(vec![repo.to_string(), path]),
-        }), 
-    }
+    provider.add_to_stage(&PathBuf::from(&path))
 }
 
 #[tauri::command]
+#[command_result]
 pub fn remove_from_stage(repo: RepoPath, path: String) -> Result<(), CE> {
     let provider = get_provider(&repo)?;
-    let result = provider.remove_from_stage(&PathBuf::from(&path));
-    match result {
-        Ok(_) => Ok(()),
-        Err(e) => Err(CE {
-            code: e.code(),
-            message: e.to_string(),
-            func: stringify!(remove_from_stage).to_string(),
-            data: Some(vec![repo.to_string(), path]),
-        }), 
-    }
+    provider.remove_from_stage(&PathBuf::from(&path))
 }
 
 #[tauri::command]
+#[command_result]
 pub fn checkout_file(repo: RepoPath, path: String) -> Result<(), CE> {
     let provider = get_provider(&repo)?;
-    let result = provider.checkout_file(&PathBuf::from(&path));
-    match result {
-        Ok(_) => Ok(()),
-        Err(e) => Err(CE {
-            code: e.code(),
-            message: e.to_string(),
-            func: stringify!(checkout_file).to_string(),
-            data: Some(vec![repo.to_string(), path]),
-        }), 
-    }
+    provider.checkout_file(&PathBuf::from(&path))
 }
 
 #[tauri::command]
-pub fn commit(repo: RepoPath, message: &str, update_ref: Option<&str>) -> Result<(), CE> {
+#[command_result]
+pub fn commit(repo: RepoPath, message: &str, update_ref: Option<&str>) -> Result<String, CE> {
     let provider = get_provider(&repo)?;
-    let result = provider.commit(message, update_ref);
-    match result {
-        Ok(_) => Ok(()),
-        Err(e) => Err(CE {
-            code: e.code(),
-            message: e.to_string(),
-            func: stringify!(commit).to_string(),
-            data: Some(vec![repo.to_string(), message.to_string()]),
-        }), 
-    }
+    let commit_id = provider.commit(message, update_ref)?;
+    Ok(commit_id.to_string())
 }
 
 #[tauri::command]
+#[command_result]
 pub fn push(repo: RepoPath, remote: String, branch: String, credentials: Option<(String, String)>) -> Result<(), CE> {
     let provider = get_provider(&repo)?;
-    let result = provider.push(&remote, &branch, credentials);
-    match result {
-        Ok(_) => Ok(()),
-        Err(e) => Err(CE {
-            code: e.code(),
-            message: e.to_string(),
-            func: stringify!(push).to_string(),
-            data: Some(vec![repo.to_string(), remote, branch]),
-        }), 
-    }
+    provider.push(&remote, &branch, credentials)
 }
 #[tauri::command]
+#[command_result]
 pub fn pull(repo: RepoPath, remote: String, branch: String, credentials: Option<(String, String)>) -> Result<(), CE> {
     let provider = get_provider(&repo)?;
-    let result = provider.pull(&remote, &branch, credentials);
-    match result {
-        Ok(_) => Ok(()),
-        Err(e) => Err(CE {
-            code: e.code(),
-            message: e.to_string(),
-            func: stringify!(pull).to_string(),
-            data: Some(vec![repo.to_string(), remote, branch]),
-        }), 
-    }
+    provider.pull(&remote, &branch, credentials)
 }
