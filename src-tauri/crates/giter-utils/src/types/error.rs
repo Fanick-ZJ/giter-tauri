@@ -67,7 +67,7 @@ pub enum ErrorCode {
     #[error("Remote HEAD not in local")]
     RemoteHeadHasNotInLocal,// 远程HEAD未在本地
 
-    #[error("Remote HEAD in local")]
+    #[error("Push need name and password")]
     PushNeedNameAndPassword, // 推送需要用户名和密码
 
     #[error("Repository author not configured")]

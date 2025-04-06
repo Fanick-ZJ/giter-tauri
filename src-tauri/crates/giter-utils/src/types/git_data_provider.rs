@@ -840,7 +840,7 @@ impl GitDataProvider {
         let handle_error = |e: git2::Error| {
             log::error!("Git operation error: {:?}", e);
             match e.code() {
-                git2::ErrorCode::User => anyhow::anyhow!(GitError::PushNeedNameAndPassword),
+                git2::ErrorCode::User => GitError::PushNeedNameAndPassword,
                 _ => return GitError::PushOtherError.into()
             }
         };
