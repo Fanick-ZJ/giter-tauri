@@ -10,7 +10,7 @@ import { commit, currentRemoteBranch, getBranches, getChangedFiles, getCurrentBr
 import { Branch, ChangedFile } from '@/types'
 
 import ChangedFileWidget from './components/changed-file-widget.vue'
-import { ReasonErrorCode } from '@/enum/error'
+import { GitUtilsErrorCode } from '@/enum/error'
 import { RemoteUserPwdDialog } from '../remote-user-pwd-dialog'
 import { RemoteUserPwdDialogProps } from '../remote-user-pwd-dialog/types'
 
@@ -105,7 +105,7 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
             window.$message.success('推送成功')
           }).catch((e) => {
             // 如果是需要用户名密码的错误，弹出对话框
-            if (e.message == ReasonErrorCode.PushNeedNameAndPassword) {
+            if (e.message == GitUtilsErrorCode.PushNeedNameAndPassword) {
               window.$message.error('请输入远程仓库的用户名和密码')
               userAuthorRetry(
                 self.zIndex.value + 1, 
@@ -115,7 +115,7 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
                     push(self.props.repo.path, remoteRef, this.currentBranch.value!.name, [res.username, res.password]).then((res) => {
                       window.$message.success('推送成功')
                     }).catch((e) => {
-                      if (e.message == ReasonErrorCode.RemoteHeadHasNotInLocal) {
+                      if (e.message == GitUtilsErrorCode.RemoteHeadHasNotInLocal) {
                         window.$message.error('远程仓库的HEAD不在本地，请先拉取')
                       }
                     })
@@ -135,7 +135,7 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
             window.$message.success('拉取成功')
           }).catch(e => {
             console.log(e)
-            if (e.message == ReasonErrorCode.PushNeedNameAndPassword) {
+            if (e.message == GitUtilsErrorCode.PushNeedNameAndPassword) {
               window.$message.error('请输入远程仓库的用户名和密码')
               userAuthorRetry(
                 self.zIndex.value + 1, 
@@ -145,14 +145,14 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
                     pull(self.props.repo.path, remoteRef, this.currentBranch.value!.name, [res.username, res.password]).then((res) => {
                       window.$message.success('拉取成功')
                     }).catch((e) => {
-                      if (e.message == ReasonErrorCode.HasConflicts) {
+                      if (e.message == GitUtilsErrorCode.HasConflicts) {
                         window.$message.error('拉取后存在冲突，请手动解决')
                       }
                     })
                   }
                 }
               )
-            } else if (e.message == ReasonErrorCode.CommitBeforePullWouldBeOverwrittenByMerge) {
+            } else if (e.message == GitUtilsErrorCode.CommitBeforePullWouldBeOverwrittenByMerge) {
               window.$message.error('拉取文件与本地存在冲突，请提交并在拉取后手动解决')
             }
           })
