@@ -178,6 +178,10 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
           window.$message.error('当前分支已经是' + branchName)
         } 
         else {
+          if( this.stagedFiles.value.length > 0) {
+            window.$message.error('暂存区有未提交的文件，请先提交')
+            return 
+          }
           const branch = self.branches.value.find((branch) => branch.reference == branchName)
           branch && switchBranch(self.props.repo.path, branch).then((res) => {
             window.$message.success('切换分支成功') 
