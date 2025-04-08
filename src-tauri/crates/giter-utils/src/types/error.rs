@@ -33,6 +33,9 @@ pub enum ErrorCode {
     
     #[error("Branch not found: {0}")] // 分支不存在
     BranchNotFound(String),      // 分支不存在
+
+    #[error("Failed to switch branch: {0}")] // 切换分支失败
+    SwitchBranchError(String),
     
     #[error("Commit not found: {0}")] // Commit不存在
     CommitNotFound(String),

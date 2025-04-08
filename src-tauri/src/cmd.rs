@@ -1,7 +1,6 @@
 use git2::Oid;
 use tauri::Manager;
 use serde_json::Value;
-use anyhow::anyhow;
 use std::{collections::HashMap, path::PathBuf, sync::Mutex, thread};
 use crate::{
     core::handle, emit::emit_branch_contribution, types::{
@@ -25,7 +24,6 @@ use giter_utils::{
     },
     util::{is_git_repo, set_owner},
 };
-use giter_traits::ExposeError;
 use giter_watcher::{
     modify_watcher::ModifyWatcher, error::ErrorCode as WatcherError
 };
@@ -69,7 +67,7 @@ pub fn remove_watch(repo: RepoPath) -> CommonResult<()> {
     let watch_center = app.state::<Mutex<ModifyWatcher>>();
     let mut watcher = watch_center.lock()
         .map_err(|_| CommonError::GetWatcherCenterFailed)?;
-    watcher.remove_watch(repo);
+    let _ = watcher.remove_watch(repo);
     Ok(())
 }
 
@@ -339,4 +337,11 @@ pub fn push(repo: RepoPath, remote: String, branch: String, credentials: Option<
 pub fn pull(repo: RepoPath, remote: String, branch: String, credentials: Option<(String, String)>) -> DataResult<()> {
     let provider = get_provider(&repo)?;
     provider.pull(&remote, &branch, credentials)
+}
+
+#[tauri::command]
+#[command_result]
+pub fn switch_branch(repo: RepoPath, branch: Branch) -> DataResult<()> {
+    let provider = get_provider(&repo)?;
+    provider.switch_branch(&branch) 
 }

@@ -1,4 +1,4 @@
-import { ADD_WATCH, BLOB_CONTENT, COMMIT_CONTENT, FILE_DIFF, GET_AUTHORS, GET_BRANCHES, GET_COMMIT, GET_BRANCH_COMMITS, GET_CURRENT_BRANCH, GET_DRIVER, GET_FOLDERS, GET_SEPARATOR, IS_REPO, REMOVE_WATCH, SET_OWNERSHIP, WORK_STATUS, BRANCH_COMMIT_CONTRIBUTION, GET_GLOBAL_AUTHOR, GET_REPO_AUTHOR, GET_BRANCH_COMMITS_AFTER_FILTER, GET_CHANGED_FILES, GET_STAFED_FILES, ADD_TO_STAGE, REMOVE_FROM_STAGE, CHECKOUT_FILE, COMMIT, CURRENT_REMOTE_BRANCH, PUSH, PULL } from "@/const/command";
+import { ADD_WATCH, BLOB_CONTENT, COMMIT_CONTENT, FILE_DIFF, GET_AUTHORS, GET_BRANCHES, GET_COMMIT, GET_BRANCH_COMMITS, GET_CURRENT_BRANCH, GET_DRIVER, GET_FOLDERS, GET_SEPARATOR, IS_REPO, REMOVE_WATCH, SET_OWNERSHIP, WORK_STATUS, BRANCH_COMMIT_CONTRIBUTION, GET_GLOBAL_AUTHOR, GET_REPO_AUTHOR, GET_BRANCH_COMMITS_AFTER_FILTER, GET_CHANGED_FILES, GET_STAFED_FILES, ADD_TO_STAGE, REMOVE_FROM_STAGE, CHECKOUT_FILE, COMMIT, CURRENT_REMOTE_BRANCH, PUSH, PULL, SWITCH_BRANCH } from "@/const/command";
 import { BRANCH_COMMIT_CONTRIBUTION_KEY } from "@/const/listen";
 import { Author, Branch, Commit, CommitFilter, CommitStatistic, DiffContent, CommitFile, ChangedFile } from "@/types";
 import { invoke } from "@tauri-apps/api/core";
@@ -212,4 +212,8 @@ export const push = (repo: RepoPath, remote: string, branch: string, credentials
 }
 export const pull = (repo: RepoPath, remote: string, branch: string, credentials:[string, String] | undefined) => {
   return bus.invoke(PULL, { repo, remote, branch, credentials }) 
+}
+
+export const switchBranch = (repo: RepoPath, branch: Branch) => {
+  return bus.invoke(SWITCH_BRANCH, { repo, branch })
 }

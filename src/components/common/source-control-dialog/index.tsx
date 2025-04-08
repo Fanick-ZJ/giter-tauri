@@ -6,7 +6,7 @@ import { NButton, NDivider, NDropdown, NInput, NLayout, NLayoutContent, NLayoutS
 import { Icon } from '@iconify/vue/dist/iconify.js'
 import { listen } from '@tauri-apps/api/event'
 import { STATUS_CHANGE, StatusChangePayloadType } from '@/const/listen'
-import { commit, currentRemoteBranch, getBranches, getChangedFiles, getCurrentBranch, getStagedFiles, pull, push } from '@/utils/command'
+import { commit, currentRemoteBranch, getBranches, getChangedFiles, getCurrentBranch, getStagedFiles, pull, push, switchBranch } from '@/utils/command'
 import { Branch, ChangedFile } from '@/types'
 
 import ChangedFileWidget from './components/changed-file-widget.vue'
@@ -18,7 +18,7 @@ const userAuthorRetry = (zindex: number, param: RemoteUserPwdDialogProps, cb?: (
   const dlg = new RemoteUserPwdDialog(param)
   dlg.setZIndex(zindex)
   dlg.show()?.then(async (res) => {
-    cb && await cb(res)
+    cb && cb(res)
   }).then((e) => {
     if (ecb) {
       ecb(e) 
@@ -61,10 +61,89 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
     })
   }
 
+  public push() {
+    if (this.currentRemoteBranch.value) {
+      // 获取remoteRef
+      const remoteRef = this.currentRemoteBranch.value.reference.split('/')[0]
+      push(this.props.repo.path, remoteRef, this.currentBranch.value!.name, undefined).then((res) => {
+        window.$message.success('推送成功')
+      }).catch((e) => {
+        // 如果是需要用户名密码的错误，弹出对话框
+        if (e.code == GitUtilsErrorCode.PushNeedNameAndPassword) {
+          window.$message.error('请输入远程仓库的用户名和密码')
+          userAuthorRetry(
+            this.zIndex.value + 1, 
+            {subtitle: this.props.repo.alias}, 
+            (res) => {
+              if (res) {
+                push(this.props.repo.path, remoteRef, this.currentBranch.value!.name, [res.username, res.password]).then((res) => {
+                  window.$message.success('推送成功')
+                }).catch((e) => {
+                  if (e.code == GitUtilsErrorCode.RemoteHeadHasNotInLocal) {
+                    window.$message.error('远程仓库的HEAD不在本地，请先拉取')
+                  }
+                  else {
+                    window.$message.error(`推送失败 ${e.message}`) 
+                  }
+                })
+              }
+            }
+          )
+        } else {
+          window.$message.error(`推送失败 ${e.message}`)
+        }
+      })
+    }
+  }
+
+  public pull() {
+    if (this.currentRemoteBranch.value) {
+      const remoteRef = this.currentRemoteBranch.value.reference.split('/')[0]
+      pull(this.props.repo.path, remoteRef, this.currentBranch.value!.name, undefined).then((res) => {
+        window.$message.success('拉取成功')
+      }).catch(e => {
+        console.log(e)
+        if (e.code == GitUtilsErrorCode.PushNeedNameAndPassword) {
+          window.$message.error('请输入远程仓库的用户名和密码')
+          userAuthorRetry(
+            this.zIndex.value + 1, 
+            {subtitle: this.props.repo.alias}, 
+            (res) => {
+              if (res) {
+                pull(this.props.repo.path, remoteRef, this.currentBranch.value!.name, [res.username, res.password]).then((res) => {
+                  window.$message.success('拉取成功')
+                }).catch((e) => {
+                  if (e.code == GitUtilsErrorCode.HasConflicts) {
+                    window.$message.error('拉取后存在冲突，请手动解决')
+                  }
+                  else {
+                    window.$message.error(`拉取失败 ${e.message}`) 
+                  }
+                })
+              }
+            }
+          )
+        } else if (e.message == GitUtilsErrorCode.CommitBeforePullWouldBeOverwrittenByMerge) {
+          window.$message.error('拉取文件与本地存在冲突，请提交并在拉取后手动解决')
+        }
+      })
+    } 
+  }
+
   public customFooter(): Component | undefined {
     const self = this;
     const computedOption = computed(() => {
       const options: any[] = []
+      options.push({
+        label: '切换分支',
+        key: 'switch-branch',
+        children: self.branches.value.map((branch) => {
+          return {
+            label: branch.reference,
+            key: branchKeyPrefix + branch.reference
+          }
+        })
+      })
       if (self.currentRemoteBranch.value) {
         options.push({
           label: '推送',
@@ -75,16 +154,6 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
           key: 'pull'
         })
       }
-      options.push({
-        label: '切换分支',
-        key: 'switch-branch',
-        children: self.branches.value.map((branch) => {
-          return {
-            label: branch.name,
-            key: branchKeyPrefix + branch.name
-          }
-        })
-      })
       return options
     })
     const menuProps = (e) => {
@@ -98,63 +167,20 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
     }
     const handleSelect = (e) => {
       if (e === 'push') {
-        if (self.currentRemoteBranch.value) {
-          // 获取remoteRef
-          const remoteRef = self.currentRemoteBranch.value.reference.split('/')[0]
-          push(self.props.repo.path, remoteRef, this.currentBranch.value!.name, undefined).then((res) => {
-            window.$message.success('推送成功')
-          }).catch((e) => {
-            // 如果是需要用户名密码的错误，弹出对话框
-            if (e.code == GitUtilsErrorCode.PushNeedNameAndPassword) {
-              window.$message.error('请输入远程仓库的用户名和密码')
-              userAuthorRetry(
-                self.zIndex.value + 1, 
-                {subtitle: self.props.repo.alias}, 
-                (res) => {
-                  if (res) {
-                    push(self.props.repo.path, remoteRef, this.currentBranch.value!.name, [res.username, res.password]).then((res) => {
-                      window.$message.success('推送成功')
-                    }).catch((e) => {
-                      if (e.code == GitUtilsErrorCode.RemoteHeadHasNotInLocal) {
-                        window.$message.error('远程仓库的HEAD不在本地，请先拉取')
-                      }
-                    })
-                  }
-                }
-              )
-            } else {
-              window.$message.error(`推送失败 ${e.message}`)
-            }
-          })
-        }
+        this.push()
       }
-      if (e === 'pull') {
-        if (self.currentRemoteBranch.value) {
-          const remoteRef = self.currentRemoteBranch.value.reference.split('/')[0]
-          pull(self.props.repo.path, remoteRef, this.currentBranch.value!.name, undefined).then((res) => {
-            window.$message.success('拉取成功')
-          }).catch(e => {
-            console.log(e)
-            if (e.code == GitUtilsErrorCode.PushNeedNameAndPassword) {
-              window.$message.error('请输入远程仓库的用户名和密码')
-              userAuthorRetry(
-                self.zIndex.value + 1, 
-                {subtitle: self.props.repo.alias}, 
-                (res) => {
-                  if (res) {
-                    pull(self.props.repo.path, remoteRef, this.currentBranch.value!.name, [res.username, res.password]).then((res) => {
-                      window.$message.success('拉取成功')
-                    }).catch((e) => {
-                      if (e.code == GitUtilsErrorCode.HasConflicts) {
-                        window.$message.error('拉取后存在冲突，请手动解决')
-                      }
-                    })
-                  }
-                }
-              )
-            } else if (e.message == GitUtilsErrorCode.CommitBeforePullWouldBeOverwrittenByMerge) {
-              window.$message.error('拉取文件与本地存在冲突，请提交并在拉取后手动解决')
-            }
+      else if (e === 'pull') {
+        this.pull()
+      }
+      else if (e.startsWith(branchKeyPrefix)) {
+        const branchName = e.replace(branchKeyPrefix, '')
+        if (branchName == self.currentBranch.value?.name) {
+          window.$message.error('当前分支已经是' + branchName)
+        } 
+        else {
+          const branch = self.branches.value.find((branch) => branch.reference == branchName)
+          branch && switchBranch(self.props.repo.path, branch).then((res) => {
+            window.$message.success('切换分支成功') 
           })
         }
       }
@@ -212,6 +238,7 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
             self.stagedFiles.value = files
           })
           getBranches(self.props.repo.path).then((branches) => {
+            console.log(branches)
             self.branches.value = branches 
           })
           currentRemoteBranch(self.props.repo.path).then((branch) => {

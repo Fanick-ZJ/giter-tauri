@@ -6,7 +6,7 @@ mod utils;
 
 use crate::utils::resolve;
 use cmd::{
-    add_to_stage, add_watch, authors, blob_content, branch_commits, branches, checkout_file, clear_all_cache, clear_cache, commit, commit_content, current_branch, current_remote_branch, file_diff, get_branch_commit_contribution, get_branch_commits_after_filter, get_changed_files, get_commit, get_db_path, get_driver, get_folders, get_global_author, get_repo_author, get_separator, get_staged_files, is_repo, pull, push, remove_from_stage, remove_watch, repos, set_repo_ownership, work_status
+    add_to_stage, add_watch, authors, blob_content, branch_commits, branches, checkout_file, clear_all_cache, clear_cache, commit, commit_content, current_branch, current_remote_branch, file_diff, get_branch_commit_contribution, get_branch_commits_after_filter, get_changed_files, get_commit, get_db_path, get_driver, get_folders, get_global_author, get_repo_author, get_separator, get_staged_files, is_repo, pull, push, remove_from_stage, remove_watch, repos, set_repo_ownership, switch_branch, work_status
 };
 
 
@@ -58,6 +58,7 @@ pub fn run() {
             current_remote_branch,
             push,
             pull,
+            switch_branch
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

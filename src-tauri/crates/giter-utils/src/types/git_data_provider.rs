@@ -938,7 +938,7 @@ impl GitDataProvider {
                 GitError::CommitBeforePullWouldBeOverwrittenByMerge
             })?;
             // 创建合并提交
-            let signature = repo.signature().map_err(|e| GitError::UserUnConfigured)?;
+            let signature = repo.signature().map_err(|_| GitError::UserUnConfigured)?;
             let tree_id = repo.index()?.write_tree()?;
             let tree = repo.find_tree(tree_id)?;
             let _ = repo.commit(
@@ -960,6 +960,20 @@ impl GitDataProvider {
             let (username, password) = credentials.unwrap();
             self.set_remote_credential(remote.url().unwrap(), &Credential::UsernamePassword(username, password));
         }
+        Ok(())
+    }
+    
+    /// 切换分支
+    pub fn switch_branch(&self, branch: &Branch) -> Result<(), GitError> {
+        let repo = &self.repository;
+        let branch_name = branch.name.to_string();
+        let branch = repo.find_branch(&branch_name, BranchType::Local)
+           .map_err(|_| GitError::BranchNotFound(branch_name.clone()))?; 
+        let branch_ref = branch.into_reference();
+        let branch_ref_name = branch_ref.name().ok_or(anyhow!(""))?;
+        repo.set_head(branch_ref_name)
+          .map_err(|_| GitError::BranchNotFound(branch_name.clone()))?;
+        let _ = repo.checkout_head(Some(CheckoutBuilder::default().force()));
         Ok(())
     }
 
