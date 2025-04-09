@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent } from 'vue';
 import { fileExtensionIconMap, fileIcons, fileNameIconMap } from './fileicons';
+import { basename, extname } from '@/utils/tool';
 
 defineOptions({
   name: 'FileIcon'
@@ -25,12 +26,13 @@ const props = defineProps({
   }
 })
 
+
 const svg = computed(() => {
-  const basename = props.pathOrName.split('/').pop()?.toLocaleLowerCase() || ''
-  const ext = basename.split('.').pop()?.toLocaleLowerCase() || ''
+  const file_name = basename(props.pathOrName)
+  const ext = extname(file_name)
   let svg = ''
-  if (fileNameIconMap.has(basename)) {
-    svg = fileNameIconMap.get(basename)!
+  if (fileNameIconMap.has(file_name)) {
+    svg = fileNameIconMap.get(file_name)!
   }
   else if (fileExtensionIconMap.has(ext)) {
     svg = fileExtensionIconMap.get(ext)!

@@ -147,3 +147,9 @@ export const basename = (path: string) => {
   idx = idx > -1 ? idx : path.lastIndexOf('\\')
   return path.slice(idx + 1)
 }
+
+export const extname = (path: string) => {
+  const idx = path.lastIndexOf('.')
+  if (idx === -1) return ''
+  return path.slice(idx + 1) 
+}
