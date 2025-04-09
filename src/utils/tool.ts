@@ -1,13 +1,11 @@
-import { RemoteUserPwdDialog } from "@/components/common/remote-user-pwd-dialog";
-import { RemoteUserPwdDialogProps } from "@/components/common/remote-user-pwd-dialog/types";
 import { SEPERATOR } from "@/const"
-import { open as openShell } from '@tauri-apps/plugin-shell';
+import { openPath } from '@tauri-apps/plugin-opener';
 import { Component, ComponentPublicInstance, createVNode, render, VNode, VNodeProps } from "vue";
 
 // 打开指定路径的文件管理器
 export async function openFileManager(path: string) {
   try {
-    await openShell(path);
+    await openPath(path);
     console.log('文件管理器已打开');
   } catch (error) {
     console.error('打开文件管理器失败:', error);
