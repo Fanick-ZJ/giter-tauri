@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::Path;
 
 use anyhow::Result;
@@ -206,23 +206,21 @@ pub fn is_binary_file<P: AsRef<Path>>(path: P) -> std::io::Result<bool> {
     let bytes_read = file.read(&mut buffer)?;
     let content = &buffer[..bytes_read];
 
-    // 空字节检查
-    if content.contains(&0x00) {
-        return Ok(true);
-    }
+    let ret = is_binary_file_content(content.to_vec());
+    Ok(ret)
+}
 
-    // 统计不可打印的 ASCII 字符数量
-    let non_printable_count = content.iter().filter(|&&byte| {
-        // 允许的字符：制表符（\t）、换行（\n）、回车（\r）以及可打印 ASCII
-        !(byte == 0x09 || 
-          byte == 0x0A || 
-          byte == 0x0D || 
-          (byte >= 0x20 && byte <= 0x7E))
-    }).count();
+pub fn get_file_content<P: AsRef<Path>>(path: P) -> Result<Vec<u8>> {
+    let mut file = std::fs::File::open(path)?;
+    let mut content = Vec::new();
+    file.read_to_end(&mut content);
+    Ok(content) 
+}
 
-    // 如果不可打印字符超过 5%，视为二进制文件
-    let threshold = content.len() / 20; // 5%
-    Ok(non_printable_count > threshold)
+pub fn write_file<P: AsRef<Path>>(path: P, content: &[u8]) -> Result<()> {
+    let mut file = std::fs::File::create(path)?;
+    file.write_all(content);
+    Ok(()) 
 }
 
 pub fn stamp_to_ymd(stamp: i64) -> Result<String, String> {

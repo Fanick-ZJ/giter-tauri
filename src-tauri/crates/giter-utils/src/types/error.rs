@@ -91,6 +91,9 @@ pub enum ErrorCode {
     #[error("Target reference is not direct")]
     TargetReferenceNotDirect, // 目标引用不是直接引用
 
+    #[error("Switch will be overwritten by merge: {0}")]
+    SwitchWillBeOverwrittenByMerge(String), // 切换将被合并覆盖
+
     #[error("Build merge commit error")]
     BuildMergeCommitError, // 构建合并提交错误
 

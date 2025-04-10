@@ -20,3 +20,16 @@ impl Branch {
         }
     }
 }
+
+impl<'a> From<git2::Reference<'a>> for Branch {
+    fn from(reference: git2::Reference) -> Self {
+        let name: String = reference.shorthand().unwrap_or_default().to_string();
+        let reference_str = reference.name().unwrap_or_default().to_string();
+        
+        Branch {
+            name,
+            is_remote: reference_str.starts_with("refs/remotes/"),
+            reference: reference_str,
+        }
+    }
+}

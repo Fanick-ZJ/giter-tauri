@@ -50,8 +50,17 @@ const obserAll = () => {
 }
 
 onMounted(async () => {
-  commit.value = await getCommit(props.repo, props.commitId)
-  commitFiles.value = await commitContent(props.repo, props.commitId)
+  const res = await Promise.allSettled([getCommit(props.repo, props.commitId), commitContent(props.repo, props.commitId)])
+  if (res[0].status === 'fulfilled') {
+    commit.value = res[0].value 
+  } else {
+    window.$message.error('获取提交信息失败')
+  }
+  if (res[1].status === 'fulfilled') {
+    commitFiles.value = res[1].value 
+  } else {
+    window.$message.error('获取提交内容失败') 
+  }
   // 设置滚动条的z-index,在layout上设置了style无效
   containerRef.value!.querySelector('.n-scrollbar-rail')!.setAttribute('style', 'z-index: 4')
   await nextTick()

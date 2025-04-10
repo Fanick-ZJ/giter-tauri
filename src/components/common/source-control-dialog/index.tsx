@@ -130,6 +130,21 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
     } 
   }
 
+  public switchBranch (branch_name: string) {
+    const branchName = branch_name.replace(branchKeyPrefix, '')
+    if (branchName == this.currentBranch.value?.reference) {
+      window.$message.error('当前分支已经是' + branchName)
+    } 
+    else {
+      const branch = this.branches.value.find((branch) => branch.reference == branchName)
+      branch && switchBranch(this.props.repo.path, branch).then((res) => {
+        window.$message.success('切换分支成功') 
+      }).catch((e) => {
+        window.$message.error(e.message)
+      })
+    } 
+  }
+
   public customFooter(): Component | undefined {
     const self = this;
     const computedOption = computed(() => {
@@ -139,7 +154,7 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
         key: 'switch-branch',
         children: self.branches.value.map((branch) => {
           return {
-            label: branch.reference,
+            label: branch.name,
             key: branchKeyPrefix + branch.reference
           }
         })
@@ -173,20 +188,7 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
         this.pull()
       }
       else if (e.startsWith(branchKeyPrefix)) {
-        const branchName = e.replace(branchKeyPrefix, '')
-        if (branchName == self.currentBranch.value?.name) {
-          window.$message.error('当前分支已经是' + branchName)
-        } 
-        else {
-          if( this.stagedFiles.value.length > 0) {
-            window.$message.error('暂存区有未提交的文件，请先提交')
-            return 
-          }
-          const branch = self.branches.value.find((branch) => branch.reference == branchName)
-          branch && switchBranch(self.props.repo.path, branch).then((res) => {
-            window.$message.success('切换分支成功') 
-          })
-        }
+        this.switchBranch(e)
       }
     }
     return () => (

@@ -1,14 +1,17 @@
 use crate::util::build_commit;
 use crate::util::change_status_to_file_status;
+use crate::util::get_file_content;
 use crate::util::is_binary_file;
 use crate::util::is_binary_file_content;
 use crate::util::size_by_path;
 use crate::util::stamp_to_ymd;
+use crate::util::write_file;
 use anyhow::anyhow;
 use anyhow::Result;
 use git2::build::CheckoutBuilder;
 use git2::Cred;
 use git2::CredentialType;
+use git2::Delta;
 use git2::FetchOptions;
 use git2::PushOptions;
 use git2::RemoteCallbacks;
@@ -294,15 +297,9 @@ impl GitDataProvider {
         let repo = &self.repository;
         let branches = repo.branches(None).unwrap();
         for branch in branches {
-            let (branch, branch_type) = branch.unwrap();
+            let (branch, _) = branch.unwrap();
             if branch.is_head() {
-                let reference = branch.name()?.unwrap_or_default().to_string();
-                let name = reference.rsplitn(3, "/").next().unwrap_or_default().to_string();
-                return Ok(Branch {
-                    name,
-                    is_remote: branch_type == BranchType::Remote,
-                    reference,
-                });
+                return Ok(Branch::from(branch.into_reference()));
             }
         }
         Err(GitError::CurrentBranchNotFound("No current branch found".to_string()))
@@ -314,18 +311,8 @@ impl GitDataProvider {
         let branches = repo.branches(None).unwrap();
         let mut _branches: Vec<Branch> = Vec::new();
         for branch in branches {
-            let (branch, branch_type) = branch.unwrap();
-            let reference = branch.name()
-                .map_err(|_| anyhow!(""))?
-                .ok_or_else(|| anyhow!("The branch name is None"))?
-                .to_string();
-            // refs/remotes/origin/main -> ["main", "origin", "remotes,refs"] -> "main"
-            let name = reference.rsplitn(3, "/").next().unwrap_or_default().to_string();
-            _branches.push(Branch {
-                name,
-                is_remote: branch_type == BranchType::Remote,
-                reference,
-            })
+            let (branch, _) = branch.unwrap();
+            _branches.push(Branch::from(branch.into_reference()))
         }
         Ok(_branches)
     }
@@ -339,13 +326,7 @@ impl GitDataProvider {
             .upstream();
         match remote {
             Ok(remote) => {
-                let reference = remote.name()?.unwrap_or_default().to_string();
-                let name = reference.rsplitn(3, "/").next().unwrap_or_default().to_string();
-                Ok(Branch {
-                    name,
-                    is_remote: true,
-                    reference,
-                })
+                Ok(Branch::from(remote.into_reference()))
             }
             Err(_) => Err(GitError::RemoteNotFound(current.name)),
         }
@@ -490,7 +471,8 @@ impl GitDataProvider {
         } else {
             BranchType::Local
         };
-        let branch_reference = self.repository.find_branch(&branch.reference, b_type);
+        println!("branch: {:?}", branch);
+        let branch_reference = self.repository.find_branch(&branch.name, b_type);
         if let Err(_) = branch_reference {
             return Err(GitError::BranchNotFound(branch.name.clone()));
         }
@@ -962,18 +944,89 @@ impl GitDataProvider {
         }
         Ok(())
     }
+
+    /// 检查两个分支是否存在合并冲突
+    pub fn check_branch_conflict(&self, branch_a: impl Into<Branch>, branch_b: impl Into<Branch>) -> Result<bool, GitError> {
+        let repo = &self.repository;
+        let branch_a = branch_a.into();
+        let branch_b = branch_b.into();
+        // 获取两个分支的最新提交
+        let commit_a = self.branch_commit_inner(&branch_a)?;
+        let commit_b = self.branch_commit_inner(&branch_b)?;
+
+        // 创建合并基线（共同祖先）
+        let ancestor_oid = repo.merge_base(commit_a.id(), commit_b.id())?;
+        let ancestor = repo.find_commit(ancestor_oid)?;
+
+        // 获取三个树对象（祖先、分支A、分支B）
+        let ancestor_tree = ancestor.tree()?;
+        let tree_a = commit_a.tree()?;
+        let tree_b = commit_b.tree()?;
+
+        // 执行三方合并
+        let mut merge_opts = git2::MergeOptions::new();
+        merge_opts.fail_on_conflict(false); // 允许继续检测冲突
+        let merged_index = repo.merge_trees(&ancestor_tree, &tree_a, &tree_b, Some(&mut merge_opts))?;
+
+        // 检查冲突文件数量
+        Ok(merged_index.has_conflicts())
+    }
     
     /// 切换分支
     pub fn switch_branch(&self, branch: &Branch) -> Result<(), GitError> {
+        let staged = self.staged_files()?;
+        if staged.len() > 0 {
+            return Err(GitError::OtherError("There are staged files, please commit them first".to_string())); 
+        }
         let repo = &self.repository;
         let branch_name = branch.name.to_string();
+
+        // 获取目标分支的树对象
+        let target_commit = self.branch_commit_inner(branch)?;
+        let target_tree = target_commit.tree()?;
         let branch = repo.find_branch(&branch_name, BranchType::Local)
-           .map_err(|_| GitError::BranchNotFound(branch_name.clone()))?; 
+           .map_err(|_| GitError::BranchNotFound(branch_name.clone()))?;
         let branch_ref = branch.into_reference();
         let branch_ref_name = branch_ref.name().ok_or(anyhow!(""))?;
+
+        // 获取工作区的修改文件
+        let work_changed = self.workspace_change()?;
+
+        // 比较工作区与目标分支的差异
+        let diff = repo.diff_tree_to_workdir_with_index(Some(&target_tree), None)?;
+        let deltas = diff.deltas();
+        
+        // 收集冲突文件
+        let mut conflicts = Vec::new();
+        for delta in deltas {
+            let new_file = delta.new_file();
+            
+            if let Some(path) = new_file.path() {
+                let path = &path.to_string_lossy().into_owned();
+                // 如果冲突的文件不是工作区的修改文件，跳过
+                if !work_changed.contains(path) {
+                    continue; 
+                }
+                conflicts.push(path.to_string());
+            }
+        }
+        if conflicts.len() > 0 {
+            return Err(GitError::SwitchWillBeOverwrittenByMerge(conflicts.join("\n"))); 
+        }
+        let mut blob_map = HashMap::new();
+        // 获取修改的文件内容，在切换之后再恢复
+        for file in work_changed {
+           let abs_path = self.blob_path(file); 
+           let blob = get_file_content(&abs_path)?;
+           blob_map.insert(abs_path, blob);
+        }
         repo.set_head(branch_ref_name)
-          .map_err(|_| GitError::BranchNotFound(branch_name.clone()))?;
+          .map_err(|e| GitError::Git2Error(e))?;
         let _ = repo.checkout_head(Some(CheckoutBuilder::default().force()));
+        // 恢复修改的文件内容
+        for (path, blob) in blob_map {
+            let _ = write_file(&path, &blob);
+        }
         Ok(())
     }
 
