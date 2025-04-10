@@ -1,5 +1,5 @@
 // 使用组件，通过函数调用的方式，将组件附着在root上
-import {Component, computed, defineComponent, nextTick, onBeforeMount, onBeforeUnmount, ref, watch } from 'vue'
+import {Component, computed, ComputedRef, defineComponent, nextTick, onBeforeMount, onBeforeUnmount, ref, watch } from 'vue'
 import { SourceConterolDialogProps } from './types'
 import { AbstractDialog } from '../abstract-dialog'
 import { NButton, NDivider, NDropdown, NInput, NLayout, NLayoutContent, NLayoutSider, NScrollbar } from 'naive-ui'
@@ -278,7 +278,7 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
               </NInput>
               <div class='flex h-[30px] bg-[#0078d4] text-white rounded-sm'>
                 <NButton class='flex-1' color='#026ec1' text textColor={'white'} onClick={self.commit.bind(self)}>
-                  提交
+                  {`提交(${self.currentBranch.value?.name})`}
                 </NButton>
                 <NDropdown text trigger='click' options={commitOptions}>
                   <div class='flex justify-center items-center hover:bg-[#026ec1]'>
