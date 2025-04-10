@@ -40,6 +40,7 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
   private branches = ref<Branch[]>([])
   private currentBranch = ref<Branch>()
   private currentRemoteBranch = ref<Branch | undefined>()
+  private computedOption?: ComputedRef<any[]>
   constructor(props: SourceConterolDialogProps) {
     super({
       containerName: className,
@@ -147,7 +148,7 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
 
   public customFooter(): Component | undefined {
     const self = this;
-    const computedOption = computed(() => {
+    this.computedOption = computed(() => {
       const options: any[] = []
       options.push({
         label: '切换分支',
@@ -196,7 +197,7 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
       <NDropdown trigger='click' 
         overlap 
         scrollable 
-        options={computedOption.value} 
+        options={self.computedOption?.value} 
         menu-props={menuProps}
         on-select={handleSelect}
         arrow-wrapper-style={{
