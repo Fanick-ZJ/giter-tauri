@@ -239,7 +239,6 @@ impl GitDataProvider {
     pub fn add_to_stage(&self, path: &PathBuf) -> Result<(), GitError> {
         let repo = &self.repository;
         let mut index = repo.index()?;
-        // TODO:还差判断gitignore
         index.add_path(&path)?;
         index.write()?;
         Ok(()) 

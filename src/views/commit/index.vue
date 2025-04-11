@@ -15,6 +15,7 @@ import { listen } from '@tauri-apps/api/event';
 import { STATUS_CHANGE, StatusChangePayloadType } from '@/const/listen';
 import _ from 'lodash';
 import { hasFlag, RepoStatus } from '@/enum';
+import { withMinDelay } from '@/utils/tool';
 
 const route = useRoute()
 const repoStore = useRepoStore()
@@ -54,16 +55,18 @@ const init = async () => {
 const getCommits = _.debounce(async () => {
   let path = repo.value!.path
   loading.value = true
-  getBranchCommits(path, curBranch.value!, 1 << 31).then((res) => {
+  // 这个函数需要有一个最小等待时间
+  withMinDelay(async () => {
+    const res = await getBranchCommits(path, curBranch.value!, 1 << 31)
     commits.value = res
-    loading.value = false
-  })
-}, 500)
+  }, 500, () => loading.value = false)
+  
+}, 100)
 
 // 文件变更时，重新获取数据
 const changed_listen = listen<StatusChangePayloadType>(STATUS_CHANGE, (event) => {
     if (event.payload.path === repo.value!.path && hasFlag(event.payload.status, RepoStatus.Unpushed)) {
-    getCommits()
+      getCommits()
   }
 })
 
@@ -179,6 +182,11 @@ const {
         <NButton :dashed='hasFilter' @click="toggleFilter">
           <NIcon>
             <Icon icon="mdi:filter-outline" width="100" height="100" />
+          </NIcon>
+        </NButton>
+        <NButton :dashed='hasFilter' @click="getCommits">
+          <NIcon>
+            <Icon icon="mdi:reload" width="24" height="24" />
           </NIcon>
         </NButton>
       </div>

@@ -3,7 +3,6 @@ import { RepoStatus, SetupStoreId } from "@/enum";
 import { Repository } from "@/types";
 import { addWatch, isRepo, removeWatch, workStatus } from "@/utils/command";
 import { cmdErrNotify } from "@/utils/err-notify";
-import { get_store_db } from "@/utils/storage";
 import { readRepos, removeRepo, saveRepo, updateRepo } from "@/utils/store";
 import { listen } from "@tauri-apps/api/event";
 import { QueryResult } from "@tauri-apps/plugin-sql";

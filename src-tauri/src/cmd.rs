@@ -32,6 +32,7 @@ type DataResult<T> = std::result::Result<T, CommandError<GitError>>;
 type CommonResult<T> = std::result::Result<T, CommandError<CommonError>>;
 type WatcherResult<T> = std::result::Result<T, CommandError<WatcherError>>;
 
+
 fn str_to_oid(str: &str) -> Result<Oid, GitError> {
     let oid = Oid::from_str(str);
     match oid {
@@ -54,10 +55,15 @@ fn watch(repo: RepoPath) -> Result<(), WatcherError> {
     
     // 修复1: 移除多余的 match 结构
     let mut watcher = watch_center.lock()
-        .map_err(|e| WatcherError::Other(format!("Failed to lock watcher center: {:?}", e)))?;
-    
-    // 修复2: 直接返回转换后的结果
-    watcher.add_watch(repo)
+    .map_err(|e| WatcherError::Other(format!("Failed to lock watcher center: {:?}", e)))?;
+
+// 修复2: 直接返回转换后的结果
+watcher.add_watch(repo)
+}
+
+#[tauri::command]
+fn repo_change_submit() {
+
 }
 
 #[tauri::command]

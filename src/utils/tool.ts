@@ -1,5 +1,6 @@
 import { SEPERATOR } from "@/const"
 import { openPath } from '@tauri-apps/plugin-opener';
+import _ from "lodash";
 import { Component, ComponentPublicInstance, createVNode, render, VNode, VNodeProps } from "vue";
 
 // 打开指定路径的文件管理器
@@ -152,4 +153,19 @@ export const extname = (path: string) => {
   const idx = path.lastIndexOf('.')
   if (idx === -1) return ''
   return path.slice(idx + 1) 
+}
+
+export async function withMinDelay<T extends (...args: any[]) => Promise<any>>(
+  fn: T,
+  delay: number,
+  cb: () => void
+): Promise<ReturnType<T>>{
+  const start = Date.now()
+  const res = await fn()
+  const elapsed = Date.now() - start
+  const remaining = Math.max(delay - elapsed, 0)
+  console.log(remaining)
+  await new Promise(resolve => setTimeout(resolve, remaining))
+  cb()
+  return res
 }
