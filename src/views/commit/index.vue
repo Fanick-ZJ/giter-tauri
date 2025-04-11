@@ -4,7 +4,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { Icon } from '@iconify/vue'
 import LayoutPage from '@/components/common/layout-page/index.vue'
-import { getAuthors, getBranchCommits, getBranches, getCurrentBranch } from '@/utils/command';
+import { getAuthors, getBranchCommits, getBranches, getCurrentBranch, singleRepoSubmit } from '@/utils/command';
 import { Author, Branch, Commit, Repository } from '@/types';
 import CommitItem from './components/commit-item.vue'
 import { NFlex, NPagination, NButton, NIcon, NSelect, NDropdown, NLayout } from 'naive-ui';
@@ -30,6 +30,7 @@ const branches = ref<Branch[]>([])
 const curBranch = ref<Branch>()
 const authors = ref<Author[]>([])
 const commits = ref<Commit[]>([])
+let single_repo_unlisten
 const init = async () => {
   let path = repo.value!.path
   const branchesPromise = getBranches(path)
@@ -50,12 +51,16 @@ const init = async () => {
       authors.value = await getAuthors(repo.value!.path, curBranch.value)
   })
   getCommits()
+  // 单仓库修改监听
+  single_repo_unlisten = singleRepoSubmit(repo.value!.path, () => {
+    getCommits()
+  })
 }
 
 const getCommits = _.debounce(async () => {
   let path = repo.value!.path
   loading.value = true
-  // 这个函数需要有一个最小等待时间
+  // 如果不足500ms，就等待500ms
   withMinDelay(async () => {
     const res = await getBranchCommits(path, curBranch.value!, 1 << 31)
     commits.value = res
@@ -74,12 +79,14 @@ onBeforeUnmount(() => {
   changed_listen.then((unlisten) => {
     unlisten()
   }) 
+  single_repo_unlisten()
 })
 // 监听路由变化，重新获取数据
 watch(()=> route.path, () => {
   if (route.path.startsWith('/commit')) {
     id.value = parseInt(route.params.id as string)
     repo.value = repoStore.getRepoById(id.value)
+    single_repo_unlisten && single_repo_unlisten()
     init().catch((err) => {
       window.$message.error(err.data) 
     }).finally(() => {

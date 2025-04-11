@@ -62,11 +62,6 @@ watcher.add_watch(repo)
 }
 
 #[tauri::command]
-fn repo_change_submit() {
-
-}
-
-#[tauri::command]
 #[command_result]
 pub fn remove_watch(repo: RepoPath) -> CommonResult<()> {
     let app = handle::Handle::global().app_handle().unwrap();

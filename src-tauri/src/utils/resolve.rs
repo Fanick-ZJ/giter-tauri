@@ -1,5 +1,5 @@
 use crate::{core::handle, emit::changed_emit};
-use crate::emit::satatus_change_emit;
+use crate::emit::{repo_single_emit, satatus_change_emit};
 use crate::utils::init;
 use anyhow::Result;
 use giter_watcher::modify_watcher::ModifyWatcher;
@@ -20,6 +20,7 @@ pub async fn resolve_setup(app: &mut App) -> Result<()> {
     let mut watcher_center = ModifyWatcher::new();
     watcher_center.add_callback(satatus_change_emit);
     watcher_center.add_callback(changed_emit);
+    watcher_center.add_callback(repo_single_emit);
     let _ = watcher_center.init();
     // 修改监控器
     app.manage(Mutex::new(watcher_center));

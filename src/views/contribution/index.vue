@@ -91,6 +91,7 @@ const authorKey = (author: Author) => {
   return author.email + AUTHOR_SPEARATER + author.name
 }
 
+// 当前选中的作者
 const selectedAuthor = computed({
   get() {
     return curAuthor.value && authorKey(curAuthor.value) || ''
@@ -121,6 +122,7 @@ const selectedBranch = computed({
     })
   }
 })
+
 const branchOptions = computed(() => {
   return branches.value.map((branch) => {
     return {
@@ -141,7 +143,6 @@ watch(() => currentBranch.value, () => {
     })
   } 
 })
-
 
 const selectedContribution = computed(() => {
   let filted = contribution.value.filter((stat) => {
