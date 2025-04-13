@@ -3,7 +3,7 @@ import {Component, computed, ComputedRef, defineComponent, nextTick, onBeforeMou
 import { SourceConterolDialogProps } from './types'
 import { AbstractDialog } from '../abstract-dialog'
 import { NButton, NDivider, NDropdown, NInput, NLayout, NLayoutContent, NLayoutSider, NScrollbar } from 'naive-ui'
-import { Icon } from '@iconify/vue/dist/iconify.js'
+import { Icon } from '@iconify/vue'
 import { listen } from '@tauri-apps/api/event'
 import { STATUS_CHANGE, StatusChangePayloadType } from '@/const/listen'
 import { commit, currentRemoteBranch, getBranches, getChangedFiles, getCurrentBranch, getStagedFiles, pull, push, switchBranch } from '@/utils/command'

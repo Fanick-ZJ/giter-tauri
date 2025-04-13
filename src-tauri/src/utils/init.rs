@@ -77,6 +77,12 @@ pub fn init_cache() -> Result<()> {
         username text not null,
         password text not null
       );
+      create table if not exists file_history (
+        id integer primary key autoincrement,
+        repo text not null,
+        file text not null, 
+        history text not null
+      )
       "
     )?;
     Ok(())

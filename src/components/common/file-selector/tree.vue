@@ -2,7 +2,7 @@
 import { NTree, TreeOption, NSpace, TreeInst } from 'naive-ui';
 import { h, onMounted, PropType, ref, useTemplateRef } from 'vue';
 import { Folder, SelectFilter, T_Dir } from './types';
-import { Icon } from '@iconify/vue/dist/iconify.js';
+import { Icon } from '@iconify/vue';
 import { SEPERATOR } from '@/const';
 import { getDriver, getFolders } from '@/utils/command';
 

@@ -5,13 +5,13 @@ use crate::util::is_binary_file;
 use crate::util::is_binary_file_content;
 use crate::util::size_by_path;
 use crate::util::stamp_to_ymd;
+use crate::util::str_to_oid;
 use crate::util::write_file;
 use anyhow::anyhow;
 use anyhow::Result;
 use git2::build::CheckoutBuilder;
 use git2::Cred;
 use git2::CredentialType;
-use git2::Delta;
 use git2::FetchOptions;
 use git2::PushOptions;
 use git2::RemoteCallbacks;
@@ -25,11 +25,13 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Pointer;
 use std::i32;
+use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::usize;
 use std::vec;
+use super::file::FileHistoryEntry;
 use super::{author::Author, branch::Branch, commit::Commit, status::WorkStatus};
 
 use super::cache::Cache;
@@ -470,7 +472,6 @@ impl GitDataProvider {
         } else {
             BranchType::Local
         };
-        println!("branch: {:?}", branch);
         let branch_reference = self.repository.find_branch(&branch.name, b_type);
         if let Err(_) = branch_reference {
             return Err(GitError::BranchNotFound(branch.name.clone()));
@@ -485,7 +486,7 @@ impl GitDataProvider {
 
     /// 获取分支的提交，返回提交对象和此分支的提交总数
     ///
-    pub fn get_branch_commits(&self, branch: &Branch, count: i32) -> Result<Vec<Commit>, GitError> {
+    pub fn branch_commits(&self, branch: &Branch, count: i32) -> Result<Vec<Commit>, GitError> {
         // 获取分支所在的提交
         let commit = self.branch_commit_inner(branch)?;
         let mut revwalk = self.repository.revwalk()?;
@@ -494,6 +495,15 @@ impl GitDataProvider {
         Ok(commits)
     }
 
+    pub fn branch_commits_count(&self, branch: &Branch) -> Result<i32, GitError> {
+        let commit = self.branch_commit_inner(branch)?;
+        let mut revwalk = self.repository.revwalk()?;
+        revwalk.push(commit.id())?; 
+        let count = revwalk.count();
+        Ok(count as i32)
+    }
+
+    /// 获取一颗提交树的所有文件列表
     fn tree_walk(&self, tree: &git2::Tree) -> Vec<CommittedFile> {
         let mut files: Vec<CommittedFile> = Vec::new();
         let _ = tree.walk(TreeWalkMode::PostOrder, |root, entry| {
@@ -501,7 +511,7 @@ impl GitDataProvider {
             let path = path.join(entry.name().unwrap()).to_str().unwrap().to_string();
             let blob = self.repository.find_blob(entry.id());
             if blob.is_err() {
-                files.push(CommittedFile::new(path, 0, FileStatus::Added, "0".repeat(20), "0".repeat(20), false, false, false));
+                files.push(CommittedFile::new(path, 0, FileStatus::Added, entry.id().to_string(), "0".repeat(20), false, false, false));
             } else {
                 let blob = blob.unwrap();
                 let size = blob.size();
@@ -549,18 +559,15 @@ impl GitDataProvider {
                 .ok_or_else(|| anyhow::anyhow!("new file path is not valid utf-8"))?
                 .to_string();
             // git2的is_blob函数好像有问题，直接用文件内容判断吧
-            let (is_binary, old_is_binary) = (
-                self.blob_is_binary(new_file.id())?,
-                self.blob_is_binary(old_file.id())?,
-            );
+            let (is_binary, old_is_binary) = (new_file.is_binary(), old_file.is_binary());
             let size = new_file.size();
             let status = change_status_to_file_status(&delta.status());
             let new_blob = repo.find_blob(delta.new_file().id());
             let new_id = new_file.id().to_string();
             let old_id = old_file.id().to_string();
-            let (exist, _) = match new_blob {
-                Ok(blob) => (true, blob.content().to_vec()),
-                Err(_) => (false, Vec::new()),
+            let exist = match new_blob {
+                Ok(_) => true,
+                Err(_) => false,
             };
             let file = CommittedFile::new(path, size as usize, status, new_id, old_id, exist, is_binary, old_is_binary);
             files.push(file);
@@ -641,12 +648,8 @@ impl GitDataProvider {
             if lasted_commit_id.is_some() && commit == lasted_commit_id.unwrap() {
                 break;
             }
-            let commit_obj = self.repository.find_commit(commit)?;
-            let author = commit_obj.author();
-            author_set.insert(Author::new(
-                author.name().unwrap().to_string(),
-                author.email().unwrap().to_string(),
-            ));
+            let author = self.get_commit_author(&commit)?;
+            author_set.insert(author);
         }
         let lasted_id = branch_commit.id();
         let authors: Vec<Author> = author_set.into_iter().collect();
@@ -655,9 +658,22 @@ impl GitDataProvider {
         Ok(authors)
     }
 
+    pub fn get_commit_author(&self, commit_id: &Oid) -> Result<Author, GitError> {
+        let commit = self.repository.find_commit(commit_id.clone())?;
+        let author = commit.author();
+        // 使用 from_utf8_lossy 处理非 UTF-8 编码
+        let name_bytes = author.name_bytes();
+        let email_bytes = author.email_bytes();
+        let name = String::from_utf8_lossy(name_bytes).into_owned();
+        let email = String::from_utf8_lossy(email_bytes).into_owned();
+        
+        Ok(Author::new(name, email))
+            
+    }
+
     
+    /// 获取分支提交贡献统计
     pub fn get_branch_commit_contribution(&self, branch: &Branch) -> Result<Vec<CommitStatistic>> {
-        let authors = self.authors(branch)?;
         let commits = self.branch_commit_inner(branch)?;
         let mut revwalk = self.repository.revwalk()?;
         revwalk.push(commits.id())?;
@@ -669,23 +685,17 @@ impl GitDataProvider {
         }
         for commit in revwalk.by_ref().into_iter() {
             if let Ok(commit) = commit {
+                let author = self.get_commit_author(&commit)?;
                 let commit = self.repository.find_commit(commit)?;
-                let author = commit.author();
-                let email = author.email().unwrap().to_string();
                 let time = stamp_to_ymd(commit.time().seconds());
-                if let Err(_) = time {
+                if let Err(_) = time{
                     continue;
                 }
                 let time = time.unwrap();
-                if !map.contains_key(email.as_str()) {
-                    let author = authors.iter().find(|a| a.email == email);
-                    if let None = author {
-                        continue;
-                    }
-                    let author = author.unwrap().clone();
-                    map.insert(email.clone(), CommitStatistic::new(self.workdir().to_path_buf(), branch.clone(), author));      
+                if !map.contains_key(author.email.as_str()) {
+                    map.insert(author.email.clone(), CommitStatistic::new(self.workdir().to_path_buf(), branch.clone(), author.clone()));      
                 }
-                let stat = map.get_mut(email.as_str()).unwrap();
+                let stat = map.get_mut(author.email.as_str()).unwrap();
                 let _ = stat.add(time, 1);
             } else {
                 continue;
@@ -698,22 +708,33 @@ impl GitDataProvider {
     }
 
     pub fn get_branch_commits_after_filter(&self, branch: &Branch, filter: &HashMap<String, Value>) -> Result<Vec<Commit>, GitError> {
-        let branch_commits = self.get_branch_commits(branch, i32::MAX)?;
-        let filter = FilterConditions::build_from_sv_map(filter);
+        let repo = &self.repository;
         // 获取过滤条件
-        let last_id= filter.last_id.unwrap_or_default();
+        let filter = FilterConditions::build_from_sv_map(filter);
+        println!("filter: {:?}", filter);
+        let branch_head = self.branch_commit_inner(branch)?;
+        let mut revwalk = self.repository.revwalk()?;
+        println!("start to find");
+        revwalk.push(branch_head.id())?;
+        if let Some(last_id) = filter.last_id {
+            revwalk.hide(str_to_oid(&last_id)?)?;
+        }
         let mut commits = Vec::<Commit>::new();
         // 遍历提交
-        for commit in branch_commits.into_iter() {
-            if commit.commit_id == last_id || commits.len() >= filter.count {
-                break; 
-            }
+        for (i, commit) in revwalk.enumerate().into_iter() {
+            if i < filter.start{ continue; }
+            let commit = commit?;
+            if commits.len() > filter.count { break;}
             let author = &filter.author;
-            let time = commit.datetime;
-            if (!author.is_default() && author.email != commit.author_email && author.name != commit.author_name)
+            let cur_commit = repo.find_commit(commit)?;
+            let time = cur_commit.time().seconds();
+            let cur_email = String::from_utf8_lossy(cur_commit.author().email_bytes()).to_string();
+            let cur_name = String::from_utf8_lossy(cur_commit.author().name_bytes()).to_string();
+            if (!author.is_default() && author.email != cur_email && author.name != cur_name)
                 || time < filter.start_time || time > filter.end_time {
                 continue; 
             }
+            let commit = build_commit(&cur_commit, &repo);
             commits.push(commit);
         }
         Ok(commits)
@@ -1029,6 +1050,43 @@ impl GitDataProvider {
         Ok(())
     }
 
+    /// 根据文件的oid获取文件的历史Oid和所在提交的oid
+    pub fn file_history(&self, file_path: String) -> Result<Vec<FileHistoryEntry>, GitError> {
+        let repo = &self.repository;
+        let head = repo.head()?;
+        let head_commit = head.peel_to_commit()?;
+        let mut revwalk = repo.revwalk()?;
+        let cache = self.get_file_history(&file_path);
+        let mut history: Vec<FileHistoryEntry> = Vec::new();
+        if let Some(cache) = cache {
+            revwalk.hide(cache[0].commit_id)?;
+            history.extend(cache.into_iter());
+        }
+        revwalk.push(head_commit.id())?; 
+        for commit_oid in revwalk.by_ref().into_iter() {
+            let commit_oid = commit_oid?;
+            let content = self.commit_content(commit_oid)?; 
+            content.iter().for_each(|file| {
+                if file.path == file_path {
+                    if let Ok(commit) = repo.find_commit(commit_oid) {
+                        let date = commit.time().seconds();
+                        let author = self.get_commit_author(&commit_oid);
+                        let message = commit.message().unwrap().trim().to_string();
+                        if let Ok(author) = author {
+                            history.push(FileHistoryEntry::new(commit_oid, file.clone(), date, author, message)); 
+                        }
+                    }
+                }
+            });
+        }
+        if history.len() > 0 {
+            self.set_file_history(&file_path, &history); 
+        }
+        Ok(history)
+    }
+}
+
+impl GitDataProvider {
     /// 获取提交者缓存
     fn authors_cache(&self, branch: &Branch) -> Option<(Vec<Author>, Oid)> {
         if let Some(cache) = self.cache.borrow().as_ref() {
@@ -1041,7 +1099,6 @@ impl GitDataProvider {
     }
 
     /// 获取分支的贡献者统计
-    /// 
     pub fn branch_contribution_cache(&self, branch: &Branch) -> Option<(HashMap<String, CommitStatistic>, Oid)> {
         if let Some(cache) = self.cache.borrow().as_ref() {
             let contrib = cache.branch_contribution(self.repository.path().to_str().unwrap(), branch);
@@ -1052,7 +1109,6 @@ impl GitDataProvider {
         None
     }
     /// 设置分支的贡献者统计
-    /// 
     pub fn set_branch_contribution_cache(
         &self,
         branch: &Branch,
@@ -1065,7 +1121,6 @@ impl GitDataProvider {
         }
     }
     /// 设置提交者缓存
-    ///
     pub fn set_authors_cache(&self, authors: Vec<Author>, branch: &Branch, lasted_id: &Oid) {
         if let Some(cache) = self.cache.borrow_mut().as_mut() {
             cache.set_authors(
@@ -1089,137 +1144,17 @@ impl GitDataProvider {
             cache.set_credential(remote_url, credential);
         } 
     }
-}
 
-#[cfg(test)]
-mod tests {
-
-    use similar::{ChangeTag, TextDiff};
-
-    use super::*;
-    use std::process::Command;
-
-    #[test]
-    fn test_untracked_files() {
-        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
-        println!(
-            "test_untracked_files: {:?}",
-            provider.untracked_files().unwrap()
-        );
-    }
-
-    #[test]
-    fn test_get_author() {
-        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
-        println!("test_get_author: {:?}", provider.author().unwrap());
-    }
-
-    #[test]
-    fn test_has_modified_files() {
-        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
-        println!(
-            "test_has_modified_files： {:?}",
-            provider.workspace_change()
-        );
-    }
-
-    #[test]
-    fn test_modified_files() {
-        let provider = GitDataProvider::new(r"E:\workSpace\git\test_repo").unwrap();
-        println!(
-            "test_modified_files： {:?}",
-            provider.workspace_change().unwrap()
-        );
-    }
-
-    #[test]
-    fn test_uncommit_files() {
-        let provider = GitDataProvider::new(r"E:\workSpace\git\test_repo").unwrap();
-        let output = if cfg!(target_os = "windows") {
-            Command::new("cmd")
-                .arg("/C")
-                .arg("git")
-                .arg("status")
-                .arg("-s")
-                .current_dir(r"E:\workSpace\git\test_repo")
-                .output()
-                .expect("failed to execute process")
-        } else {
-            Command::new("sh")
-                .arg("-c")
-                .arg("git status -s")
-                .output()
-                .expect("failed to execute process")
-        };
-        match output.status.success() {
-            true => {
-                let output = String::from_utf8_lossy(&output.stdout);
-                for line in output.lines() {
-                    let status = &line[0..2];
-                    let path = &line[3..];
-                    if status.chars().nth(0).unwrap() != ' ' {
-                        println!("{}", path);
-                    }
-                }
-            }
-            false => {
-                println!("{}", String::from_utf8_lossy(&output.stderr));
-            }
+    pub fn get_file_history(&self, file_path: &str) -> Option<Vec<FileHistoryEntry>> {
+        if let Some(cache) = self.cache.borrow().as_ref() {
+            return cache.get_file_history(self.repository.path().to_str().unwrap(), file_path);
         }
+        None
     }
 
-    #[test]
-    fn test_unpushed_commits() {
-        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
-        println!(
-            "test_unpushed_commits: {}",
-            provider.unpushed_commits().unwrap()
-        );
-    }
-
-    #[test]
-    fn test_branches() {
-        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
-        for branch in provider.branches().unwrap() {
-            println!("{:?}", branch)
+    pub fn set_file_history(&self, file_path: &str, history: &Vec<FileHistoryEntry>) {
+        if let Some(cache) = self.cache.borrow_mut().as_mut() {
+            cache.set_file_history(self.repository.path().to_str().unwrap(), file_path, history);
         }
-    }
-
-    #[test]
-    fn test_branch_commit() {
-        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL").unwrap();
-        let branch = Branch::new(
-            "gh-pages".to_string(),
-            true,
-            "refs/remotes/origin/gh-pages".to_string(),
-        );
-        let commits = provider.get_branch_commits(&branch, 1000).unwrap();
-        for commit in commits.iter() {
-            println!("{:?}", commit);
-        }
-    }
-
-    #[test]
-    fn valid_provider() {
-        let provider = GitDataProvider::new(r"E:\workSpace\Rust\GQL");
-        match provider {
-            Ok(_) => {
-                println!("valid_provider");
-            }
-            Err(_) => {
-                println!("invalid_provider");
-            }
-        }
-    }
-
-    #[test]
-    fn test_diff() {
-        let diff = TextDiff::from_lines(
-            "Hello World\nThis is the second line.\nMoar and more",
-            "Hallo Welt\nThis is the second line.\nThis is the third.\nMoar and more",
-        );
-        diff.ops().iter().for_each(| f | {
-            println!("----{:?}", f);
-        });
     }
 }

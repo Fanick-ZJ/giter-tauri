@@ -4,9 +4,11 @@ use git2::Oid;
 use serde::{
     de::{Error as DeError, Visitor},
     ser::SerializeStruct,
-    Deserialize, Deserializer, Serialize, Serializer,
+    Deserialize, Deserializer, Serialize
 };
-use super::status::FileStatus;
+use crate::util::str_to_oid;
+
+use super::{author::Author, status::FileStatus};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -176,3 +178,111 @@ impl Serialize for ChangedFile {
 }
 
 
+
+#[derive(Debug, Clone)]
+pub struct FileHistoryEntry {
+    pub commit_id: Oid,
+    /// 文件在该提交中的状态
+    pub file: CommittedFile,
+    /// 提交时间戳 (秒级Unix时间戳)
+    pub commit_date: i64,
+    /// 提交者信息
+    pub author: Author,
+    /// 完整的提交消息
+    pub message: String,
+}
+
+impl Serialize for FileHistoryEntry {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut s = serializer.serialize_struct("FileHistoryEntry", 5)?;
+        s.serialize_field("commitId", &self.commit_id.to_string())?; 
+        s.serialize_field("file", &self.file)?;
+        s.serialize_field("commitDate", &self.commit_date)?;
+        s.serialize_field("author", &self.author)?;
+        s.serialize_field("message", &self.message)?;
+        s.end()
+    } 
+}
+
+impl<'de> Deserialize<'de> for FileHistoryEntry {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct CommitVisitor;
+
+        impl<'de> Visitor<'de> for CommitVisitor {
+            type Value = FileHistoryEntry;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("struct FileHistoryEntry")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<FileHistoryEntry, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut commit_id = None;
+                let mut file = None;
+                let mut commit_date = None;
+                let mut author = None;
+                let mut message = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        "commitId" => commit_id = {
+                            let s = map.next_value::<String>()?;
+                            Some(str_to_oid(&s).map_err(|_|DeError::invalid_value(
+                                serde::de::Unexpected::Str(&s), 
+                                &"a valid Git object ID (40-character hex string)"))?)
+                        },
+                        "file" => file = Some(map.next_value()?),
+                        "commitDate" => commit_date = Some(map.next_value()?),
+                        "author" => author = Some(map.next_value()?),
+                        "message" => message = Some(map.next_value()?),
+                        _ => (),
+                    }
+                }
+
+                Ok(FileHistoryEntry {
+                    commit_id: commit_id.ok_or_else(|| DeError::missing_field("commitId"))?,
+                    file: file.ok_or_else(|| DeError::missing_field("file"))?,
+                    commit_date: commit_date.ok_or_else(|| DeError::missing_field("commitDate"))?,
+                    author: author.ok_or_else(|| DeError::missing_field("author"))?,
+                    message: message.ok_or_else(|| DeError::missing_field("message"))?,
+                })
+            }
+        }
+
+        const FIELDS: &[&str] = &[
+            "commitId",
+            "file",
+            "commitDate",
+            "author",
+            "message",
+        ];
+
+        deserializer.deserialize_struct("FileHistory", FIELDS, CommitVisitor)
+    }
+}
+
+impl FileHistoryEntry {
+    pub fn new(
+        commit_id: Oid,
+        file: CommittedFile,
+        commit_date: i64,
+        author: Author,
+        message: String,
+    ) -> Self {
+        Self {
+            commit_id,
+            file,
+            commit_date,
+            author,
+            message,
+        }
+    }
+}

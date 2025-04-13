@@ -5,7 +5,7 @@ use git2::Oid;
 use super::{
     author::Author,
     contribution::CommitStatistic, 
-    credential::Credential
+    credential::Credential, file::FileHistoryEntry
 };
 
 pub trait Cache {
@@ -36,10 +36,16 @@ pub trait Cache {
         last_commit_id: &Oid,
     );
 
+    // 清除单个仓库缓存
     fn clear(&mut self, repo: &str);
-
+    /// 清除所有缓存
     fn clear_all(&mut self);
 
+    // 获取和设置凭证
     fn get_credential(&self, repo: &str) -> Option<Credential>;
     fn set_credential(&mut self, repo: &str, credential: &Credential);
+
+    // 获取文件历史缓存
+    fn get_file_history(&self, repo: &str, file: &str) -> Option<Vec<FileHistoryEntry>>;
+    fn set_file_history(&mut self, repo: &str, file: &str, history: &Vec<FileHistoryEntry>);
 }

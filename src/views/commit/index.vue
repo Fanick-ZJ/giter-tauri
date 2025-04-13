@@ -4,11 +4,10 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { Icon } from '@iconify/vue'
 import LayoutPage from '@/components/common/layout-page/index.vue'
-import { getAuthors, getBranchCommits, getBranches, getCurrentBranch, singleRepoSubmit } from '@/utils/command';
-import { Author, Branch, Commit, Repository } from '@/types';
+import { getAuthors, getBranchCommitsAfterFilter, getBranchCommitsCount, getBranches, getCurrentBranch, singleRepoSubmit } from '@/utils/command';
+import { Author, Branch, Commit, CommitFilter, Repository } from '@/types';
 import CommitItem from './components/commit-item.vue'
 import { NFlex, NPagination, NButton, NIcon, NSelect, NDropdown, NLayout } from 'naive-ui';
-import { Model } from './type';
 import FilterForm from './components/filter-form.vue'
 import { useContextMenu } from './hook';
 import { listen } from '@tauri-apps/api/event';
@@ -17,25 +16,40 @@ import _ from 'lodash';
 import { hasFlag, RepoStatus } from '@/enum';
 import { withMinDelay } from '@/utils/tool';
 
+const INIT_PAGE = 1
+const INIT_PAGE_SIZE = 10
+
 const route = useRoute()
 const repoStore = useRepoStore()
 const loading = ref(false)
 const id = ref(parseInt(route.params.id as string))
 const repo = ref<Repository>()
-const page = ref(1)
-const pageSize = ref(10)
+const page = ref(INIT_PAGE)
+const pageSize = ref(INIT_PAGE_SIZE)
 
 // 获取分支列表
 const branches = ref<Branch[]>([])
 const curBranch = ref<Branch>()
 const authors = ref<Author[]>([])
 const commits = ref<Commit[]>([])
+const commitsCount = ref(0)
+// 筛选模型
+const filterModel = ref<CommitFilter>({
+  lastId: undefined,
+  start: page.value,
+  count: page.value * pageSize.value,
+  author: undefined,
+  startTime: undefined,
+  endTime: undefined,
+  message: undefined,
+})
+
 let single_repo_unlisten
 const init = async () => {
   let path = repo.value!.path
   const branchesPromise = getBranches(path)
   const curBranchPromise = getCurrentBranch(path)
-  await Promise.allSettled([branchesPromise, curBranchPromise]).then(async (res) => {
+  return Promise.allSettled([branchesPromise, curBranchPromise]).then(async (res) => {
     if (res[0].status === 'fulfilled') {
       branches.value = res[0].value
     } else {
@@ -48,11 +62,7 @@ const init = async () => {
       window.$message.error('获取当前分支失败')
       curBranch.value = branches.value[0]
     }
-      authors.value = await getAuthors(repo.value!.path, curBranch.value)
-  })
-  getCommits()
-  // 单仓库修改监听
-  single_repo_unlisten = singleRepoSubmit(repo.value!.path, () => {
+    authors.value = await getAuthors(repo.value!.path, curBranch.value)
     getCommits()
   })
 }
@@ -62,7 +72,11 @@ const getCommits = _.debounce(async () => {
   loading.value = true
   // 如果不足500ms，就等待500ms
   withMinDelay(async () => {
-    const res = await getBranchCommits(path, curBranch.value!, 1 << 31)
+    const t1 = Date.now()
+    commitsCount.value = await getBranchCommitsCount(path, curBranch.value!)
+    const t2 = Date.now()
+    console.log("统计数量耗时", t2 - t1)
+    const res = await getBranchCommitsAfterFilter(path, curBranch.value!, filterModel.value)
     commits.value = res
   }, 500, () => loading.value = false)
   
@@ -87,50 +101,30 @@ watch(()=> route.path, () => {
     id.value = parseInt(route.params.id as string)
     repo.value = repoStore.getRepoById(id.value)
     single_repo_unlisten && single_repo_unlisten()
+    // 重置分页,筛选刷新
+    page.value = 1 
+    filterModel.value = {
+      lastId: undefined,
+      start: INIT_PAGE,
+      count: INIT_PAGE_SIZE,
+      author: undefined,
+      startTime: undefined,
+      endTime: undefined,
+      message: undefined
+    }
     init().catch((err) => {
       window.$message.error(err.data) 
-    }).finally(() => {
-      // 重置分页,筛选刷新
-      page.value = 1 
-      filterModel.value = {
-        author: null,
-        content: null,
-        timeRange: null
-      }
     })
   }
 }, {immediate: true})
 
-// 筛选模型
-const filterModel = ref<Model>({
-  author: null,
-  content: null,
-  timeRange: null
-})
-
-// 提交记录总数
-const total = computed(() => {
-  return filtedList.value.length 
-})
-
-const filtedList = computed(() => {
-  return commits.value.filter((commit) => {
-    if (filterModel.value.author !== null) {
-      return commit.authorName === filterModel.value.author 
-    }
-    return true
-  }).filter((commit) => {
-    return commit.message.includes(filterModel.value.content || '') 
-  }).filter((commit) => {
-    if (filterModel.value.timeRange === null) {
-      return true 
-    }
-    return commit.datetime >= filterModel.value.timeRange[0] && commit.datetime <= filterModel.value.timeRange[1]
-  })
+watch(() => filterModel, () => {
+  console.log("筛选参数修改")
+  getCommits()
 })
 
 const hasFilter = computed(() => {
-  return filterModel.value.author !== null || filterModel.value.content !== null || filterModel.value.timeRange !== null 
+  return !_.every(_.values(filterModel.value), _.isUndefined)
 })
 
 const selectedBranch = computed({
@@ -163,6 +157,13 @@ const selectBranch = (reference: string) => {
     return branch.reference === reference 
   })
   return branch
+}
+
+const pageParamChanged = () => {
+  filterModel.value.start = pageSize.value * (page.value - 1)
+  filterModel.value.count = pageSize.value
+  console.log(pageSize.value * (page.value - 1), pageSize.value)
+  getCommits()
 }
 
 const showFilter = ref(false)
@@ -202,17 +203,19 @@ const {
       <FilterForm v-if="showFilter" :author-list="authors" v-bind:model-value="filterModel"></FilterForm>
     </template>
     <NFlex @contextmenu="handleContextMenu" :data-repo="repo?.path">
-      <template v-for="c in filtedList.slice((page - 1) * pageSize, page * pageSize)">
+      <template v-for="c in commits">
         <CommitItem :commit="c"/>
       </template>
     </NFlex>
     <template #footer>
       <NFlex justify="center">
         <NPagination 
-          :item-count="total" 
+          :item-count="commitsCount" 
           v-model:page="page"
           v-model:page-size="pageSize"
           :page-sizes="[10, 20, 30]"
+          @update:page="pageParamChanged"
+          @update:page-size="pageParamChanged"
           show-size-picker>
         </NPagination>
       </NFlex>

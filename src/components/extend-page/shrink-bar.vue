@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Icon } from '@iconify/vue/dist/iconify.js';
+import { Icon } from '@iconify/vue';
 import { NFloatButton, NIcon } from 'naive-ui';
 
 const emit = defineEmits(['shrink']);

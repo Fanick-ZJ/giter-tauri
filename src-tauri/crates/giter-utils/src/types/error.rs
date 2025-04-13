@@ -1,4 +1,5 @@
 use std::string::FromUtf8Error;
+
 use giter_traits::ExposeError;
 use strum_macros::{EnumDiscriminants, EnumIter};
 
@@ -7,8 +8,11 @@ use thiserror::Error;
 #[derive(Error, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(EnumIter))]
 pub enum ErrorCode {
-    #[error("not valid utf8")]
-    NotValidUtf8(#[from] FromUtf8Error),
+    #[error("not valid utf8: {0}")]
+    NotValidUtf8S(String),
+
+    #[error("not valid utf8: {0}")]
+    NotValidUtf8F(#[from] FromUtf8Error),
 
     #[error("read file error: {0}")]
     ReadFileError(String),

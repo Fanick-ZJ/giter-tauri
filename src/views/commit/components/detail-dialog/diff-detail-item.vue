@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, defineComponent, nextTick, onBeforeUnmount, onMounted, onUnmounted, PropType, Ref, ref, shallowRef } from 'vue';
+import { computed, nextTick, onBeforeUnmount, PropType, Ref, ref, shallowRef } from 'vue';
 import { DiffContent, CommitFile } from '@/types';
-import { NCard, NWatermark, NFlex } from 'naive-ui';
+import { Icon } from '@iconify/vue';
+import { NCard, NWatermark, NFlex, NButton } from 'naive-ui';
 import * as monaco from 'monaco-editor';
 import { getMonacoLanguage } from '@/utils/tool';
 import LoadingView from '@/components/common/loading-view.vue';
@@ -231,6 +232,7 @@ const applyEditorStyle = () => {
                                                           ...diffDetailDecorations]);
   return decorations
 }
+
 </script>
 
 <template>
@@ -249,6 +251,12 @@ const applyEditorStyle = () => {
           {{ + deletedLines.length  }}
         </div>
         <div class="h-[10px] w-[30px]" :style="modifRatiStyle"></div>
+        <NButton quaternary>
+          <template #icon>
+            <Icon icon="material-symbols:history-rounded" width="24" height="24" />
+          </template>
+          文件历史
+        </NButton>
       </div>
     </template>
     <LoadingView :loading="loading">

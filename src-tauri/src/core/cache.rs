@@ -6,7 +6,7 @@ use crate::{
     },
 };
 use git2::Oid;
-use giter_utils::types::{author::Author, branch::Branch, cache::Cache as ProviderCache, contribution::CommitStatistic};
+use giter_utils::types::{author::Author, branch::Branch, cache::Cache as ProviderCache, contribution::CommitStatistic, file::FileHistoryEntry};
 use rusqlite::Connection;
 use std::{
     collections::{HashMap, HashSet},
@@ -380,5 +380,59 @@ impl ProviderCache for GitCache {
                 });
             }
         }
-    }  // 移除 todo!()
+    }
+    
+    fn get_file_history(&self, repo: &str, file: &str) -> Option<Vec<FileHistoryEntry>> {
+        let conn = self.conn();
+        let sql = "select history from file_history where repo=?1 and file=?2";
+        let mut stmt = conn.prepare(sql).unwrap();
+        let ret = stmt.query_row([repo, file], |row| {
+            match row.get::<_, String>(0) {
+                Ok(history) => {
+                    let history: Vec<FileHistoryEntry> = serde_json::from_str(&history).unwrap();
+                    Ok(history)
+                } 
+                e => {
+                    log::error!("get cache error: {:?}", e);
+                    Err(rusqlite::Error::QueryReturnedNoRows)
+                },
+            } 
+        });
+        if let Err(e) = ret {
+            log::error!("get cache error: {:?}", e);
+            return None; 
+        }
+        let history = ret.unwrap();
+        if history.is_empty() {
+            return None; 
+        }
+        Some(history)
+    }
+    
+    fn set_file_history(&mut self, repo: &str, file: &str, history: &Vec<FileHistoryEntry>) {
+        let conn = self.conn();
+        let insert_sql = "insert into file_history (id, repo, file, history) values (null,?1,?2,?3)";
+        let update_sql = "update file_history set history=?1 where repo=?2 and file=?3";
+        let select_sql = "select count(*) from file_history where repo=?1 and file=?2";
+        let mut stmt = conn.prepare(select_sql).unwrap();
+        let res = stmt.query_row([repo, file], |row| row.get::<_, i32>(0));
+        if let Err(e) = res {
+            log::error!("get cache error: {:?}", e);
+            return;
+        }
+        let count = res.unwrap();
+        if count > 0 {
+            let _ = conn.execute(update_sql, [
+                serde_json::to_string(history).unwrap(),
+                repo.to_string(),
+                file.to_string(),
+            ]); 
+        } else {
+            let _ = conn.execute(insert_sql, [
+                repo.to_string(),
+                file.to_string(),
+                serde_json::to_string(history).unwrap(), 
+            ]);
+        }
+    }
 }

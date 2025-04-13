@@ -1,5 +1,5 @@
 import { FileStatus } from "@/enum";
-import { CommandError } from "@/enum/error"
+import { CommonErrorCode } from "@/enum/error"
 import { MessageApiInjection } from "naive-ui/es/message/src/MessageProvider";
 import { NotificationApiInjection } from "naive-ui/es/notification/src/NotificationProvider";
 
@@ -13,7 +13,7 @@ export type Repository = {
 }
 
 export type Error = {
-  type: keyof typeof CommandError,
+  type: keyof typeof CommonErrorCode,
   data: string
 }
 
@@ -91,10 +91,12 @@ export type CommitStatistic = {
 
 export type CommitFilter = {
   lastId?: string,
+  start?: number,
   count?: number,
-  author?: Author
+  author?: Author,
   startTime?: number,
-  endTime?: number
+  endTime?: number,
+  message?: string,
 }
 
 declare global {
