@@ -48,4 +48,8 @@ pub trait Cache {
     // 获取文件历史缓存
     fn get_file_history(&self, repo: &str, file: &str) -> Option<Vec<FileHistoryEntry>>;
     fn set_file_history(&mut self, repo: &str, file: &str, history: &Vec<FileHistoryEntry>);
+
+    // 获取分支提交次数缓存
+    fn get_reference_commit_count(&self, repo: &str, oid: &str) -> Option<(i32, String)>;
+    fn set_reference_commit_count(&self, repo: &str, oid: &str, last_id: &str, count: i64);
 }

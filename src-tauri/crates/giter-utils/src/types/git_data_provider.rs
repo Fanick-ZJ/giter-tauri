@@ -496,10 +496,18 @@ impl GitDataProvider {
     }
 
     pub fn branch_commits_count(&self, branch: &Branch) -> Result<i32, GitError> {
+        let branch_inner = self.branch_commit_inner(branch)?;
+        let cache = self.get_reference_commit_count(branch_inner.id());
         let commit = self.branch_commit_inner(branch)?;
         let mut revwalk = self.repository.revwalk()?;
-        revwalk.push(commit.id())?; 
-        let count = revwalk.count();
+        revwalk.push(commit.id())?;
+        let mut count = 0; 
+        if let Some((cached_count, last_id)) = cache {
+            revwalk.hide(last_id)?;
+            count = cached_count;
+        }
+        count +=  revwalk.count() as i32;
+        self.set_reference_commit_count(branch_inner.id(), commit.id(), count as i64);
         Ok(count as i32)
     }
 
@@ -1155,6 +1163,23 @@ impl GitDataProvider {
     pub fn set_file_history(&self, file_path: &str, history: &Vec<FileHistoryEntry>) {
         if let Some(cache) = self.cache.borrow_mut().as_mut() {
             cache.set_file_history(self.repository.path().to_str().unwrap(), file_path, history);
+        }
+    }
+
+    pub fn get_reference_commit_count(&self, reference_id: Oid) -> Option<(i32, Oid)> {
+        if let Some(cache) = self.cache.borrow_mut().as_mut() {
+            let cache = cache.get_reference_commit_count(self.repository.path().to_str().unwrap(), &reference_id.to_string());
+            if let Some(cache) = cache {
+                return Some((cache.0, str_to_oid(&cache.1).unwrap()));
+            }
+            return None
+        }
+        None
+    }
+
+    pub fn set_reference_commit_count(&self, reference_id: Oid, last_id: Oid, count: i64) {
+        if let Some(cache) = self.cache.borrow_mut().as_mut() {
+            cache.set_reference_commit_count(self.repository.path().to_str().unwrap(), &reference_id.to_string(), &last_id.to_string(), count);
         }
     }
 }

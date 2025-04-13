@@ -435,4 +435,58 @@ impl ProviderCache for GitCache {
             ]);
         }
     }
+    
+    fn get_reference_commit_count(&self, repo: &str, oid: &str) -> Option<(i32, String)> {
+        let conn = self.conn();
+        let sql = "select `count`, last_id from reference_commit_count where repo=?1 and reference=?2";
+        let mut stmt = conn.prepare(sql).unwrap();
+        let ret = stmt.query_row([repo, oid], |row| {
+            match (row.get::<_, i32>(0), row.get::<_, String>(1)) {
+                (Ok(count), Ok(reference)) => {
+                    Ok((count, reference))
+                } 
+                e => {
+                    log::error!("get cache error: {:?}", e);
+                    Err(rusqlite::Error::QueryReturnedNoRows)
+                },
+            } 
+        });
+        if let Err(e) = ret {
+            log::error!("get cache error: {:?}", e);
+            return None; 
+        }
+        return Some(ret.unwrap());
+
+    }
+    
+    fn set_reference_commit_count(&self, repo: &str, reference: &str, last_id: &str, count: i64) {
+        let conn = self.conn();
+        let select_sql = "select count(*) from reference_commit_count where repo=?1 and reference=?2";
+        let update_sql = "update reference_commit_count set count=?1, last_id=?2 where repo=?3 and reference=?4";
+        let insert_sql = "insert into reference_commit_count (id, repo, reference, last_id, count) values (null,?1,?2,?3,?4)";
+        let mut stmt = conn.prepare(select_sql).unwrap();
+        let res = stmt.query_row([repo, reference], |row| row.get::<_, i32>(0));
+        if let Err(e) = res {
+            log::error!("get cache error: {:?}", e);
+            return;
+        }
+        let c = res.unwrap();
+        println!("count {:?}", c);
+        if c > 0 {
+            let _ = conn.execute(update_sql, [
+                count.to_string(),
+                last_id.to_string(),
+                repo.to_string(),
+                reference.to_string()
+            ]);
+        } else {
+            let _ = conn.execute(insert_sql, [
+                repo.to_string(),
+                reference.to_string(),
+                last_id.to_string(),
+                count.to_string(), 
+            ]);
+        }
+
+    }
 }

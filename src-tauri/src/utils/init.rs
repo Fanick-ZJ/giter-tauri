@@ -82,6 +82,13 @@ pub fn init_cache() -> Result<()> {
         repo text not null,
         file text not null, 
         history text not null
+      );
+      create table if not exists reference_commit_count(
+        id integer primary key autoincrement,
+        repo text not null,
+        reference text not null,
+        last_id text not null,
+        count int
       )
       "
     )?;
