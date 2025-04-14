@@ -11,6 +11,9 @@ pub enum ErrorCode {
     #[error("not valid utf8: {0}")]
     NotValidUtf8S(String),
 
+    #[error("IO error: {0}")]
+    IOError(#[from] std::io::Error),
+
     #[error("not valid utf8: {0}")]
     NotValidUtf8F(#[from] FromUtf8Error),
 

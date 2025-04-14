@@ -1,11 +1,15 @@
 use std::fmt;
 
-use git2::Oid;
+use git2::{Oid, Repository};
 use serde::{
     de::{Error as DeError, SeqAccess, Visitor},
     ser::SerializeStruct,
     Deserialize, Deserializer, Serialize, Serializer,
 };
+
+use crate::util::str_to_oid;
+
+use super::error::ErrorCode;
 
 #[derive(Debug, Clone)]
 pub struct Commit {
@@ -46,6 +50,23 @@ impl Commit {
             parents,
             repo,
         }
+    }
+
+    pub fn from_oid(oid: Oid, repo: &Repository) -> Result<Self, ErrorCode> {
+        let commit = repo.find_commit(oid)?;
+        let time = commit.time().seconds();
+        let author = commit.author();
+        let author_name = String::from_utf8_lossy(author.name_bytes()).to_string();
+        let author_email = String::from_utf8_lossy(author.email_bytes()).to_string();
+        let committer = commit.committer();
+        let comitter_name = String::from_utf8_lossy(committer.name_bytes()).to_string();
+        let comitter_email = String::from_utf8_lossy(committer.email_bytes()).to_string();
+        let parents = commit.parent_ids().into_iter().collect::<Vec<Oid>>();
+        let message = String::from_utf8_lossy(commit.message_bytes()).to_string();
+        let title = message.lines().next().unwrap_or("").to_string();
+        let commit_id = commit.id().to_string();
+        let repo = repo.path().to_str().unwrap().to_string();
+        Ok(Commit::new(commit_id, author_name, author_email, comitter_name, comitter_email, title, message, time * 1000, parents, repo))
     }
 }
 

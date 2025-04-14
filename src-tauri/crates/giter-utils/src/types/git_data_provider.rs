@@ -6,6 +6,7 @@ use crate::util::is_binary_file_content;
 use crate::util::size_by_path;
 use crate::util::stamp_to_ymd;
 use crate::util::str_to_oid;
+use crate::util::time_to_ymd;
 use crate::util::write_file;
 use anyhow::anyhow;
 use anyhow::Result;
@@ -25,7 +26,8 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Pointer;
 use std::i32;
-use std::io::Read;
+use std::process::Command;
+use std::io::{self, ErrorKind};
 use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -495,20 +497,24 @@ impl GitDataProvider {
         Ok(commits)
     }
 
-    pub fn branch_commits_count(&self, branch: &Branch) -> Result<i32, GitError> {
-        let branch_inner = self.branch_commit_inner(branch)?;
-        let cache = self.get_reference_commit_count(branch_inner.id());
-        let commit = self.branch_commit_inner(branch)?;
-        let mut revwalk = self.repository.revwalk()?;
-        revwalk.push(commit.id())?;
-        let mut count = 0; 
-        if let Some((cached_count, last_id)) = cache {
-            revwalk.hide(last_id)?;
-            count = cached_count;
+    /// 在某些情况下，使用git命令获取提交数量会更快，因为git命令是直接调用底层的git库，而不是通过rust的git2库
+    pub fn before_reference_commits_count(&self, reference: &str) -> Result<i32, GitError> {
+        let output = Command::new("git")
+            .args(&["rev-list", "--count", reference])
+            .current_dir(self.workdir())
+            .output()?;
+
+        if output.status.success() {
+            let commit_count = String::from_utf8_lossy(&output.stdout)
+                .trim()
+                .parse::<usize>()
+                .map_err(|_| io::Error::new(ErrorKind::InvalidData, "无法解析提交数量"))?;
+
+            Ok(commit_count as i32)
+        } else {
+            let error_message = String::from_utf8_lossy(&output.stderr);
+            return Err(GitError::OtherError(error_message.to_string()));
         }
-        count +=  revwalk.count() as i32;
-        self.set_reference_commit_count(branch_inner.id(), commit.id(), count as i64);
-        Ok(count as i32)
     }
 
     /// 获取一颗提交树的所有文件列表
@@ -715,38 +721,66 @@ impl GitDataProvider {
         Ok(map.into_values().collect())
     }
 
-    pub fn get_branch_commits_after_filter(&self, branch: &Branch, filter: &HashMap<String, Value>) -> Result<Vec<Commit>, GitError> {
-        let repo = &self.repository;
-        // 获取过滤条件
+    /// 获取根据筛选条件过滤后的命令行
+    pub fn build_cinnut_filter(&self, reference: &str, filter: &HashMap<String, Value>) -> Result<Command, GitError> {
         let filter = FilterConditions::build_from_sv_map(filter);
-        println!("filter: {:?}", filter);
-        let branch_head = self.branch_commit_inner(branch)?;
-        let mut revwalk = self.repository.revwalk()?;
-        println!("start to find");
-        revwalk.push(branch_head.id())?;
-        if let Some(last_id) = filter.last_id {
-            revwalk.hide(str_to_oid(&last_id)?)?;
+        let mut cmd = Command::new("git");
+        cmd.current_dir(self.workdir());
+        cmd.args(&["rev-list", reference]);
+        if let Some(author) = filter.author {
+            cmd.args(&["--author", &format!("{}", author.name)]); 
         }
+        if let Some(start_time) = filter.start_time {
+            let formated = time_to_ymd(start_time)?;
+            cmd.args(&["--since", & formated]); 
+        }
+        if let Some(end_time) = filter.end_time {
+            let formated = time_to_ymd(end_time)?;
+            cmd.args(&["--until", & formated]); 
+        }
+        if let Some(offset) = filter.offset {
+            cmd.args(&["--skip", &offset.to_string()]);
+        }
+        if let Some(count) = filter.count {
+            cmd.args(&["--max-count", &count.to_string()]); 
+        }
+
+        Ok(cmd)
+    }
+
+    pub fn reference_commit_filter_count(&self, reference: &str, filter: &HashMap<String, Value>, offset: Option<i32>, size: Option<i32>) -> Result<i32, GitError> {
+        let mut filter = filter.clone();
+        filter.entry("offset".to_string()).or_insert(Value::from(offset.unwrap_or(0)));
+        filter.entry("count".to_string()).or_insert(Value::from(size.unwrap_or(i32::MAX)));
+        let mut cmd = self.build_cinnut_filter(reference, &filter)?;
+        cmd.args(&["--count"]);
+        let output = cmd.output()?;
+        let count = String::from_utf8_lossy(&output.stdout)
+           .trim()
+           .parse::<usize>().map_err(|e| anyhow!(e.to_string()))?; 
+        Ok(count as i32)
+    }
+
+    pub fn reference_commit_filter_details(&self, reference: &str, filter: &HashMap<String, Value>, offset: Option<i32>, size: Option<i32>) -> Result<Vec<Commit>, GitError> {
+        let mut filter = filter.clone();
+        filter.entry("offset".to_string()).or_insert(Value::from(offset.unwrap_or(0)));
+        filter.entry("count".to_string()).or_insert(Value::from(size.unwrap_or(i32::MAX)));
+        let mut cmd = self.build_cinnut_filter(reference, &filter)?;
+        let output = cmd.output()?;
+        let commit_ids = String::from_utf8_lossy(&output.stdout)
+          .trim()
+         .split("\n")
+         .map(|s| s.to_string())
+         .collect::<Vec<String>>();
         let mut commits = Vec::<Commit>::new();
-        // 遍历提交
-        for (i, commit) in revwalk.enumerate().into_iter() {
-            if i < filter.start{ continue; }
-            let commit = commit?;
-            if commits.len() > filter.count { break;}
-            let author = &filter.author;
-            let cur_commit = repo.find_commit(commit)?;
-            let time = cur_commit.time().seconds();
-            let cur_email = String::from_utf8_lossy(cur_commit.author().email_bytes()).to_string();
-            let cur_name = String::from_utf8_lossy(cur_commit.author().name_bytes()).to_string();
-            if (!author.is_default() && author.email != cur_email && author.name != cur_name)
-                || time < filter.start_time || time > filter.end_time {
-                continue; 
-            }
-            let commit = build_commit(&cur_commit, &repo);
-            commits.push(commit);
+        for commit_id in commit_ids {
+           let commit = Commit::from_oid(str_to_oid(&commit_id)?, &self.repository)?; 
+           commits.push(commit);
         }
         Ok(commits)
+
     }
+
  
     pub fn commit (&self, message: &str, update_ref: Option<&str>) -> Result<Oid, GitError> {
         // 如果没有指定更新的分支，默认更新当前分支

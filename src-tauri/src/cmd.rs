@@ -196,9 +196,9 @@ pub async fn branch_commits(repo: RepoPath, branch: Branch, count: i32) -> DataR
 
 #[tauri::command]
 #[command_result]
-pub async fn branch_commits_count(repo: RepoPath, branch: Branch) -> DataResult<i32> {
+pub async fn before_reference_commits_count(repo: RepoPath, reference: String) -> DataResult<i32> {
     let provider = get_provider(&repo)?;
-    provider.branch_commits_count(&branch) 
+    provider.before_reference_commits_count(&reference) 
 }
 
 #[tauri::command]
@@ -279,9 +279,16 @@ pub async fn get_repo_author(repo: RepoPath) -> DataResult<Author> {
 
 #[tauri::command]
 #[command_result]
-pub async fn get_branch_commits_after_filter(repo: RepoPath, branch: Branch, filter: HashMap<String, Value>) -> DataResult<Vec<Commit>> {
+pub async fn reference_commit_filter_details(repo: RepoPath, reference: String, filter: HashMap<String, Value>, offset: Option<i32>, count: Option<i32>) -> DataResult<Vec<Commit>> {
     let provider = get_provider(&repo)?;
-    provider.get_branch_commits_after_filter(&branch, &filter)
+    provider.reference_commit_filter_details(&reference, &filter, offset, count)
+}
+
+#[tauri::command]
+#[command_result]
+pub async fn reference_commit_filter_count(repo: RepoPath, reference: String, filter: HashMap<String, Value>, offset: Option<i32>, count: Option<i32>) -> DataResult<i32> {
+    let provider = get_provider(&repo)?;
+    provider.reference_commit_filter_count(&reference, &filter, offset, count)
 }
 
 #[tauri::command]

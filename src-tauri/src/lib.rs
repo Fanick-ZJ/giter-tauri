@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 use crate::utils::resolve;
 use cmd::{
-    add_to_stage, add_watch, authors, blob_content, branch_commits, branch_commits_count, branches, checkout_file, clear_all_cache, clear_cache, commit, commit_content, current_branch, current_remote_branch, file_diff, file_history, get_branch_commit_contribution, get_branch_commits_after_filter, get_changed_files, get_commit, get_db_path, get_driver, get_folders, get_global_author, get_repo_author, get_separator, get_staged_files, is_repo, pull, push, remove_from_stage, remove_watch, repos, set_repo_ownership, switch_branch, work_status
+    add_to_stage, add_watch, authors, before_reference_commits_count, blob_content, branch_commits, branches, checkout_file, clear_all_cache, clear_cache, commit, commit_content, current_branch, current_remote_branch, file_diff, file_history, get_branch_commit_contribution, get_changed_files, get_commit, get_db_path, get_driver, get_folders, get_global_author, get_repo_author, get_separator, get_staged_files, is_repo, pull, push, reference_commit_filter_count, reference_commit_filter_details, remove_from_stage, remove_watch, repos, set_repo_ownership, switch_branch, work_status
 };
 use parking_lot::RwLock;
 use types::cache::RepoPath;
@@ -66,7 +66,9 @@ pub fn run() {
             set_repo_ownership,
             remove_watch,
             branch_commits,
-            branch_commits_count,
+            before_reference_commits_count,
+            reference_commit_filter_details,
+            reference_commit_filter_count,
             current_branch,
             commit_content,
             file_diff,
@@ -75,7 +77,7 @@ pub fn run() {
             get_branch_commit_contribution,
             get_global_author,
             get_repo_author,
-            get_branch_commits_after_filter,
+            reference_commit_filter_details,
             get_changed_files,
             get_staged_files,
             add_to_stage,

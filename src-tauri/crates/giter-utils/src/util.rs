@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use git2::{Commit as Git2Commit, Config, Delta, Oid, Repository};
 use chrono::{Utc, TimeZone};
 use serde::Deserialize;
@@ -299,4 +299,16 @@ pub fn str_to_oid(str: &str) -> Result<Oid, ErrorCode> {
         Ok(oid) => Ok(oid),
         Err(_) => Err(ErrorCode::OtherError(format!("invalid object id: {}", str))), 
     }
+}
+
+pub fn time_to_ymd(stamp: i64) -> Result<String> {
+    // 将时间戳转换为 DateTime<Utc> 类型
+    let datetime  = Utc.timestamp_opt(stamp, 0); 
+    let t = match datetime {
+        chrono::offset::LocalResult::Single(time) => Ok(time),
+        chrono::offset::LocalResult::Ambiguous(early, last) => Ok(last),
+        chrono::offset::LocalResult::None => Err(anyhow!("Invalid timestamp".to_string())), 
+    };
+    let datetime = t?;
+    Ok(datetime.format("%Y-%m-%d").to_string())
 }

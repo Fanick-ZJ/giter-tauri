@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { Author } from '@/types';
 import { NForm, NSelect, NInput, NFormItem, NDatePicker, NButton } from 'naive-ui';
-import { computed, PropType } from 'vue';
+import { computed, PropType, watch } from 'vue';
 import { CommitFilter} from '@/types';
 import { cp } from 'fs';
 
-const model = defineModel<Omit<Omit<CommitFilter, 'start'>, 'count'>>({
+const model = defineModel<CommitFilter>({
   default: {
     lastId: undefined,
     author: undefined,
@@ -70,6 +70,12 @@ const clear = () => {
 }
 
 const emit = defineEmits(['filter'])
+
+watch(() => model.value, (val) => {
+  emit('filter', val)
+}, {
+  deep: true
+})
 </script>
 <template>
   <NForm 

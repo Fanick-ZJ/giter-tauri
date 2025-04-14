@@ -4,7 +4,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { Icon } from '@iconify/vue'
 import LayoutPage from '@/components/common/layout-page/index.vue'
-import { getAuthors, getBranchCommitsAfterFilter, getBranchCommitsCount, getBranches, getCurrentBranch, singleRepoSubmit } from '@/utils/command';
+import { getAuthors, getBranchCommitsAfterFilter, beforeReferenceCommitsCount, getBranches, getCurrentBranch, singleRepoSubmit, reference_commit_filter_count, reference_commit_filter_details } from '@/utils/command';
 import { Author, Branch, Commit, CommitFilter, Repository } from '@/types';
 import CommitItem from './components/commit-item.vue'
 import { NFlex, NPagination, NButton, NIcon, NSelect, NDropdown, NLayout } from 'naive-ui';
@@ -36,8 +36,6 @@ const commitsCount = ref(0)
 // 筛选模型
 const filterModel = ref<CommitFilter>({
   lastId: undefined,
-  start: page.value,
-  count: page.value * pageSize.value,
   author: undefined,
   startTime: undefined,
   endTime: undefined,
@@ -46,6 +44,7 @@ const filterModel = ref<CommitFilter>({
 
 let single_repo_unlisten
 const init = async () => {
+  loading.value = true
   let path = repo.value!.path
   const branchesPromise = getBranches(path)
   const curBranchPromise = getCurrentBranch(path)
@@ -63,20 +62,29 @@ const init = async () => {
       curBranch.value = branches.value[0]
     }
     authors.value = await getAuthors(repo.value!.path, curBranch.value)
+    commitsCount.value = await reference_commit_filter_count(path, curBranch.value!.name, filterModel.value)
     getCommits()
   })
 }
+
+const filterChanged = _.debounce(async () => {
+  let path = repo.value!.path
+  const t1 = Date.now()
+  commitsCount.value = await reference_commit_filter_count(path, curBranch.value!.name, filterModel.value)
+  console.log("统计数量", commitsCount.value)
+  const t2 = Date.now()
+  console.log("统计数量耗时", t2 - t1)
+  getCommits()
+}, 1000)
 
 const getCommits = _.debounce(async () => {
   let path = repo.value!.path
   loading.value = true
   // 如果不足500ms，就等待500ms
   withMinDelay(async () => {
-    const t1 = Date.now()
-    commitsCount.value = await getBranchCommitsCount(path, curBranch.value!)
-    const t2 = Date.now()
-    console.log("统计数量耗时", t2 - t1)
-    const res = await getBranchCommitsAfterFilter(path, curBranch.value!, filterModel.value)
+    const start = pageSize.value * (page.value - 1)
+    const count = pageSize.value
+    const res = await reference_commit_filter_details(path, curBranch.value!.name, filterModel.value, start, count)
     commits.value = res
   }, 500, () => loading.value = false)
   
@@ -105,8 +113,6 @@ watch(()=> route.path, () => {
     page.value = 1 
     filterModel.value = {
       lastId: undefined,
-      start: INIT_PAGE,
-      count: INIT_PAGE_SIZE,
       author: undefined,
       startTime: undefined,
       endTime: undefined,
@@ -117,11 +123,6 @@ watch(()=> route.path, () => {
     })
   }
 }, {immediate: true})
-
-watch(() => filterModel, () => {
-  console.log("筛选参数修改")
-  getCommits()
-})
 
 const hasFilter = computed(() => {
   return !_.every(_.values(filterModel.value), _.isUndefined)
@@ -160,9 +161,6 @@ const selectBranch = (reference: string) => {
 }
 
 const pageParamChanged = () => {
-  filterModel.value.start = pageSize.value * (page.value - 1)
-  filterModel.value.count = pageSize.value
-  console.log(pageSize.value * (page.value - 1), pageSize.value)
   getCommits()
 }
 
@@ -200,7 +198,7 @@ const {
       </div>
     </template>
     <template #filter-form>
-      <FilterForm v-if="showFilter" :author-list="authors" v-bind:model-value="filterModel"></FilterForm>
+      <FilterForm v-if="showFilter" :author-list="authors" v-bind:model-value="filterModel" @filter="filterChanged"></FilterForm>
     </template>
     <NFlex @contextmenu="handleContextMenu" :data-repo="repo?.path">
       <template v-for="c in commits">

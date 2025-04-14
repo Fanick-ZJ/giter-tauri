@@ -91,8 +91,6 @@ export type CommitStatistic = {
 
 export type CommitFilter = {
   lastId?: string,
-  start?: number,
-  count?: number,
   author?: Author,
   startTime?: number,
   endTime?: number,
