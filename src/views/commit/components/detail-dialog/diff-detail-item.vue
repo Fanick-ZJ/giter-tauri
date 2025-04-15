@@ -6,7 +6,7 @@ import { NCard, NWatermark, NFlex, NButton } from 'naive-ui';
 import * as monaco from 'monaco-editor';
 import { getMonacoLanguage } from '@/utils/tool';
 import LoadingView from '@/components/common/loading-view.vue';
-import { fileDiff, getBlobContent } from '@/utils/command';
+import { fileDiff, getBlobContent, fileHistory } from '@/utils/command';
 import { BinaryResult, processBinaryData } from './utils';
 
 defineOptions({
@@ -233,6 +233,12 @@ const applyEditorStyle = () => {
   return decorations
 }
 
+const showFileHistory = () => {
+  fileHistory(props.repo, props.file.path).then(res => {
+    console.log(res)
+  })
+}
+
 </script>
 
 <template>
@@ -251,7 +257,7 @@ const applyEditorStyle = () => {
           {{ + deletedLines.length  }}
         </div>
         <div class="h-[10px] w-[30px]" :style="modifRatiStyle"></div>
-        <NButton quaternary>
+        <NButton quaternary @click="showFileHistory">
           <template #icon>
             <Icon icon="material-symbols:history-rounded" width="24" height="24" />
           </template>

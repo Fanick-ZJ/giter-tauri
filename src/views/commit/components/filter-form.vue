@@ -18,6 +18,10 @@ const props = defineProps({
   authorList: {
     type: Array as PropType<Author[]>,
     default: () => [] 
+  },
+  disabled: {
+    type: Boolean,
+    default: true 
   }
 })
 
@@ -55,7 +59,7 @@ const authorSelected = computed({
 const authorOptions = computed(() => {
   return props.authorList.map((author) => {
     return {
-      label: `${author.name} ${author.email}`,
+      label: author.name,
       value: author.email
     }
   })
@@ -71,7 +75,8 @@ const clear = () => {
 
 const emit = defineEmits(['filter'])
 
-watch(() => model.value, (val) => {
+watch(model, (val) => {
+  console.log(val)
   emit('filter', val)
 }, {
   deep: true
@@ -81,6 +86,7 @@ watch(() => model.value, (val) => {
   <NForm 
     :model="model"
     label-placement="left"
+    :disabled="!props.disabled"
     class="flex flex-wrap gap-y-[5px] gap-x-[10px]">
     <NFormItem label="作者"
         path="author"

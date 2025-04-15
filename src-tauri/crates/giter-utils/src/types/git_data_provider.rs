@@ -1095,18 +1095,29 @@ impl GitDataProvider {
     /// 根据文件的oid获取文件的历史Oid和所在提交的oid
     pub fn file_history(&self, file_path: String) -> Result<Vec<FileHistoryEntry>, GitError> {
         let repo = &self.repository;
-        let head = repo.head()?;
-        let head_commit = head.peel_to_commit()?;
-        let mut revwalk = repo.revwalk()?;
-        let cache = self.get_file_history(&file_path);
-        let mut history: Vec<FileHistoryEntry> = Vec::new();
-        if let Some(cache) = cache {
-            revwalk.hide(cache[0].commit_id)?;
-            history.extend(cache.into_iter());
+        let mut cmd = Command::new("git");
+        cmd.current_dir(self.workdir());
+        cmd.args(&["log", "--follow","--format=%H", &file_path]);
+
+        let output = cmd.output()?;
+        if!output.status.success() {
+            return Err(GitError::OtherError(format!("git log failed: {}", String::from_utf8_lossy(&output.stderr))));
         }
-        revwalk.push(head_commit.id())?; 
-        for commit_oid in revwalk.by_ref().into_iter() {
-            let commit_oid = commit_oid?;
+        /*
+         * collect 的魔法： collect::<Result<Vec<_>, _>>() 的特殊性在于，
+         * 它可以将 Iterator<Item = Result<T, E>> 转换为 Result<Vec<T>, E>。这个操作会：
+         * 如果所有元素都是 Ok(T)，则合并为 Ok(Vec<T>)
+         * 如果遇到任何一个 Err(E)，则立即返回第一个遇到的错误
+         */
+        let commit_ids = String::from_utf8_lossy(&output.stdout)
+          .trim()
+          .split("\n")
+          .map(|s| str_to_oid(s))
+          .collect::<Result<Vec<_>, _>>()?;
+        println!("commit_ids: {:?}", commit_ids.len());
+        let mut history = Vec::new();
+        for commit_oid in commit_ids {
+            println!("commit_oid: {:?}", commit_oid);
             let content = self.commit_content(commit_oid)?; 
             content.iter().for_each(|file| {
                 if file.path == file_path {

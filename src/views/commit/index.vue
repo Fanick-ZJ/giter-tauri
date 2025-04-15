@@ -68,14 +68,11 @@ const init = async () => {
 }
 
 const filterChanged = _.debounce(async () => {
+  loading.value = true
   let path = repo.value!.path
-  const t1 = Date.now()
   commitsCount.value = await reference_commit_filter_count(path, curBranch.value!.name, filterModel.value)
-  console.log("统计数量", commitsCount.value)
-  const t2 = Date.now()
-  console.log("统计数量耗时", t2 - t1)
   getCommits()
-}, 1000)
+}, 100 )
 
 const getCommits = _.debounce(async () => {
   let path = repo.value!.path
@@ -198,7 +195,7 @@ const {
       </div>
     </template>
     <template #filter-form>
-      <FilterForm v-if="showFilter" :author-list="authors" v-bind:model-value="filterModel" @filter="filterChanged"></FilterForm>
+      <FilterForm :disabled="!loading" v-if="showFilter" :author-list="authors" v-bind:model-value="filterModel" @filter="filterChanged"></FilterForm>
     </template>
     <NFlex @contextmenu="handleContextMenu" :data-repo="repo?.path">
       <template v-for="c in commits">
