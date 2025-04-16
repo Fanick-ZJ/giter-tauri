@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Window } from "@tauri-apps/api/window"
 import { computed, nextTick, onBeforeUnmount, PropType, Ref, ref, shallowRef } from 'vue';
 import { DiffContent, CommitFile } from '@/types';
 import { Icon } from '@iconify/vue';
@@ -234,8 +235,7 @@ const applyEditorStyle = () => {
 }
 
 const showFileHistory = () => {
-  fileHistory(props.repo, props.file.path).then(res => {
-    console.log(res)
+  fileHistory(props.repo, props.file.path).then(async res => {
   })
 }
 

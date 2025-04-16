@@ -1,5 +1,4 @@
-use git2::Oid;
-use tauri::Manager;
+use tauri::{Manager, Url, WebviewBuilder};
 use serde_json::Value;
 use std::{collections::HashMap, path::PathBuf, sync::Mutex, thread};
 use crate::{
@@ -359,4 +358,35 @@ pub async fn switch_branch(repo: RepoPath, branch: Branch) -> DataResult<()> {
 pub async fn file_history(repo: RepoPath, file_path: String) -> DataResult<Vec<FileHistoryEntry>> {
     let provider = get_provider(&repo)?;
     provider.file_history(file_path)
+}
+
+#[tauri::command]
+pub fn create_window(
+    app: tauri::AppHandle,
+    label: &str,
+    title: &str,
+    url: &str,
+    width: f64,
+    height: f64,
+    fullscreen: bool,
+    resizable: bool
+) {
+    let windows = app.windows();
+    if windows.get(label).is_some() {
+        return; 
+    }
+    let window = tauri::window::WindowBuilder::new(
+        &app,
+        label, // 必须唯一
+        )
+        .title(title)
+        .inner_size(width, height)
+        .fullscreen(fullscreen)
+        .resizable(resizable)
+        .build()
+        .expect("无法创建窗口");
+    
+    let url = tauri::WebviewUrl::External(Url::parse(url).unwrap());
+    let webview = WebviewBuilder::new(label, url);
+    window.add_child(webview, tauri::LogicalPosition::new(0, 0), window.inner_size().unwrap());
 }
