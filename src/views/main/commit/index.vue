@@ -42,7 +42,6 @@ const filterModel = ref<CommitFilter>({
   message: undefined,
 })
 
-let single_repo_unlisten
 const init = async () => {
   loading.value = true
   let path = repo.value!.path
@@ -98,14 +97,12 @@ onBeforeUnmount(() => {
   changed_listen.then((unlisten) => {
     unlisten()
   }) 
-  single_repo_unlisten()
 })
 // 监听路由变化，重新获取数据
 watch(()=> route.path, () => {
-  if (route.path.startsWith('/commit')) {
+  if (route.path.startsWith('/main/commit')) {
     id.value = parseInt(route.params.id as string)
     repo.value = repoStore.getRepoById(id.value)
-    single_repo_unlisten && single_repo_unlisten()
     // 重置分页,筛选刷新
     page.value = 1 
     filterModel.value = {

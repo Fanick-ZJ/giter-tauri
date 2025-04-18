@@ -5,17 +5,24 @@ export const router = createRouter({
   routes: [
     {
       path: "/",
-      component: () => import("@/views/home/index.vue") 
+      redirect: "/main" 
     },
     {
-      name: "commit",
-      path: "/commit/:id",
-      component: () => import("@/views/commit/index.vue")
-    },
-    {
-      name: "contribution",
-      path: "/contribution/:path",
-      component: () => import("@/views/contribution/index.vue") 
+      name: 'main',
+      path: '/main',
+      component: () => import('@/views/main/index.vue'),
+      children: [
+        {
+          name: "commit",
+          path: "/main/commit/:id",
+          component: () => import("@/views/main/commit/index.vue")
+        },
+        {
+          name: "contribution",
+          path: "/main/contribution/:path",
+          component: () => import("@/views/main/contribution/index.vue") 
+        }   
+      ]
     }
   ]
 })

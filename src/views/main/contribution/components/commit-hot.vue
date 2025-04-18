@@ -161,11 +161,10 @@ const handleClick = (e: MouseEvent) => {
     emit('date-click', el.getAttribute('data-date')!)
   } 
 }
-
-const emit = defineEmits({
-  'switch-year': (year: number) => undefined ,
-  'date-click': (date: string) => undefined,
-})
+const emit = defineEmits<{
+  (e: 'switch-year', year: number): void,
+  (e: 'date-click', date: string): void,
+}>()
 
 </script>
 <template>

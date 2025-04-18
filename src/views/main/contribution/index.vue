@@ -78,7 +78,7 @@ const init = async () => {
 
 // 监听路由变化，重新获取数据
 watch(()=> route.path, () => {
-  if (route.path.startsWith('/contribution')) {
+  if (route.path.startsWith('/main/contribution')) {
     repo.value = repoStore.getRepoByPath(route.params.path as string)
     init().catch((err) => {
       window.$message.error(err) 
@@ -194,7 +194,6 @@ const handleClick = (date: string) => {
   console.log(repo.value!.path, currentBranch.value!)
   getBranchCommitsAfterFilter(repo.value!.path, currentBranch.value!, {
     author: curAuthor.value,
-    count: 1 << 31,
     startTime: startTime.getTime(),
     endTime: endTime.getTime()
   }).then((res) => {
