@@ -2,7 +2,7 @@
 import { NFlex } from 'naive-ui'
 import { EXPAND_MIN_WIDTH, MIN_HEIGHT, REPOLIST_MAX_WIDTH, REPOLIST_WIDTH } from '@/const'
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window'
-import { nextTick, provide, ref, StyleValue } from 'vue'
+import { nextTick, onMounted, provide, ref, StyleValue } from 'vue'
 import RepoHome from '@/components/repo-home/index.vue'
 import ExtendPage from '@/components/extend-page/index.vue';
 import { viewExtend, viewShrink } from '@/types/key';

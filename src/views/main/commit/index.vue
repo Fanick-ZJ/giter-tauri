@@ -113,7 +113,7 @@ watch(()=> route.path, () => {
       message: undefined
     }
     init().catch((err) => {
-      window.$message.error(err.data) 
+      window.$message.error(`获取数据失败: ${err.data}`) 
     })
   }
 }, {immediate: true})

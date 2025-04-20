@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { Window } from "@tauri-apps/api/window"
 import { computed, nextTick, onBeforeUnmount, PropType, Ref, ref, shallowRef } from 'vue';
 import { DiffContent, CommitFile } from '@/types';
 import { Icon } from '@iconify/vue';
-import { NCard, NWatermark, NFlex, NButton } from 'naive-ui';
+import { NCard, NWatermark, NFlex, NButton, useDialog } from 'naive-ui';
 import * as monaco from 'monaco-editor';
-import { getMonacoLanguage } from '@/utils/tool';
+import { bytesToString, getMonacoLanguage, withMinDelay } from '@/utils/tool';
 import LoadingView from '@/components/common/loading-view.vue';
 import { fileDiff, getBlobContent, fileHistory } from '@/utils/command';
 import { BinaryResult, processBinaryData } from './utils';
+import FileHistoryWindow from "@/windows/file-history";
 
 defineOptions({
   name: 'DiffDetailComponent' 
@@ -25,6 +25,7 @@ const props = defineProps({
   }
 })
 
+const dialog = useDialog()
 const diffContent = ref<DiffContent>()
 let addedLines: Ref<number[]> = ref([])
 let deletedLines: Ref<number[]> = ref([])
@@ -68,14 +69,12 @@ const load = async () => {
   else if (props.file.status === 'Deleted') {
     getBlobContent(props.repo, props.file.prevObjectId).then(async res => {
       // 将u8数组转换为字符串
-      const view = new Uint8Array(res);
-      const decoder = new TextDecoder('utf-8');
-      const str = decoder.decode(view)
+      const content = bytesToString(res)
       success.value = true
-      deletedLines.value = str.split('\n').map((_, i) => i)
+      deletedLines.value = content.split('\n').map((_, i) => i)
 
       await nextTick()
-      initEditor(str)
+      initEditor(content)
       applyEditorStyle()
     }).catch(err => {
       console.error(err)
@@ -235,7 +234,27 @@ const applyEditorStyle = () => {
 }
 
 const showFileHistory = () => {
-  fileHistory(props.repo, props.file.path).then(async res => {
+  const historyHandle = withMinDelay(() => fileHistory(props.repo, props.file.path), 500)
+  let cancled = false
+  const d = dialog.success({
+    title: '获取历史记录中....',
+    content: `正在获取${props.file.path}的历史记录`,
+    positiveText: '取消',
+    maskClosable: false,
+    onEsc: () => {
+      cancled = true
+    },
+    onClose: () => {
+      cancled = true
+    },
+    onPositiveClick: () => {
+      cancled = true
+    },
+  })
+  historyHandle.then(res => {
+    if (cancled) return
+    d.destroy()
+    FileHistoryWindow.addHistoryTab(props.repo, res)
   })
 }
 

@@ -1,6 +1,7 @@
 import { SEPERATOR } from "@/const"
 import { openPath } from '@tauri-apps/plugin-opener';
 import _ from "lodash";
+import { NDialogProvider } from "naive-ui";
 import { Component, ComponentPublicInstance, createVNode, render, VNode, VNodeProps } from "vue";
 
 // 打开指定路径的文件管理器
@@ -48,19 +49,22 @@ export function createSingletonComponent<T extends Component>(
     throw new Error(`Component with class name ${className} already exists`)
   }
 
-  // 创建容器
+  // 创建容器，这里还需要为容器添加额外的NDialogProvider之类的组件
   let container = document.querySelector(`.${className}`) as HTMLElement
+  
   if (!container) {
     container = document.createElement('div')
     container.className = className
     parent.appendChild(container)
   }
-
   // 创建虚拟节点
   const vm = createVNode(component, options.props)
+  const dialogProvider = createVNode(NDialogProvider, null, {
+    default: () => [vm]
+  })
 
   // 挂载组件
-  render(vm, container)
+  render(dialogProvider, container)
 
   // 创建卸载方法
   const unmount = () => {
@@ -158,14 +162,20 @@ export const extname = (path: string) => {
 export async function withMinDelay<T extends (...args: any[]) => Promise<any>>(
   fn: T,
   delay: number,
-  cb: () => void
-): Promise<ReturnType<T>>{
+  cb?: () => void
+): Promise<Awaited<ReturnType<T>>>{
   const start = Date.now()
   const res = await fn()
   const elapsed = Date.now() - start
   const remaining = Math.max(delay - elapsed, 0)
-  console.log(remaining)
   await new Promise(resolve => setTimeout(resolve, remaining))
-  cb()
+  cb && cb()
   return res
+}
+
+export const bytesToString = (buffer: number[]) => {
+  const view = new Uint8Array(buffer);
+  const decoder = new TextDecoder('utf-8');
+  const str = decoder.decode(view)
+  return str;
 }

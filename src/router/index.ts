@@ -1,7 +1,7 @@
-import { createMemoryHistory, createRouter } from "vue-router";
+import { createMemoryHistory, createRouter, createWebHistory } from "vue-router";
 
 export const router = createRouter({
-  history: createMemoryHistory(),
+  history: createWebHistory(),
   routes: [
     {
       path: "/",
@@ -23,6 +23,11 @@ export const router = createRouter({
           component: () => import("@/views/main/contribution/index.vue") 
         }   
       ]
+    },
+    {
+      name: 'file-history',
+      path: '/file_history',
+      component: () => import('@/views/file-history/index.vue')
     }
   ]
 })

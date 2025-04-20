@@ -81,7 +81,7 @@ watch(()=> route.path, () => {
   if (route.path.startsWith('/main/contribution')) {
     repo.value = repoStore.getRepoByPath(route.params.path as string)
     init().catch((err) => {
-      window.$message.error(err) 
+      window.$message.error(`获取数据失败${err}`) 
     })
   }
 }, {immediate: true})

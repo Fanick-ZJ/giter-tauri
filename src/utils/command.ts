@@ -1,6 +1,6 @@
 import { ADD_WATCH, BLOB_CONTENT, COMMIT_CONTENT, FILE_DIFF, GET_AUTHORS, GET_BRANCHES, GET_COMMIT, GET_BRANCH_COMMITS, GET_CURRENT_BRANCH, GET_DRIVER, GET_FOLDERS, GET_SEPARATOR, IS_REPO, REMOVE_WATCH, SET_OWNERSHIP, WORK_STATUS, BRANCH_COMMIT_CONTRIBUTION, GET_GLOBAL_AUTHOR, GET_REPO_AUTHOR, GET_BRANCH_COMMITS_AFTER_FILTER, GET_CHANGED_FILES, GET_STAFED_FILES, ADD_TO_STAGE, REMOVE_FROM_STAGE, CHECKOUT_FILE, COMMIT, CURRENT_REMOTE_BRANCH, PUSH, PULL, SWITCH_BRANCH, REPO_SINGLE_SUBMIT, REPO_SINGLE_UNSUBMIT, FILE_HISTORY, BEFORE_REFERENCE_COMMITS_COUNT, REFERENCE_COMMIT_FILTER_DETAILS, REFERENCE_COMMIT_FILTER_COUNT } from "@/const/command";
 import { BRANCH_COMMIT_CONTRIBUTION_KEY, SINGLE_REPO_EMIT } from "@/const/listen";
-import { Author, Branch, Commit, CommitFilter, CommitStatistic, DiffContent, CommitFile, ChangedFile } from "@/types";
+import { Author, Branch, Commit, CommitFilter, CommitStatistic, DiffContent, CommitFile, ChangedFile, FileHistoryItem } from "@/types";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -254,5 +254,5 @@ export const singleRepoSubmit = (repo: RepoPath, cb: () => void) => {
 }
 
 export const fileHistory = (repo: RepoPath, filePath: string) => {
-  return bus.invoke(FILE_HISTORY, { repo, filePath }) 
+  return bus.invoke<FileHistoryItem[]>(FILE_HISTORY, { repo, filePath }) 
 }

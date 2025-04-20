@@ -8,7 +8,7 @@ use serde::{
 };
 use crate::util::str_to_oid;
 
-use super::{author::Author, status::FileStatus};
+use super::{author::Author, commit::Commit, status::FileStatus};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -181,15 +181,9 @@ impl Serialize for ChangedFile {
 
 #[derive(Debug, Clone)]
 pub struct FileHistoryEntry {
-    pub commit_id: Oid,
     /// 文件在该提交中的状态
     pub file: CommittedFile,
-    /// 提交时间戳 (秒级Unix时间戳)
-    pub commit_date: i64,
-    /// 提交者信息
-    pub author: Author,
-    /// 完整的提交消息
-    pub message: String,
+    pub commit: Commit
 }
 
 impl Serialize for FileHistoryEntry {
@@ -197,12 +191,9 @@ impl Serialize for FileHistoryEntry {
     where
         S: serde::Serializer,
     {
-        let mut s = serializer.serialize_struct("FileHistoryEntry", 5)?;
-        s.serialize_field("commitId", &self.commit_id.to_string())?; 
+        let mut s = serializer.serialize_struct("FileHistoryEntry", 2)?;
+        s.serialize_field("commit", &self.commit)?; 
         s.serialize_field("file", &self.file)?;
-        s.serialize_field("commitDate", &self.commit_date)?;
-        s.serialize_field("author", &self.author)?;
-        s.serialize_field("message", &self.message)?;
         s.end()
     } 
 }
@@ -225,34 +216,20 @@ impl<'de> Deserialize<'de> for FileHistoryEntry {
             where
                 V: serde::de::MapAccess<'de>,
             {
-                let mut commit_id = None;
+                let mut commit = None;
                 let mut file = None;
-                let mut commit_date = None;
-                let mut author = None;
-                let mut message = None;
 
                 while let Some(key) = map.next_key()? {
                     match key {
-                        "commitId" => commit_id = {
-                            let s = map.next_value::<String>()?;
-                            Some(str_to_oid(&s).map_err(|_|DeError::invalid_value(
-                                serde::de::Unexpected::Str(&s), 
-                                &"a valid Git object ID (40-character hex string)"))?)
-                        },
+                        "commit" => commit = Some(map.next_value()?),
                         "file" => file = Some(map.next_value()?),
-                        "commitDate" => commit_date = Some(map.next_value()?),
-                        "author" => author = Some(map.next_value()?),
-                        "message" => message = Some(map.next_value()?),
                         _ => (),
                     }
                 }
 
                 Ok(FileHistoryEntry {
-                    commit_id: commit_id.ok_or_else(|| DeError::missing_field("commitId"))?,
+                    commit: commit.ok_or_else(|| DeError::missing_field("commit"))?,
                     file: file.ok_or_else(|| DeError::missing_field("file"))?,
-                    commit_date: commit_date.ok_or_else(|| DeError::missing_field("commitDate"))?,
-                    author: author.ok_or_else(|| DeError::missing_field("author"))?,
-                    message: message.ok_or_else(|| DeError::missing_field("message"))?,
                 })
             }
         }
@@ -271,18 +248,12 @@ impl<'de> Deserialize<'de> for FileHistoryEntry {
 
 impl FileHistoryEntry {
     pub fn new(
-        commit_id: Oid,
+        commit: Commit,
         file: CommittedFile,
-        commit_date: i64,
-        author: Author,
-        message: String,
     ) -> Self {
         Self {
-            commit_id,
+            commit,
             file,
-            commit_date,
-            author,
-            message,
         }
     }
 }

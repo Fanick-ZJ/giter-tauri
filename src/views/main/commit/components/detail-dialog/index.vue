@@ -169,7 +169,7 @@ watch(() => page.value, async () => {
           :native-scrollbar="false"
           >
           <NFlex justify="center">
-            <template v-for="item in pageItems" :key="item.objectId">
+            <template v-for="item in pageItems" :key="item.objectId + item.path">
               <DiffDetailComponent ref="diffDetailRefs" :repo="repo" :file="item" />
             </template>
             <NPagination

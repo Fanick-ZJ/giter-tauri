@@ -97,6 +97,11 @@ export type CommitFilter = {
   message?: string,
 }
 
+export type FileHistoryItem = {
+  commit: Commit,
+  file: CommitFile,
+}
+
 declare global {
   interface Window {
     $message: MessageApiInjection;

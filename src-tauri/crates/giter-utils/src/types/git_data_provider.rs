@@ -1097,7 +1097,7 @@ impl GitDataProvider {
         let repo = &self.repository;
         let mut cmd = Command::new("git");
         cmd.current_dir(self.workdir());
-        cmd.args(&["log", "--follow","--format=%H", &file_path]);
+        cmd.args(&["log", "--follow","--format=%H", "--", &file_path]);
 
         let output = cmd.output()?;
         if!output.status.success() {
@@ -1119,18 +1119,11 @@ impl GitDataProvider {
         for commit_oid in commit_ids {
             println!("commit_oid: {:?}", commit_oid);
             let content = self.commit_content(commit_oid)?; 
-            content.iter().for_each(|file| {
+            for file in content.iter() {
                 if file.path == file_path {
-                    if let Ok(commit) = repo.find_commit(commit_oid) {
-                        let date = commit.time().seconds();
-                        let author = self.get_commit_author(&commit_oid);
-                        let message = commit.message().unwrap().trim().to_string();
-                        if let Ok(author) = author {
-                            history.push(FileHistoryEntry::new(commit_oid, file.clone(), date, author, message)); 
-                        }
-                    }
+                    history.push(FileHistoryEntry::new(Commit::from_oid(commit_oid, repo)?, file.clone())); 
                 }
-            });
+            }
         }
         if history.len() > 0 {
             self.set_file_history(&file_path, &history); 

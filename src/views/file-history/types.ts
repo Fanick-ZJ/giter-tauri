@@ -1,0 +1,1 @@
+export const HistoryTabInjectKey = Symbol('HistoryTabInjectKey')
