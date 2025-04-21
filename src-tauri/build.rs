@@ -21,6 +21,8 @@ fn generaste_ts_error_enum() {
         error_code.push_str(&ts_code);
         error_code.push_str("\n");
     }
+    error_code.push_str("\n");
+    error_code.push_str("export type ErrorCode = typeof CommonErrorCode | typeof GitUtilsErrorCode | typeof WatcherErrorCode");
     fs::write(r"..\src\enum\error.ts", error_code).unwrap();
 }
 
@@ -32,7 +34,7 @@ fn generate_ts_code((path, error_name): (&str, &str)) -> String {
     let mut variants = vec![];
     for item in ast.items {
         if let syn::Item::Enum(item_enum) = item {
-            if item_enum.ident == "ErrorCode" {
+            if item_enum.ident.to_string().ends_with("ErrorCode") {
                 for variant in item_enum.variants {
                     variants.push(variant.ident.to_string());
                 }
@@ -49,7 +51,7 @@ export const {} = {{
         variants.iter().enumerate()
             .map(|(i, v)| format!("{}: {}", v, i))
             .collect::<Vec<_>>()
-            .join(",\n\t")
+            .join(",\n  ")
     );
     return ts_code;
 }

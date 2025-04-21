@@ -17,7 +17,11 @@ pub fn wrapper(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #vis fn #func_name(#inputs) #output {
             let __result: Result<_, _> = (|| #block)();
             use types::error::CommandError;
-            __result.map_err(|e| CommandError::new(stringify!(#func_name), e))
+            
+            __result.map_err(|e| {
+                let etype = std::any::type_name_of_val(&e).split("::").last().unwrap().to_string();
+                CommandError::new(stringify!(#func_name), e, etype)
+            })
         }
     };
     

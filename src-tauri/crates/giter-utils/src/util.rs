@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use crate::types::author::Author;
 use crate::types::commit::Commit;
-use crate::types::error::ErrorCode;
+use crate::types::error::GitUtilsErrorCode;
 use crate::types::file::CommittedFile;
 use crate::types::status::FileStatus;
 
@@ -293,11 +293,11 @@ pub fn size_by_path<P: AsRef<Path>>(path: P) -> Result<u64> {
     let metadata = std::fs::metadata(path)?;
     Ok(metadata.len()) 
 }
-pub fn str_to_oid(str: &str) -> Result<Oid, ErrorCode> {
+pub fn str_to_oid(str: &str) -> Result<Oid, GitUtilsErrorCode> {
     let oid = Oid::from_str(str);
     match oid {
         Ok(oid) => Ok(oid),
-        Err(_) => Err(ErrorCode::OtherError(format!("invalid object id: {}", str))), 
+        Err(_) => Err(GitUtilsErrorCode::OtherError(format!("invalid object id: {}", str))), 
     }
 }
 

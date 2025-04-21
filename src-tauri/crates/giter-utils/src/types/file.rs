@@ -6,9 +6,8 @@ use serde::{
     ser::SerializeStruct,
     Deserialize, Deserializer, Serialize
 };
-use crate::util::str_to_oid;
 
-use super::{author::Author, commit::Commit, status::FileStatus};
+use super::{commit::Commit, status::FileStatus};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]

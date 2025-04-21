@@ -5,7 +5,7 @@ use crate::{
     core::handle, emit::emit_branch_contribution, types::{
         cache::RepoPath, 
         error::{
-            CommandError, ErrorCode as CommonError
+            CommandError, CommonErrorCode as CommonError
         },
         fs::Dir, store
     }, utils::{
@@ -17,23 +17,23 @@ use giter_macros::command_result;
 use giter_utils::{
     types::{
         author::Author, branch::Branch, cache::Cache, 
-        commit::Commit, diff::ContentDiff, error::ErrorCode as GitError, 
+        commit::Commit, diff::ContentDiff, error::GitUtilsErrorCode, 
         file::{ChangedFile, CommittedFile, FileHistoryEntry}, git_data_provider::GitDataProvider, 
         status::WorkStatus
     },
     util::{is_git_repo, set_owner, str_to_oid},
 };
 use giter_watcher::{
-    modify_watcher::ModifyWatcher, error::ErrorCode as WatcherError
+    modify_watcher::ModifyWatcher, error::WatcherErrorCode as WatcherError
 };
 
-type DataResult<T> = std::result::Result<T, CommandError<GitError>>;
+type DataResult<T> = std::result::Result<T, CommandError<GitUtilsErrorCode>>;
 type CommonResult<T> = std::result::Result<T, CommandError<CommonError>>;
 type WatcherResult<T> = std::result::Result<T, CommandError<WatcherError>>;
 
 
 
-fn get_provider(repo: &str) -> Result<GitDataProvider, GitError> {
+fn get_provider(repo: &str) -> Result<GitDataProvider, GitUtilsErrorCode> {
     let handle = handle::Handle::global();
     let mut provider = GitDataProvider::new(repo)?;
     let cache = handle.cache().unwrap();
@@ -179,7 +179,7 @@ pub async fn set_repo_ownership(repo: RepoPath) -> CommonResult<bool> {
         Err(_) => match set_owner(&repo) {
             Ok(_) => Ok(true),
             Err(err) => {
-                let e = GitError::Git2Error(err);
+                let e = GitUtilsErrorCode::Git2Error(err);
                 Err(CommonError::SetGlobalConfigError(e.to_string()))
             }
         },
@@ -256,7 +256,7 @@ pub async fn get_branch_commit_contribution(key: String, repo: RepoPath, branch:
         let contrib = provider.get_branch_commit_contribution(&branch);
         emit_branch_contribution(&key, contrib);
     });
-    Ok::<(), GitError>(())
+    Ok::<(), GitUtilsErrorCode>(())
 }
 
 #[tauri::command]
@@ -330,7 +330,7 @@ pub async fn checkout_file(repo: RepoPath, path: String) -> DataResult<()> {
 pub async fn commit(repo: RepoPath, message: &str, update_ref: Option<&str>) -> DataResult<String> {
     let provider = get_provider(&repo)?;
     let commit_id = provider.commit(message, update_ref)?;
-    Ok::<String, GitError>(commit_id.to_string())
+    Ok::<String, GitUtilsErrorCode>(commit_id.to_string())
 }
 
 #[tauri::command]

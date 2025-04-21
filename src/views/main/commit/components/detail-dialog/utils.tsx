@@ -17,13 +17,13 @@ const isImage = (file: CommitFile) => {
   return imageTypes.includes(fileType?.toLowerCase() || '')
 }
 
-const readFile = (repo: String,  cid: String) => {
+const readFile = (repo: string,  cid: String) => {
   return getBlobContent(repo, cid).then((res) => {
     return new Uint8Array(res);
   })
 } 
 
-const processImage  = (repo: String,  file: CommitFile) => {
+const processImage  = (repo: string,  file: CommitFile) => {
   const result: BinaryResult = [undefined, undefined]
   let _resolve: (res: BinaryResult) => void
   let _reject: (err: any) => void
@@ -94,7 +94,7 @@ const processImage  = (repo: String,  file: CommitFile) => {
   return promise
 }
 
-export const processBinaryData = (repo: String,  file: CommitFile) => {
+export const processBinaryData = (repo: string,  file: CommitFile) => {
   if (isImage(file)) {
     return processImage(repo, file)
   }

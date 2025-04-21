@@ -2,7 +2,6 @@ import { STATUS_CHANGE } from "@/const/listen";
 import { RepoStatus, SetupStoreId } from "@/enum";
 import { Repository } from "@/types";
 import { addWatch, isRepo, removeWatch, workStatus } from "@/utils/command";
-import { cmdErrNotify } from "@/utils/err-notify";
 import { readRepos, removeRepo, saveRepo, updateRepo } from "@/utils/store";
 import { listen } from "@tauri-apps/api/event";
 import { QueryResult } from "@tauri-apps/plugin-sql";
@@ -26,16 +25,16 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
       }
       status.set(repo.path, ref(RepoStatus.Ok))
       try {
-       const _status = await workStatus(repo.path) 
-       repo.valid = true
-       setStatus(repo.path, _status as RepoStatus)
+        const _status = await workStatus(repo.path) 
+        repo.valid = true
+        setStatus(repo.path, _status as RepoStatus)
       } catch (error) {
-        cmdErrNotify(error as any, () => workStatus(repo.path))
+        window.$message.error('获取仓库状态失败')
         repo.valid = false
       }
       return repo
     }).catch((err) => {
-      cmdErrNotify(err, () => isRepo(repo.path))
+      window.$message.error('获取仓库状态失败')
       return repo
     })
   }

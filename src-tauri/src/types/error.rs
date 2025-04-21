@@ -1,5 +1,3 @@
-use std::process::Command;
-
 use serde::{ser::SerializeStruct, Serialize};
 use giter_traits::ExposeError;
 use strum_macros::{EnumDiscriminants, EnumIter};
@@ -11,14 +9,16 @@ use thiserror::Error;
 pub struct CommandError<T>{
     pub func: String,
     pub error: Option<T>,
+    pub etype: String,
 }
 impl <T> CommandError<T>
 where T: std::fmt::Display + giter_traits::ExposeError
 {
-    pub fn new(func: &str, e: T) -> Self {
+    pub fn new(func: &str, e: T, etype: String) -> Self {
         Self {
             func: func.to_string(),
             error: Some(e),
+            etype,
         }
     }
 }
@@ -26,10 +26,11 @@ where T: std::fmt::Display + giter_traits::ExposeError
 impl <T> CommandError<T>
 where T: AsRef<dyn giter_traits::ExposeError>
 {
-    pub fn from_command(func: &str, e: T) -> Self {
+    pub fn from_command(func: &str, e: T, etype: String) -> Self {
         Self {
             func: func.to_string(),
             error: Some(e.into()),
+            etype,
         }
     }
 }
@@ -41,11 +42,12 @@ where T: std::fmt::Display + giter_traits::ExposeError
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("CommandError", 4)?;
+        let mut state = serializer.serialize_struct("CommandError", 5)?;
         state.serialize_field("code", &self.error.as_ref().unwrap().code())?;
         state.serialize_field("message", &self.error.as_ref().unwrap().to_string())?;
         state.serialize_field("func", &self.func)?;
         state.serialize_field("module", &self.error.as_ref().unwrap().module())?;
+        state.serialize_field("etype", &self.etype)?;
         state.end()
     }
 }
@@ -53,7 +55,7 @@ where T: std::fmt::Display + giter_traits::ExposeError
 
 #[derive(Error, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(EnumIter))]
-pub enum ErrorCode {
+pub enum CommonErrorCode {
     #[error("Get watcher center failed")]
     GetWatcherCenterFailed,
     #[error("Get repos failed")]
@@ -68,9 +70,9 @@ pub enum ErrorCode {
     GetGlobalConfigError(String),
 }
 
-impl ExposeError for ErrorCode {
+impl ExposeError for CommonErrorCode {
     fn code(&self) -> u32 {
-        ErrorCodeDiscriminants::from(self) as u32
+        CommonErrorCodeDiscriminants::from(self) as u32
     }
     
     fn module(&self) -> &str {

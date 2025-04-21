@@ -9,7 +9,7 @@ use serde::{
 
 use crate::util::str_to_oid;
 
-use super::error::ErrorCode;
+use super::error::GitUtilsErrorCode;
 
 #[derive(Debug, Clone)]
 pub struct Commit {
@@ -52,7 +52,7 @@ impl Commit {
         }
     }
 
-    pub fn from_oid(oid: Oid, repo: &Repository) -> Result<Self, ErrorCode> {
+    pub fn from_oid(oid: Oid, repo: &Repository) -> Result<Self, GitUtilsErrorCode> {
         let commit = repo.find_commit(oid)?;
         let time = commit.time().seconds();
         let author = commit.author();

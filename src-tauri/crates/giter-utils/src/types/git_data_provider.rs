@@ -46,7 +46,7 @@ use super::file::CommittedFile;
 use super::file::UntrackedFile;
 use super::status::status_to_changed_status;
 use super::status::FileStatus;
-use super::error::ErrorCode as GitError;
+use super::error::GitUtilsErrorCode;
 
 
 pub struct GitDataProvider {
@@ -66,7 +66,7 @@ impl Pointer for GitDataProvider {
 }
 
 impl GitDataProvider {
-    pub fn new<P: AsRef<Path>>(repository: P) -> Result<Self, GitError> {
+    pub fn new<P: AsRef<Path>>(repository: P) -> Result<Self, GitUtilsErrorCode> {
         let repo = Repository::open(&repository);
         match repo {
             Ok(repo) => Ok(GitDataProvider {
@@ -75,9 +75,9 @@ impl GitDataProvider {
             }),
             Err(err) => {
                 match err.code() {
-                    git2::ErrorCode::NotFound => Err(GitError::RepoNotFound(repository.as_ref().display().to_string())),
-                    git2::ErrorCode::Owner => Err(GitError::NoOwner(repository.as_ref().display().to_string())),
-                    _ => Err(GitError::OtherError(err.message().to_string())),
+                    git2::ErrorCode::NotFound => Err(GitUtilsErrorCode::RepoNotFound(repository.as_ref().display().to_string())),
+                    git2::ErrorCode::Owner => Err(GitUtilsErrorCode::NoOwner(repository.as_ref().display().to_string())),
+                    _ => Err(GitUtilsErrorCode::OtherError(err.message().to_string())),
                 }
             }
         }
@@ -91,7 +91,7 @@ impl GitDataProvider {
         self.repository.workdir().unwrap()
     }
 
-    pub fn author(&self) -> Result<Author, GitError> {
+    pub fn author(&self) -> Result<Author, GitUtilsErrorCode> {
         let config = self.repository.config()?;
         let name = config.get_string("user.name")?;
         let email = config.get_string("user.email")?;
@@ -108,7 +108,7 @@ impl GitDataProvider {
 
     /// 获取位追踪的文件列表
     ///
-    pub fn untracked_files(&self) -> Result<Vec<UntrackedFile>, GitError> {
+    pub fn untracked_files(&self) -> Result<Vec<UntrackedFile>, GitUtilsErrorCode> {
         let status = self.repository.statuses(None)?;
         let mut untracks: Vec<UntrackedFile> = Vec::new();
         for item in &status {
@@ -116,7 +116,7 @@ impl GitDataProvider {
                 let abs_path = self.blob_path(item.path().unwrap());
                 let size = size_by_path(&abs_path)? as usize;
                 let is_binary = is_binary_file(&abs_path)
-                    .map_err(|e| GitError::OtherError(e.to_string()))?;
+                    .map_err(|e| GitUtilsErrorCode::OtherError(e.to_string()))?;
                 let untracked_file = UntrackedFile::new(&abs_path, size, is_binary);
                 untracks.push(untracked_file);
             }
@@ -126,7 +126,7 @@ impl GitDataProvider {
 
     ///工作空间是否有修改
     ///
-    pub fn workspace_change(&self) -> Result<Vec<String>, GitError> {
+    pub fn workspace_change(&self) -> Result<Vec<String>, GitUtilsErrorCode> {
         let status = self.repository.statuses(None)?;
         let mut modified: Vec<String> = Vec::new();
         let index_status = Status::WT_DELETED.bits()
@@ -143,7 +143,7 @@ impl GitDataProvider {
         Ok(modified)
     }
 
-    pub fn uncommitted(&self) -> Result<bool, GitError> {
+    pub fn uncommitted(&self) -> Result<bool, GitUtilsErrorCode> {
         let status = self.repository.statuses(None)?;
         for item in &status {
             let bits = item.status().bits();
@@ -180,17 +180,17 @@ impl GitDataProvider {
         Ok(entry?.id())
     }
 
-    fn blob_is_binary(&self, oid: Oid) -> Result<bool, GitError> {
+    fn blob_is_binary(&self, oid: Oid) -> Result<bool, GitUtilsErrorCode> {
         let blob = self.repository
             .find_blob(oid)
-            .map_err(|_| GitError::BlobNotFound(oid.to_string()))?;
+            .map_err(|_| GitUtilsErrorCode::BlobNotFound(oid.to_string()))?;
         let content = blob.content();
         let is = is_binary_file_content(content.to_vec());
         Ok(is)
 
     }
 
-    pub fn staged_files(&self) -> Result<Vec<ChangedFile>, GitError> {
+    pub fn staged_files(&self) -> Result<Vec<ChangedFile>, GitUtilsErrorCode> {
         let status = self.repository.statuses(None)?;
         let mut modified: Vec<ChangedFile> = Vec::new();
         for item in &status {
@@ -211,7 +211,7 @@ impl GitDataProvider {
         Ok(modified)
     }
 
-    pub fn changed_files(&self) -> Result<Vec<ChangedFile>, GitError> {
+    pub fn changed_files(&self) -> Result<Vec<ChangedFile>, GitUtilsErrorCode> {
         let status = self.repository.statuses(None)?;
         let mut modified: Vec<ChangedFile> = Vec::new(); 
         for item in &status {
@@ -240,7 +240,7 @@ impl GitDataProvider {
         Ok(relative_path.to_path_buf()) 
     }
 
-    pub fn add_to_stage(&self, path: &PathBuf) -> Result<(), GitError> {
+    pub fn add_to_stage(&self, path: &PathBuf) -> Result<(), GitUtilsErrorCode> {
         let repo = &self.repository;
         let mut index = repo.index()?;
         index.add_path(&path)?;
@@ -248,7 +248,7 @@ impl GitDataProvider {
         Ok(()) 
     }
 
-    pub fn remove_from_stage(&self, path: &PathBuf) -> Result<(), GitError> {
+    pub fn remove_from_stage(&self, path: &PathBuf) -> Result<(), GitUtilsErrorCode> {
         let repo = &self.repository;
         let staged_files = self.staged_files()?;
         let file = staged_files
@@ -269,7 +269,7 @@ impl GitDataProvider {
                 if let Some(entry) = entry {
                     index.add_frombuffer(&entry, blob.content())?;
                 } else {
-                    return Err(GitError::OtherError("File not found in index".to_string()));
+                    return Err(GitUtilsErrorCode::OtherError("File not found in index".to_string()));
                 }
             } 
         }
@@ -278,7 +278,7 @@ impl GitDataProvider {
     }
 
     /// 暂存区文件恢复到工作区
-    pub fn checkout_file (&self, path: &PathBuf) -> Result<(), GitError> {
+    pub fn checkout_file (&self, path: &PathBuf) -> Result<(), GitUtilsErrorCode> {
         let repo = &self.repository;
         // 判断当前的文件是不是新加的
         let status = self.changed_files()?;
@@ -296,7 +296,7 @@ impl GitDataProvider {
         Ok(())
     }
 
-    pub fn current_branch(&self) -> Result<Branch, GitError> {
+    pub fn current_branch(&self) -> Result<Branch, GitUtilsErrorCode> {
         let repo = &self.repository;
         let branches = repo.branches(None).unwrap();
         for branch in branches {
@@ -305,11 +305,11 @@ impl GitDataProvider {
                 return Ok(Branch::from(branch.into_reference()));
             }
         }
-        Err(GitError::CurrentBranchNotFound("No current branch found".to_string()))
+        Err(GitUtilsErrorCode::CurrentBranchNotFound("No current branch found".to_string()))
     }
 
     /// 获取分支列表
-    pub fn branches(&self) -> Result<Vec<Branch>, GitError> {
+    pub fn branches(&self) -> Result<Vec<Branch>, GitUtilsErrorCode> {
         let repo = &self.repository;
         let branches = repo.branches(None).unwrap();
         let mut _branches: Vec<Branch> = Vec::new();
@@ -321,7 +321,7 @@ impl GitDataProvider {
     }
 
     /// 获取当前分支对应的远程分支
-    pub fn current_remote_branch(&self) -> Result<Branch, GitError>{
+    pub fn current_remote_branch(&self) -> Result<Branch, GitUtilsErrorCode>{
         let current = self.current_branch()?;
         let remote = self
             .repository
@@ -331,11 +331,11 @@ impl GitDataProvider {
             Ok(remote) => {
                 Ok(Branch::from(remote.into_reference()))
             }
-            Err(_) => Err(GitError::RemoteNotFound(current.name)),
+            Err(_) => Err(GitUtilsErrorCode::RemoteNotFound(current.name)),
         }
     }
 
-    fn current_remote_branch_inner(&self) -> Result<git2::Branch, GitError> {
+    fn current_remote_branch_inner(&self) -> Result<git2::Branch, GitUtilsErrorCode> {
         let current = self.current_branch()?;
         let remote = self
             .repository
@@ -343,7 +343,7 @@ impl GitDataProvider {
             .upstream();
         match remote {
             Ok(remote) => Ok(remote),
-            Err(_) => Err(GitError::RemoteNotFound(current.name)),
+            Err(_) => Err(GitUtilsErrorCode::RemoteNotFound(current.name)),
         }
     }
 
@@ -384,7 +384,7 @@ impl GitDataProvider {
     }
 
     /// 获取仓库的文件状态
-    pub fn work_status(&self) -> Result<WorkStatus, GitError> {
+    pub fn work_status(&self) -> Result<WorkStatus, GitUtilsErrorCode> {
         let mut statuses = WorkStatus::None;
 
         // 统一错误处理，使用 map_err 转换错误类型
@@ -422,14 +422,14 @@ impl GitDataProvider {
         Ok(statuses)
     }
 
-    pub fn get_branch(&self, branch_name: &str) -> Result<Branch, GitError> {
+    pub fn get_branch(&self, branch_name: &str) -> Result<Branch, GitUtilsErrorCode> {
         let branches = self.branches()?;
         for branch in branches {
             if branch.name == branch_name {
                 return Ok(branch);
             }
         }
-        Err(GitError::BranchNotFound(branch_name.to_string()))
+        Err(GitUtilsErrorCode::BranchNotFound(branch_name.to_string()))
     }
 
     pub fn build_commits(&self, revwalk: &mut Revwalk, count: i32) -> Result<Vec<Commit>> {
@@ -468,7 +468,7 @@ impl GitDataProvider {
     }
 
     /// 获取分支所有提交(分支的最后一次提交)，git2中的提交对象
-    fn branch_commit_inner(&self, branch: &Branch) -> Result<git2::Commit, GitError> {
+    fn branch_commit_inner(&self, branch: &Branch) -> Result<git2::Commit, GitUtilsErrorCode> {
         let b_type = if branch.is_remote {
             BranchType::Remote
         } else {
@@ -476,19 +476,19 @@ impl GitDataProvider {
         };
         let branch_reference = self.repository.find_branch(&branch.name, b_type);
         if let Err(_) = branch_reference {
-            return Err(GitError::BranchNotFound(branch.name.clone()));
+            return Err(GitUtilsErrorCode::BranchNotFound(branch.name.clone()));
         }
         let branch_reference = branch_reference?;
         let branch_commit = branch_reference.get().peel_to_commit();
         if let Err(_) = branch_commit {
-            return Err(GitError::BranchNotFound(branch.name.clone()));
+            return Err(GitUtilsErrorCode::BranchNotFound(branch.name.clone()));
         }
         Ok(branch_commit?)
     }
 
     /// 获取分支的提交，返回提交对象和此分支的提交总数
     ///
-    pub fn branch_commits(&self, branch: &Branch, count: i32) -> Result<Vec<Commit>, GitError> {
+    pub fn branch_commits(&self, branch: &Branch, count: i32) -> Result<Vec<Commit>, GitUtilsErrorCode> {
         // 获取分支所在的提交
         let commit = self.branch_commit_inner(branch)?;
         let mut revwalk = self.repository.revwalk()?;
@@ -498,7 +498,7 @@ impl GitDataProvider {
     }
 
     /// 在某些情况下，使用git命令获取提交数量会更快，因为git命令是直接调用底层的git库，而不是通过rust的git2库
-    pub fn before_reference_commits_count(&self, reference: &str) -> Result<i32, GitError> {
+    pub fn before_reference_commits_count(&self, reference: &str) -> Result<i32, GitUtilsErrorCode> {
         let output = Command::new("git")
             .args(&["rev-list", "--count", reference])
             .current_dir(self.workdir())
@@ -513,7 +513,7 @@ impl GitDataProvider {
             Ok(commit_count as i32)
         } else {
             let error_message = String::from_utf8_lossy(&output.stderr);
-            return Err(GitError::OtherError(error_message.to_string()));
+            return Err(GitUtilsErrorCode::OtherError(error_message.to_string()));
         }
     }
 
@@ -539,7 +539,7 @@ impl GitDataProvider {
         files
     }
 
-    pub fn get_commit (&self, commit_id: impl Into<Oid>) -> Result<Commit, GitError> {
+    pub fn get_commit (&self, commit_id: impl Into<Oid>) -> Result<Commit, GitUtilsErrorCode> {
         let commit = self.repository.find_commit(commit_id.into())?;
         let commit = build_commit(&commit, &self.repository);
         Ok(commit)
@@ -547,7 +547,7 @@ impl GitDataProvider {
 
     /// 获取一个提交的内容
     ///
-    pub fn commit_content(&self, commit_id: impl Into<Oid>) -> Result<Vec<CommittedFile>, GitError> {
+    pub fn commit_content(&self, commit_id: impl Into<Oid>) -> Result<Vec<CommittedFile>, GitUtilsErrorCode> {
         let repo = &self.repository;
         // 获取父提交
         let commit = repo.find_commit(commit_id.into())?;
@@ -591,11 +591,11 @@ impl GitDataProvider {
 
     /// 根据oid获取文件内容
     /// oid: 提交id
-    pub fn get_blob_content(&self, oid: impl Into<Oid>) -> Result<Vec<u8>, GitError> {
+    pub fn get_blob_content(&self, oid: impl Into<Oid>) -> Result<Vec<u8>, GitUtilsErrorCode> {
         let oid = oid.into();
         let blob = self.repository.find_blob(oid);
         if blob.is_err() {
-            return Err(GitError::BlobNotFound(oid.to_string()));
+            return Err(GitUtilsErrorCode::BlobNotFound(oid.to_string()));
         }
         let blob = blob.unwrap();
         Ok(blob.content().to_vec())
@@ -605,16 +605,16 @@ impl GitDataProvider {
     /// old: 旧的文件内容
     /// new: 新的文件内容
     ///
-    pub fn get_file_diff(&self, old: impl Into<Oid>, new: impl Into<Oid>) -> Result<(Vec<DiffOp>, String), GitError> {
+    pub fn get_file_diff(&self, old: impl Into<Oid>, new: impl Into<Oid>) -> Result<(Vec<DiffOp>, String), GitUtilsErrorCode> {
         let old = old.into();
         let new = new.into();
         let old_blob = self.repository.find_blob(old);
         let new_blob = self.repository.find_blob(new);
         if old_blob.is_err() {
-            return Err(GitError::BlobNotFound(old.to_string()));
+            return Err(GitUtilsErrorCode::BlobNotFound(old.to_string()));
         }
         if new_blob.is_err() {
-            return Err(GitError::BlobNotFound(new.to_string()));
+            return Err(GitUtilsErrorCode::BlobNotFound(new.to_string()));
         }
         let old_blob = old_blob.unwrap();
         let new_blob = new_blob.unwrap();
@@ -627,7 +627,7 @@ impl GitDataProvider {
 
     /// 获取文件内容、差异
     /// 
-    pub fn get_file_content_diff(&self, old: impl Into<Oid>, new: impl Into<Oid>) -> Result<ContentDiff, GitError> {
+    pub fn get_file_content_diff(&self, old: impl Into<Oid>, new: impl Into<Oid>) -> Result<ContentDiff, GitUtilsErrorCode> {
         let old = old.into();
         let new = new.into();
         let old_blob = self.get_blob_content(old)?;
@@ -642,7 +642,7 @@ impl GitDataProvider {
     }
 
     /// 获取分支的贡献者
-    pub fn authors(&self, branch: &Branch) -> Result<Vec<Author>, GitError> {
+    pub fn authors(&self, branch: &Branch) -> Result<Vec<Author>, GitUtilsErrorCode> {
         let mut lasted_commit_id = Option::<Oid>::None;
         let mut author_set = HashSet::new();
         // 获取缓存
@@ -672,7 +672,7 @@ impl GitDataProvider {
         Ok(authors)
     }
 
-    pub fn get_commit_author(&self, commit_id: &Oid) -> Result<Author, GitError> {
+    pub fn get_commit_author(&self, commit_id: &Oid) -> Result<Author, GitUtilsErrorCode> {
         let commit = self.repository.find_commit(commit_id.clone())?;
         let author = commit.author();
         // 使用 from_utf8_lossy 处理非 UTF-8 编码
@@ -722,7 +722,7 @@ impl GitDataProvider {
     }
 
     /// 获取根据筛选条件过滤后的命令行
-    pub fn build_cinnut_filter(&self, reference: &str, filter: &HashMap<String, Value>) -> Result<Command, GitError> {
+    pub fn build_cinnut_filter(&self, reference: &str, filter: &HashMap<String, Value>) -> Result<Command, GitUtilsErrorCode> {
         let filter = FilterConditions::build_from_sv_map(filter);
         let mut cmd = Command::new("git");
         cmd.current_dir(self.workdir());
@@ -748,7 +748,7 @@ impl GitDataProvider {
         Ok(cmd)
     }
 
-    pub fn reference_commit_filter_count(&self, reference: &str, filter: &HashMap<String, Value>, offset: Option<i32>, size: Option<i32>) -> Result<i32, GitError> {
+    pub fn reference_commit_filter_count(&self, reference: &str, filter: &HashMap<String, Value>, offset: Option<i32>, size: Option<i32>) -> Result<i32, GitUtilsErrorCode> {
         let mut filter = filter.clone();
         filter.entry("offset".to_string()).or_insert(Value::from(offset.unwrap_or(0)));
         filter.entry("count".to_string()).or_insert(Value::from(size.unwrap_or(i32::MAX)));
@@ -761,7 +761,7 @@ impl GitDataProvider {
         Ok(count as i32)
     }
 
-    pub fn reference_commit_filter_details(&self, reference: &str, filter: &HashMap<String, Value>, offset: Option<i32>, size: Option<i32>) -> Result<Vec<Commit>, GitError> {
+    pub fn reference_commit_filter_details(&self, reference: &str, filter: &HashMap<String, Value>, offset: Option<i32>, size: Option<i32>) -> Result<Vec<Commit>, GitUtilsErrorCode> {
         let mut filter = filter.clone();
         filter.entry("offset".to_string()).or_insert(Value::from(offset.unwrap_or(0)));
         filter.entry("count".to_string()).or_insert(Value::from(size.unwrap_or(i32::MAX)));
@@ -782,7 +782,7 @@ impl GitDataProvider {
     }
 
  
-    pub fn commit (&self, message: &str, update_ref: Option<&str>) -> Result<Oid, GitError> {
+    pub fn commit (&self, message: &str, update_ref: Option<&str>) -> Result<Oid, GitUtilsErrorCode> {
         // 如果没有指定更新的分支，默认更新当前分支
         let update_ref =  if update_ref.is_none() {
            Some("HEAD")
@@ -791,19 +791,19 @@ impl GitDataProvider {
         };
         let repo = &self.repository;
         if repo.is_bare() {
-            return Err(GitError::RepoIsBare(repo.path().display().to_string()));
+            return Err(GitUtilsErrorCode::RepoIsBare(repo.path().display().to_string()));
         }
         let mut index = repo.index()?;
         let conflicts = index.conflicts()?;
         if conflicts.into_iter().count() > 0 {
-            return Err(GitError::RepoHasConflicts(repo.path().display().to_string())); 
+            return Err(GitUtilsErrorCode::RepoHasConflicts(repo.path().display().to_string())); 
         }
         let author = repo.signature();
         if author.is_err() {
-            return Err(GitError::RepoAuthorNoConfig);
+            return Err(GitUtilsErrorCode::RepoAuthorNoConfig);
         }
         if self.staged_files()?.len() == 0 {
-            return Err(GitError::NoStagedFile);
+            return Err(GitUtilsErrorCode::NoStagedFile);
         }
         let author = author.unwrap();
         let tree_oid = index.write_tree()?;
@@ -857,19 +857,19 @@ impl GitDataProvider {
     }
 
 
-    pub fn push(&self, remote: &str, branch_name: &str, credentials: Option<(String, String)>) -> Result<(), GitError> {
+    pub fn push(&self, remote: &str, branch_name: &str, credentials: Option<(String, String)>) -> Result<(), GitUtilsErrorCode> {
         let repo = &self.repository;
         
         // 提取远程获取和分支验证逻辑
         let mut remote = repo.find_remote(remote)
-            .map_err(|_| GitError::RemoteNotFound(branch_name.to_string()))?;
+            .map_err(|_| GitUtilsErrorCode::RemoteNotFound(branch_name.to_string()))?;
 
         let branch = repo.find_branch(branch_name, BranchType::Local)
-            .map_err(|_| GitError::BranchNotFound(branch_name.to_string()))?;
+            .map_err(|_| GitUtilsErrorCode::BranchNotFound(branch_name.to_string()))?;
         
         // 验证分支跟踪状态
         if !self.has_tracking(&branch) {
-            return Err(GitError::BranchNotTrackAny(branch_name.to_string()));
+            return Err(GitUtilsErrorCode::BranchNotTrackAny(branch_name.to_string()));
         }
 
         // 提取公共回调配置
@@ -884,8 +884,8 @@ impl GitDataProvider {
         let handle_error = |e: git2::Error| {
             log::error!("Git operation error: {:?}", e);
             match e.code() {
-                git2::ErrorCode::User => GitError::PushNeedNameAndPassword,
-                _ => return GitError::PushOtherError.into()
+                git2::ErrorCode::User => GitUtilsErrorCode::PushNeedNameAndPassword,
+                _ => return GitUtilsErrorCode::PushOtherError.into()
             }
         };
 
@@ -905,7 +905,7 @@ impl GitDataProvider {
         let remote_head = remote_commit.id();
         let local_commit = branch_ref.peel_to_commit()?;
         if !local_commit.parent_ids().any(|id| id == remote_head) {
-            return Err(GitError::RemoteHeadHasNotInLocal.into());
+            return Err(GitUtilsErrorCode::RemoteHeadHasNotInLocal.into());
         }
 
         // 执行push操作
@@ -922,14 +922,14 @@ impl GitDataProvider {
         Ok(())
     }
 
-    pub fn pull(&self, remote: &str, branch: &str, credentials: Option<(String, String)>) -> Result<(), GitError> {
+    pub fn pull(&self, remote: &str, branch: &str, credentials: Option<(String, String)>) -> Result<(), GitUtilsErrorCode> {
         let repo = &self.repository;
     
         // 1. 获取远程引用
         let mut remote = repo.find_remote(remote)
             .map_err(|e| {
                 log::error!("Find remote error: {:?}", e);
-                GitError::RemoteNotFound(remote.to_string())
+                GitUtilsErrorCode::RemoteNotFound(remote.to_string())
             })?;
         // 2. 配置回调（复用已有的凭证处理逻辑）
         let use_cache = Rc::new(RefCell::new(true));
@@ -943,14 +943,14 @@ impl GitDataProvider {
         });
         // 获取本地分支
         let local_branch = repo.find_branch(branch, BranchType::Local)
-            .map_err(|_| GitError::BranchNotFound(branch.to_string()))?;
+            .map_err(|_| GitUtilsErrorCode::BranchNotFound(branch.to_string()))?;
         let local_branch_ref = local_branch.into_reference();
 
         // 4. 获取FETCH_HEAD 提交
         remote.fetch(&[local_branch_ref.name().unwrap()], Some(&mut fetch_opts), None)
            .map_err(|e| {
             log::error!("Fetch error: {:?}", e);
-            GitError::PushOtherError
+            GitUtilsErrorCode::PushOtherError
         })?;
         let fetch_head = repo.find_reference("FETCH_HEAD")?;
         let fetch_commit = repo.reference_to_annotated_commit(&fetch_head)?;
@@ -969,7 +969,7 @@ impl GitDataProvider {
              */
             let _ = reference.set_target(fetch_commit.id(), "Fast-Forward").map_err(|e| {
                 log::error!("Set target error: {:?}", e);
-                GitError::TargetReferenceNotDirect
+                GitUtilsErrorCode::TargetReferenceNotDirect
             })?;
             repo.checkout_head(Some(CheckoutBuilder::default().force()))?;
             return Ok(());
@@ -979,10 +979,10 @@ impl GitDataProvider {
             let head_commit = repo.head()?.peel_to_commit()?;
             repo.merge(&[&fetch_commit], None, None).map_err(|e| {
                 log::error!("Merge error: {:?}", e);
-                GitError::CommitBeforePullWouldBeOverwrittenByMerge
+                GitUtilsErrorCode::CommitBeforePullWouldBeOverwrittenByMerge
             })?;
             // 创建合并提交
-            let signature = repo.signature().map_err(|_| GitError::UserUnConfigured)?;
+            let signature = repo.signature().map_err(|_| GitUtilsErrorCode::UserUnConfigured)?;
             let tree_id = repo.index()?.write_tree()?;
             let tree = repo.find_tree(tree_id)?;
             let _ = repo.commit(
@@ -994,11 +994,11 @@ impl GitDataProvider {
                 &[&head_commit, &fetch_head.peel_to_commit()?])
                 .map_err(|e| {
                     log::error!("Commit error: {:?}", e);
-                    GitError::BuildMergeCommitError
+                    GitUtilsErrorCode::BuildMergeCommitError
                 })?;
         }
         else if analysis.0.is_none() {
-            return Err(GitError::CantPull.into());
+            return Err(GitUtilsErrorCode::CantPull.into());
         }
         if credentials.is_some() && *use_cache.borrow() {
             let (username, password) = credentials.unwrap();
@@ -1008,7 +1008,7 @@ impl GitDataProvider {
     }
 
     /// 检查两个分支是否存在合并冲突
-    pub fn check_branch_conflict(&self, branch_a: impl Into<Branch>, branch_b: impl Into<Branch>) -> Result<bool, GitError> {
+    pub fn check_branch_conflict(&self, branch_a: impl Into<Branch>, branch_b: impl Into<Branch>) -> Result<bool, GitUtilsErrorCode> {
         let repo = &self.repository;
         let branch_a = branch_a.into();
         let branch_b = branch_b.into();
@@ -1035,10 +1035,10 @@ impl GitDataProvider {
     }
     
     /// 切换分支
-    pub fn switch_branch(&self, branch: &Branch) -> Result<(), GitError> {
+    pub fn switch_branch(&self, branch: &Branch) -> Result<(), GitUtilsErrorCode> {
         let staged = self.staged_files()?;
         if staged.len() > 0 {
-            return Err(GitError::OtherError("There are staged files, please commit them first".to_string())); 
+            return Err(GitUtilsErrorCode::OtherError("There are staged files, please commit them first".to_string())); 
         }
         let repo = &self.repository;
         let branch_name = branch.name.to_string();
@@ -1047,7 +1047,7 @@ impl GitDataProvider {
         let target_commit = self.branch_commit_inner(branch)?;
         let target_tree = target_commit.tree()?;
         let branch = repo.find_branch(&branch_name, BranchType::Local)
-           .map_err(|_| GitError::BranchNotFound(branch_name.clone()))?;
+           .map_err(|_| GitUtilsErrorCode::BranchNotFound(branch_name.clone()))?;
         let branch_ref = branch.into_reference();
         let branch_ref_name = branch_ref.name().ok_or(anyhow!(""))?;
 
@@ -1073,7 +1073,7 @@ impl GitDataProvider {
             }
         }
         if conflicts.len() > 0 {
-            return Err(GitError::SwitchWillBeOverwrittenByMerge(conflicts.join("\n"))); 
+            return Err(GitUtilsErrorCode::SwitchWillBeOverwrittenByMerge(conflicts.join("\n"))); 
         }
         let mut blob_map = HashMap::new();
         // 获取修改的文件内容，在切换之后再恢复
@@ -1083,7 +1083,7 @@ impl GitDataProvider {
            blob_map.insert(abs_path, blob);
         }
         repo.set_head(branch_ref_name)
-          .map_err(|e| GitError::Git2Error(e))?;
+          .map_err(|e| GitUtilsErrorCode::Git2Error(e))?;
         let _ = repo.checkout_head(Some(CheckoutBuilder::default().force()));
         // 恢复修改的文件内容
         for (path, blob) in blob_map {
@@ -1093,7 +1093,7 @@ impl GitDataProvider {
     }
 
     /// 根据文件的oid获取文件的历史Oid和所在提交的oid
-    pub fn file_history(&self, file_path: String) -> Result<Vec<FileHistoryEntry>, GitError> {
+    pub fn file_history(&self, file_path: String) -> Result<Vec<FileHistoryEntry>, GitUtilsErrorCode> {
         let repo = &self.repository;
         let mut cmd = Command::new("git");
         cmd.current_dir(self.workdir());
@@ -1101,7 +1101,7 @@ impl GitDataProvider {
 
         let output = cmd.output()?;
         if!output.status.success() {
-            return Err(GitError::OtherError(format!("git log failed: {}", String::from_utf8_lossy(&output.stderr))));
+            return Err(GitUtilsErrorCode::OtherError(format!("git log failed: {}", String::from_utf8_lossy(&output.stderr))));
         }
         /*
          * collect 的魔法： collect::<Result<Vec<_>, _>>() 的特殊性在于，

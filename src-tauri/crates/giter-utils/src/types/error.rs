@@ -7,7 +7,7 @@ use thiserror::Error;
 
 #[derive(Error, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(EnumIter))]
-pub enum ErrorCode {
+pub enum GitUtilsErrorCode {
     #[error("not valid utf8: {0}")]
     NotValidUtf8S(String),
 
@@ -121,9 +121,9 @@ pub enum ErrorCode {
   
 }
 
-impl ExposeError for ErrorCode {
+impl ExposeError for GitUtilsErrorCode {
     fn code(&self) -> u32 {
-       ErrorCodeDiscriminants::from(self) as u32
+       GitUtilsErrorCodeDiscriminants::from(self) as u32
     }
     
     fn module(&self) -> &str {

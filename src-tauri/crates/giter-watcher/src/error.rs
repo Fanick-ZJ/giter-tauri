@@ -4,7 +4,7 @@ use thiserror::Error;
 
 #[derive(Error, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(EnumIter))]
-pub enum ErrorCode {
+pub enum WatcherErrorCode {
   #[error("Add watcher failed: {0}")]
   AddWatcherFailed(String),
   #[error("Remove watcher failed: {0}")]
@@ -14,9 +14,9 @@ pub enum ErrorCode {
 }
 
 
-impl ExposeError for ErrorCode {
+impl ExposeError for WatcherErrorCode {
   fn code(&self) -> u32 {
-     ErrorCodeDiscriminants::from(self) as u32
+    WatcherErrorCodeDiscriminants::from(self) as u32
   }
   
   fn module(&self) -> &str {
