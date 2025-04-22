@@ -33,6 +33,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::usize;
 use std::vec;
+use std::os::windows::process::CommandExt;
 use super::file::FileHistoryEntry;
 use super::{author::Author, branch::Branch, commit::Commit, status::WorkStatus};
 
@@ -725,6 +726,7 @@ impl GitDataProvider {
     pub fn build_cinnut_filter(&self, reference: &str, filter: &HashMap<String, Value>) -> Result<Command, GitUtilsErrorCode> {
         let filter = FilterConditions::build_from_sv_map(filter);
         let mut cmd = Command::new("git");
+        cmd.creation_flags(0x08000000);
         cmd.current_dir(self.workdir());
         cmd.args(&["rev-list", reference]);
         if let Some(author) = filter.author {
@@ -1096,6 +1098,7 @@ impl GitDataProvider {
     pub fn file_history(&self, file_path: String) -> Result<Vec<FileHistoryEntry>, GitUtilsErrorCode> {
         let repo = &self.repository;
         let mut cmd = Command::new("git");
+        cmd.creation_flags(0x08000000);
         cmd.current_dir(self.workdir());
         cmd.args(&["log", "--follow","--format=%H", "--", &file_path]);
 

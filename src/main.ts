@@ -8,3 +8,4 @@ const app = createApp(App);
 await setupStore(app);
 
 app.mount("#app");
+console.log("app mounted");
