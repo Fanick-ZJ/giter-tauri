@@ -4,10 +4,10 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { Icon } from '@iconify/vue'
 import LayoutPage from '@/components/common/layout-page/index.vue'
-import { getAuthors, getBranchCommitsAfterFilter, beforeReferenceCommitsCount, getBranches, getCurrentBranch, singleRepoSubmit, reference_commit_filter_count, reference_commit_filter_details } from '@/utils/command';
+import { getAuthors, getBranches, getCurrentBranch, reference_commit_filter_count, reference_commit_filter_details } from '@/utils/command';
 import { Author, Branch, Commit, CommitFilter, Repository } from '@/types';
 import CommitItem from './components/commit-item.vue'
-import { NFlex, NPagination, NButton, NIcon, NSelect, NDropdown, NLayout } from 'naive-ui';
+import { NFlex, NPagination, NButton, NIcon, NSelect, NDropdown } from 'naive-ui';
 import FilterForm from './components/filter-form.vue'
 import { useContextMenu } from './hook';
 import { listen } from '@tauri-apps/api/event';
@@ -69,6 +69,7 @@ const init = async () => {
 const filterChanged = _.debounce(async () => {
   loading.value = true
   let path = repo.value!.path
+  page.value = 1
   commitsCount.value = await reference_commit_filter_count(path, curBranch.value!.name, filterModel.value)
   getCommits()
 }, 100 )
@@ -192,7 +193,7 @@ const {
       </div>
     </template>
     <template #filter-form>
-      <FilterForm :disabled="!loading" v-if="showFilter" :author-list="authors" v-bind:model-value="filterModel" @filter="filterChanged"></FilterForm>
+      <FilterForm :disabled="loading" v-if="showFilter" :author-list="authors" v-bind:model-value="filterModel" @filter="filterChanged"></FilterForm>
     </template>
     <NFlex @contextmenu="handleContextMenu" :data-repo="repo?.path">
       <template v-for="c in commits">
@@ -202,6 +203,7 @@ const {
     <template #footer>
       <NFlex justify="center">
         <NPagination 
+          :disabled="loading"
           :item-count="commitsCount" 
           v-model:page="page"
           v-model:page-size="pageSize"
@@ -220,6 +222,7 @@ const {
     :y="menuY"
     :show="showMenu"
     :options="options"
+    :disabled="loading"
     @clickoutside="menuCloseOutside"
     @select="handleSelect">
   </NDropdown>

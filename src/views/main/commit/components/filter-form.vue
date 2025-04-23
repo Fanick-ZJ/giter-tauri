@@ -57,6 +57,7 @@ const authorSelected = computed({
       const [email, name] = key.split(AUTHOR_EMAIL_INTERVAL)
       if (author.email == email && author.name == name) {
         model.value.author = author
+        return
       }
     })
   }
@@ -82,7 +83,6 @@ const clear = () => {
 const emit = defineEmits(['filter'])
 
 watch(model, (val) => {
-  console.log(val)
   emit('filter', val)
 }, {
   deep: true
@@ -92,7 +92,7 @@ watch(model, (val) => {
   <NForm 
     :model="model"
     label-placement="left"
-    :disabled="!props.disabled"
+    :disabled="props.disabled"
     class="flex flex-wrap gap-y-[5px] gap-x-[10px]">
     <NFormItem label="作者"
         path="author"

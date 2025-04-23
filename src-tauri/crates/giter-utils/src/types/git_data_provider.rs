@@ -774,6 +774,9 @@ impl GitDataProvider {
          .split("\n")
          .map(|s| s.to_string())
          .collect::<Vec<String>>();
+        if commit_ids.len() == 1 && commit_ids[0].is_empty() {
+            return Ok(vec![]);
+        }
         let mut commits = Vec::<Commit>::new();
         for commit_id in commit_ids {
            let commit = Commit::from_oid(str_to_oid(&commit_id)?, &self.repository)?; 
