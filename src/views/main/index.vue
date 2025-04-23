@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { NFlex } from 'naive-ui'
+import { NFlex, useMessage } from 'naive-ui'
 import { EXPAND_MIN_WIDTH, MIN_HEIGHT, REPOLIST_MAX_WIDTH, REPOLIST_WIDTH } from '@/const'
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window'
 import { nextTick, onMounted, provide, ref, StyleValue } from 'vue'
 import RepoHome from '@/components/repo-home/index.vue'
 import ExtendPage from '@/components/extend-page/index.vue';
 import { viewExtend, viewShrink } from '@/types/key';
+import { useRepoStore } from '@/store/modules/repo'
 
 const homeRef = ref<InstanceType<typeof RepoHome>>()
+// 在window上挂在一个message对象实例，方便使用
+window.$message = useMessage()
 
 const isExtend = ref(false)
 const homeStyle = ref<StyleValue>()
@@ -42,6 +45,10 @@ const viewToShrink = () => {
 
 provide(viewExtend, viewToExtend)
 provide(viewShrink, viewToShrink)
+
+onMounted(() => {
+  useRepoStore().init_repo()
+})
 </script>
 
 <template>

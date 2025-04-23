@@ -3,7 +3,8 @@ import { Author } from '@/types';
 import { NForm, NSelect, NInput, NFormItem, NDatePicker, NButton } from 'naive-ui';
 import { computed, PropType, watch } from 'vue';
 import { CommitFilter} from '@/types';
-import { cp } from 'fs';
+
+const AUTHOR_EMAIL_INTERVAL = "<author-email-interval>"
 
 const model = defineModel<CommitFilter>({
   default: {
@@ -47,9 +48,14 @@ const authorSelected = computed({
   get: () => {
     return model.value.author?.email
   },
-  set: (email: string) => {
+  set: (key: string) => {
+    if (key == null) {
+      model.value.author = undefined
+      return
+    }
     props.authorList.forEach(author => {
-      if (author.email == email) {
+      const [email, name] = key.split(AUTHOR_EMAIL_INTERVAL)
+      if (author.email == email && author.name == name) {
         model.value.author = author
       }
     })
@@ -60,7 +66,7 @@ const authorOptions = computed(() => {
   return props.authorList.map((author) => {
     return {
       label: author.name,
-      value: author.email
+      value: author.email + AUTHOR_EMAIL_INTERVAL + author.name,
     }
   })
 })

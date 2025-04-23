@@ -28,13 +28,14 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
         const _status = await workStatus(repo.path) 
         repo.valid = true
         setStatus(repo.path, _status as RepoStatus)
-      } catch (error) {
-        window.$message.error('获取仓库状态失败')
+      } catch (error: any) {
+        window.$message.error(`获取仓库状态失败: ${error.message}`)
         repo.valid = false
       }
       return repo
     }).catch((err) => {
-      window.$message.error('获取仓库状态失败')
+      console.error(err)
+      window.$message.error(`获取仓库状态失败: ${err.message}`)
       return repo
     })
   }

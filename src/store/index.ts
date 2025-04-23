@@ -3,16 +3,14 @@ import { createPinia } from 'pinia'
 import { App } from 'vue';
 import { useRepoStore } from './modules/repo';
 
-export async function setupStore(app: App) {
+export function setupStore(app: App) {
+  const pathname = window.location.pathname
+  if (pathname.startsWith('/main') && pathname !== '/main') {
+    // 重定向到'/'
+    window.location.href = '/'
+
+  }
   const store = createPinia()
   app.use(router)
   app.use(store)
-
-  // 根据当前的路由，判断是不是要重置路由，使用浏览器的方法判断
-  if (window.location.pathname.startsWith('/main') 
-    || window.location.pathname == '/') {
-    // 重置路由，重新初始化仓库
-    router.replace('/')
-    useRepoStore().init_repo()
-  }
 }

@@ -48,7 +48,7 @@ thiserror = "2.0.12"
 strum = "0.27.1"
 strum_macros = "0.27.1"
 
-tauri = { version = "2", features = ["unstable", "devtools"] }
+tauri = { version = "2", features = ["unstable"] }
 tauri-plugin-opener = "2"
 tauri-plugin-store = "2"
 tauri-plugin-sql = { version = "2.2.0", features = ["sqlite"] }
