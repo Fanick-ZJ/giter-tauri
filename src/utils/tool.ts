@@ -179,3 +179,23 @@ export const bytesToString = (buffer: number[]) => {
   const str = decoder.decode(view)
   return str;
 }
+
+export function isTextOverflow(text: string, container: HTMLElement): boolean {
+  const canvas = document.createElement('canvas')
+  const context = canvas.getContext('2d')!
+  // 获取容器实际样式
+  const style = window.getComputedStyle(container)
+  
+  // 设置测量上下文样式（需要与容器实际样式一致）
+  context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
+  
+  // 计算文本测量宽度
+  const textWidth = context.measureText(text).width
+  // 获取容器内容宽度（需要减去 padding）
+  const containerWidth = container.clientWidth 
+    - parseFloat(style.paddingLeft)
+    - parseFloat(style.paddingRight)
+
+  canvas.remove()
+  return textWidth > containerWidth
+}

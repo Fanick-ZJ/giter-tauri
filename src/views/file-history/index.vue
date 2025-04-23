@@ -79,7 +79,7 @@ const panelHeight = computed(() => {
       v-model:value="curPanel"
       type="card"
       closable
-      :tab-style="{ width: '200px', height: `${tabbarHeight}px`, overflow: 'auto' }"
+      :tab-style="{ height: `${tabbarHeight}px`, overflow: 'auto' }"
       :tab-padding="0"
       :tab-size="0"
       placement="top"

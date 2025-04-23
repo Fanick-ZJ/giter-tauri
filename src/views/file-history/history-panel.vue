@@ -41,7 +41,7 @@ const handlePaneChange = async (name: string) => {
       :key="history.path"
       v-model:value="curCommit"
       :style="{height: `${props.height}px`}"
-      :tab-style="{width: '200px'}"
+      :tab-style="{width: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}"
       placement="left"
       @before-leave="handlePaneChange"
       :type="'line'">

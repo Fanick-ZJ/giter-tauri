@@ -2,7 +2,7 @@ import { FileHistoryItem } from "@/types";
 import { TauriEvent } from "@tauri-apps/api/event";
 import { WebviewOptions } from "@tauri-apps/api/webview";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { WindowOptions, Window } from "@tauri-apps/api/window";
+import { WindowOptions, Window, LogicalSize } from "@tauri-apps/api/window";
 
 export const LOCAL_STORAGE_FIRST_FILE_HISTORY = "first-file-history"
 
@@ -19,6 +19,9 @@ class FileHistoryWindow {
 
   private static buildWindow() { 
     FileHistoryWindow.window = new WebviewWindow("file-history", FileHistoryWindow.options())
+    FileHistoryWindow.window.once(TauriEvent.WINDOW_CREATED, () => {
+      FileHistoryWindow.window.setMinSize(new LogicalSize(800, 600))
+    })
     FileHistoryWindow.hasWindow = true;
     FileHistoryWindow.window.once(TauriEvent.WINDOW_DESTROYED, () => {
       FileHistoryWindow.hasWindow = false 
