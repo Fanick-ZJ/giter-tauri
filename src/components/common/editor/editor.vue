@@ -40,6 +40,8 @@ const initEditor = () => {
     readOnly: props.readonly, // 设置只读模式
     contextmenu: false,
   })
+  editor.getDomNode()!.style.width = '100%'
+  editor.getDomNode()!.style.height = '100%' // 新增高度设置
   updateEditorHeight()
 }
 
@@ -74,12 +76,6 @@ function calculateEditorHeight() {
 onMounted(() => {
   initEditor()
 })
-const bodySize = useElementSize(editorBody)
-watch(bodySize.height, (newHeight) => {
-  if (editor) {
-    updateEditorHeight()
-  }
-})
 </script>
 
 <template>
@@ -88,6 +84,8 @@ watch(bodySize.height, (newHeight) => {
     <div class="editor-header">
       <slot name="header"/>
     </div>
-    <div class="editor-body w-full h-full flex-auto" ref="editorBody"></div>
+    <div class="flex-1 min-h-0 relative">
+      <div class="editor-body absolute w-full h-full flex-auto" ref="editorBody"></div>
+    </div>
   </div>
 </template>

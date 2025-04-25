@@ -5,7 +5,7 @@ import { FileHistoryItem } from '@/types';
 import { getBlobContent } from '@/utils/command';
 import { bytesToString, getMonacoLanguage } from '@/utils/tool';
 import { FileHistory } from '@/windows/file-history';
-import { NTabs, NTabPane, NSpace } from 'naive-ui'
+import { NTabs, NTabPane, NSpace, NEllipsis } from 'naive-ui'
 import { ref } from 'vue';
 
 const props = defineProps<{
@@ -51,6 +51,12 @@ const handlePaneChange = async (name: string) => {
         :closable="true"
         :name="item.commit.commitId"
         :tab="item.commit.message">
+        <!-- @vue-ignore -->
+        <template #tab>
+          <NEllipsis style="max-width:180px">
+            {{ item.commit.message }}
+          </NEllipsis>
+        </template>
         <Editor 
           :language="getMonacoLanguage(props.history.path)" 
           :content="currentHistoryFileContent"
