@@ -30,17 +30,14 @@ use std::process::Command;
 use std::io::{self, ErrorKind};
 use std::path::Path;
 use std::path::PathBuf;
-use std::rc::Rc;
 use std::usize;
 use std::vec;
 use std::os::windows::process::CommandExt;
 use super::file::FileHistoryEntry;
 use super::{author::Author, branch::Branch, commit::Commit, status::WorkStatus};
 
-use super::cache::Cache;
 use super::commit_filter::FilterConditions;
 use super::contribution::CommitStatistic;
-use super::credential::Credential;
 use super::diff::ContentDiff;
 use super::file::ChangedFile;
 use super::file::CommittedFile;
@@ -52,7 +49,6 @@ use super::error::GitUtilsErrorCode;
 
 pub struct GitDataProvider {
     pub repository: Repository,
-    cache: RefCell<Option<Box<dyn Cache + Send>>>,
 }
 
 impl Pointer for GitDataProvider {
@@ -72,7 +68,6 @@ impl GitDataProvider {
         match repo {
             Ok(repo) => Ok(GitDataProvider {
                 repository: repo,
-                cache: RefCell::new(None),
             }),
             Err(err) => {
                 match err.code() {
@@ -82,10 +77,6 @@ impl GitDataProvider {
                 }
             }
         }
-    }
-
-    pub fn set_cache(&mut self, cache: impl Cache + Send + 'static) {
-        self.cache = RefCell::new(Some(Box::new(cache)));
     }
 
     pub fn workdir(&self) -> &Path {
@@ -646,12 +637,6 @@ impl GitDataProvider {
     pub fn authors(&self, branch: &Branch) -> Result<Vec<Author>, GitUtilsErrorCode> {
         let mut lasted_commit_id = Option::<Oid>::None;
         let mut author_set = HashSet::new();
-        // 获取缓存
-        let cache_value = self.authors_cache(branch);
-        if let Some(cache_value) = cache_value {
-            author_set.extend(cache_value.0);
-            lasted_commit_id = Some(cache_value.1);
-        }
         // 1. 获取分支的提交
         let branch_commit = self.branch_commit_inner(branch)?;
         let mut revwalk = self.repository.revwalk()?;
@@ -668,8 +653,6 @@ impl GitDataProvider {
         }
         let lasted_id = branch_commit.id();
         let authors: Vec<Author> = author_set.into_iter().collect();
-        // 3. 设置缓存
-        self.set_authors_cache(authors.clone(), branch, &lasted_id);
         Ok(authors)
     }
 
@@ -693,11 +676,6 @@ impl GitDataProvider {
         let mut revwalk = self.repository.revwalk()?;
         revwalk.push(commits.id())?;
         let mut map = HashMap::<String, CommitStatistic>::new();
-        let cache = self.branch_contribution_cache(branch);
-        if let Some(cache) = cache {
-            map.extend(cache.0);
-            revwalk.hide(cache.1)?;
-        }
         for commit in revwalk.by_ref().into_iter() {
             if let Ok(commit) = commit {
                 let author = self.get_commit_author(&commit)?;
@@ -716,9 +694,6 @@ impl GitDataProvider {
                 continue;
             }
         }
-        // 获取最后一次提交的id
-        let lasted_id = commits.id();
-        self.set_branch_contribution_cache(branch, &map, &lasted_id);
         Ok(map.into_values().collect())
     }
 
@@ -827,21 +802,11 @@ impl GitDataProvider {
         }
     }
 
-    fn build_remote_credentials_cb(&self, credentials: &Option<(String, String)>, use_cache: Rc<RefCell<bool>>) -> impl Fn(&str, Option<&str>, CredentialType) -> Result<Cred, git2::Error> + '_ {
+    fn build_remote_credentials_cb(&self, credentials: &Option<(String, String)>) -> impl Fn(&str, Option<&str>, CredentialType) -> Result<Cred, git2::Error> + '_ {
         let (username, password) = credentials.as_ref()
             .map(|(u, p)| (u.clone(), p.clone()))
             .unwrap_or_default();
         move |url: &str, username_from_url: Option<&str>, allowed_types: CredentialType| {
-            let cache = self.remote_credential(url);
-            if let Some(cache) = cache {
-               match cache {
-                    Credential::UsernamePassword(username, password) => {
-                        *use_cache.borrow_mut() = false;
-                        return Cred::userpass_plaintext(&username, &password);
-                    }
-                    Credential::Token(_) => todo!(),
-                } 
-            }
             if let CredentialType::USER_PASS_PLAINTEXT = allowed_types {
                 if username.is_empty() || password.is_empty() {
                     return Err(git2::Error::new(
@@ -878,10 +843,9 @@ impl GitDataProvider {
         }
 
         // 提取公共回调配置
-        let use_cache = Rc::new(RefCell::new(true));
         let build_callbacks = || {
             let mut cbs = RemoteCallbacks::new();
-            cbs.credentials(self.build_remote_credentials_cb(&credentials, use_cache.clone()));
+            cbs.credentials(self.build_remote_credentials_cb(&credentials));
             cbs
         };
 
@@ -918,12 +882,6 @@ impl GitDataProvider {
         push_opt.remote_callbacks(build_callbacks());
         remote.push(&[branch_ref_name], Some(&mut push_opt))
             .map_err(handle_error)?;
-        // 设置远程凭据缓存
-        if credentials.is_some() && *use_cache.borrow() {
-            let (username, password) = credentials.unwrap();
-            self.set_remote_credential(remote.url().unwrap(), &Credential::UsernamePassword(username, password));
-        }
-        println!("Push successful!");
         Ok(())
     }
 
@@ -937,8 +895,7 @@ impl GitDataProvider {
                 GitUtilsErrorCode::RemoteNotFound(remote.to_string())
             })?;
         // 2. 配置回调（复用已有的凭证处理逻辑）
-        let use_cache = Rc::new(RefCell::new(true));
-        let callbacks = self.build_remote_credentials_cb(&credentials, use_cache.clone());
+        let callbacks = self.build_remote_credentials_cb(&credentials);
         // 3. 执行 fetch 操作
         let mut fetch_opts = FetchOptions::new();
         fetch_opts.remote_callbacks({
@@ -1004,10 +961,6 @@ impl GitDataProvider {
         }
         else if analysis.0.is_none() {
             return Err(GitUtilsErrorCode::CantPull.into());
-        }
-        if credentials.is_some() && *use_cache.borrow() {
-            let (username, password) = credentials.unwrap();
-            self.set_remote_credential(remote.url().unwrap(), &Credential::UsernamePassword(username, password));
         }
         Ok(())
     }
@@ -1131,99 +1084,6 @@ impl GitDataProvider {
                 }
             }
         }
-        if history.len() > 0 {
-            self.set_file_history(&file_path, &history); 
-        }
         Ok(history)
-    }
-}
-
-impl GitDataProvider {
-    /// 获取提交者缓存
-    fn authors_cache(&self, branch: &Branch) -> Option<(Vec<Author>, Oid)> {
-        if let Some(cache) = self.cache.borrow().as_ref() {
-            let authors = cache.branch_authors(self.repository.path().to_str().unwrap(), branch);
-            if let Some((authors, last_commit_id)) = authors {
-                return Some((authors, last_commit_id));
-            }
-        }
-        None
-    }
-
-    /// 获取分支的贡献者统计
-    pub fn branch_contribution_cache(&self, branch: &Branch) -> Option<(HashMap<String, CommitStatistic>, Oid)> {
-        if let Some(cache) = self.cache.borrow().as_ref() {
-            let contrib = cache.branch_contribution(self.repository.path().to_str().unwrap(), branch);
-            if let Some((contrib, last_commit_id)) = contrib {
-                return Some((contrib, last_commit_id));
-            }
-        }
-        None
-    }
-    /// 设置分支的贡献者统计
-    pub fn set_branch_contribution_cache(
-        &self,
-        branch: &Branch,
-        contrib: &HashMap<String, CommitStatistic>,
-        last_commit_id: &Oid,
-    ) {
-        if let Some(cache) = self.cache.borrow_mut().as_mut() {
-            let path = self.repository.path().to_str().unwrap();
-            cache.set_branch_contribution(path, branch, contrib, last_commit_id);
-        }
-    }
-    /// 设置提交者缓存
-    pub fn set_authors_cache(&self, authors: Vec<Author>, branch: &Branch, lasted_id: &Oid) {
-        if let Some(cache) = self.cache.borrow_mut().as_mut() {
-            cache.set_authors(
-                self.repository.path().to_str().unwrap(),
-                &authors,
-                branch,
-                lasted_id,
-            );
-        }
-    }
-
-    pub fn remote_credential(&self, remote_url: &str) -> Option<Credential> {
-        if let Some(cache) = self.cache.borrow().as_ref() {
-            return cache.get_credential(remote_url);
-        }
-        None
-    }
-
-    pub fn set_remote_credential(&self, remote_url: &str, credential: &Credential) {
-        if let Some(cache) = self.cache.borrow_mut().as_mut() {
-            cache.set_credential(remote_url, credential);
-        } 
-    }
-
-    pub fn get_file_history(&self, file_path: &str) -> Option<Vec<FileHistoryEntry>> {
-        if let Some(cache) = self.cache.borrow().as_ref() {
-            return cache.get_file_history(self.repository.path().to_str().unwrap(), file_path);
-        }
-        None
-    }
-
-    pub fn set_file_history(&self, file_path: &str, history: &Vec<FileHistoryEntry>) {
-        if let Some(cache) = self.cache.borrow_mut().as_mut() {
-            cache.set_file_history(self.repository.path().to_str().unwrap(), file_path, history);
-        }
-    }
-
-    pub fn get_reference_commit_count(&self, reference_id: Oid) -> Option<(i32, Oid)> {
-        if let Some(cache) = self.cache.borrow_mut().as_mut() {
-            let cache = cache.get_reference_commit_count(self.repository.path().to_str().unwrap(), &reference_id.to_string());
-            if let Some(cache) = cache {
-                return Some((cache.0, str_to_oid(&cache.1).unwrap()));
-            }
-            return None
-        }
-        None
-    }
-
-    pub fn set_reference_commit_count(&self, reference_id: Oid, last_id: Oid, count: i64) {
-        if let Some(cache) = self.cache.borrow_mut().as_mut() {
-            cache.set_reference_commit_count(self.repository.path().to_str().unwrap(), &reference_id.to_string(), &last_id.to_string(), count);
-        }
     }
 }

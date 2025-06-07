@@ -36,8 +36,6 @@ type WatcherResult<T> = std::result::Result<T, CommandError<WatcherError>>;
 fn get_provider(repo: &str) -> Result<GitDataProvider, GitUtilsErrorCode> {
     let handle = handle::Handle::global();
     let mut provider = GitDataProvider::new(repo)?;
-    let cache = handle.cache().unwrap();
-    provider.set_cache(cache);
     Ok(provider)
 }
 
@@ -92,18 +90,6 @@ pub async fn authors(repo: RepoPath, branch: Branch) -> DataResult<Vec<Author>> 
 pub async fn branches(repo: RepoPath) -> DataResult<Vec<Branch>> {
     let provider = get_provider(&repo)?;
     provider.branches()
-}
-
-#[tauri::command]
-pub async fn clear_cache(repo: RepoPath) {
-    let mut cache = handle::Handle::global().cache().unwrap();
-    cache.clear(&repo);
-}
-
-#[tauri::command]
-pub async fn clear_all_cache() {
-    let mut cache = handle::Handle::global().cache().unwrap();
-    cache.clear_all();
 }
 
 #[tauri::command]
