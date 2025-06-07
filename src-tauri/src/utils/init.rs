@@ -47,54 +47,6 @@ pub fn init_log() -> Result<()> {
     Ok(())
 }
 
-pub fn init_cache() -> Result<()> {
-    let database_path = dirs::database_dir()?;
-    if !database_path.exists() {
-        fs::create_dir_all(&database_path)?;
-    }
-    let cache_path = database_path.join("cache.db");
-    println!("{:?}", cache_path);
-    let conn = Connection::open(cache_path)?;
-    conn.execute_batch(
-        "create table if not exists branch_author (
-        id integer primary key autoincrement,
-        path text not null,
-        branch text not null,
-        authors text not null,
-        last_commit_id varchar(20) not null
-      );
-      create table if not exists contribution (
-        id integer primary key autoincrement,
-        path text not null,
-        branch text not null,
-        contributors text not null,
-        last_commit_id varchar(20) not null
-      );
-      create table if not exists credentials (
-        id integer primary key autoincrement,
-        host text not null,
-        token text not null,
-        username text not null,
-        password text not null
-      );
-      create table if not exists file_history (
-        id integer primary key autoincrement,
-        repo text not null,
-        file text not null, 
-        history text not null
-      );
-      create table if not exists reference_commit_count(
-        id integer primary key autoincrement,
-        repo text not null,
-        reference text not null,
-        last_id text not null,
-        count int
-      )
-      "
-    )?;
-    Ok(())
-}
-
 pub fn init_store() -> Result<()> {
     let database_path = dirs::database_dir()?;
     if !database_path.exists() {

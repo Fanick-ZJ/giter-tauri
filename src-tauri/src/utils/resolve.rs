@@ -3,7 +3,7 @@ use crate::emit::{repo_single_emit, satatus_change_emit};
 use crate::utils::init;
 use anyhow::Result;
 use giter_watcher::modify_watcher::ModifyWatcher;
-use tauri::menu::{Menu, MenuBuilder, MenuItem};
+use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use std::sync::Mutex;
 use tauri::{App, Manager};
@@ -13,8 +13,6 @@ pub async fn resolve_setup(app: &mut App) -> Result<()> {
     // 初始化日志
     init::init_log()?;
     println!("init log success");
-    init::init_cache()?;
-    println!("init cache success");
     init::init_store()?;
     println!("init store success");
     init::init_config()?;
