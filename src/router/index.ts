@@ -28,6 +28,11 @@ export const router = createRouter({
       name: 'file-history',
       path: '/file_history',
       component: () => import('@/views/file-history/index.vue')
+    },
+    {
+      name: 'file-tree',
+      path: '/file_tree/:repo/:commitId',
+      component: () => import('@/views/file-tree/index.vue')  
     }
   ]
 })

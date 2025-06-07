@@ -1,6 +1,7 @@
 import { upToDataElement } from '@/utils/dom';
 import { nextTick, ref } from "vue"
 import { useCommitDetailDialog } from "./components/detail-dialog"
+import FileTreeWindow from "@/windows/file-tree"
 
 export const useContextMenu = () => {
   const menuX = ref(0)
@@ -12,8 +13,13 @@ export const useContextMenu = () => {
     {
       key: 'detail',
       label: '详情'
+    },
+    {
+      key: 'file-tree',
+      label: '文件树'
     }
   ]
+
   const handleContextMenu = (e: MouseEvent) => {
     e.preventDefault()
     showMenu.value = false
@@ -33,13 +39,22 @@ export const useContextMenu = () => {
   const menuCloseOutside = () => {
     showMenu.value = false
   }
+
+  const getCommitId = () => {
+    if (!target.value) return ''
+    return target.value.attributes.getNamedItem('data-commit-id')?.value || '' 
+  }
+
   const handleSelect = (key: string) => {
-    if (key === 'detail' && repo.value) {
-      const commitId = target.value?.attributes.getNamedItem('data-commit-id')?.value || ''
+    if (!repo.value) return
+    if (key === 'detail') {
       useCommitDetailDialog({
-        commitId,
+        commitId: getCommitId(),
         repo: repo.value
       })
+    }
+    if (key === 'file-tree') {
+      new FileTreeWindow(repo.value, getCommitId())
     }
     showMenu.value = false
   }

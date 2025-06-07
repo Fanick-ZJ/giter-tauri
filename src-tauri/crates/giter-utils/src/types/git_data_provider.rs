@@ -1,3 +1,4 @@
+use crate::types::file_tree::FileTree;
 use crate::util::build_commit;
 use crate::util::change_status_to_file_status;
 use crate::util::get_file_content;
@@ -1086,5 +1087,9 @@ impl GitDataProvider {
             }
         }
         Ok(history)
+    }
+
+    pub fn get_commit_file_tree(&self, commit: &Commit) -> Result<FileTree, GitUtilsErrorCode> {
+        todo!()
     }
 }

@@ -1,4 +1,4 @@
-use std::{fmt::format, fs};
+use std::fs;
 use syn;
 
 fn main() {
