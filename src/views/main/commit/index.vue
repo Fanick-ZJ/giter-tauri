@@ -70,7 +70,11 @@ const filterChanged = _.debounce(async () => {
   loading.value = true
   let path = repo.value!.path
   page.value = 1
-  commitsCount.value = await reference_commit_filter_count(path, curBranch.value!.name, filterModel.value)
+  reference_commit_filter_count(path, curBranch.value!.name, filterModel.value).then((res) => {
+    commitsCount.value
+  }).catch((err) => {
+    window.$message.error('获取提交总数失败') 
+  })
   getCommits()
 }, 100 )
 
@@ -81,8 +85,11 @@ const getCommits = _.debounce(async () => {
   withMinDelay(async () => {
     const start = pageSize.value * (page.value - 1)
     const count = pageSize.value
-    const res = await reference_commit_filter_details(path, curBranch.value!.name, filterModel.value, start, count)
-    commits.value = res
+    reference_commit_filter_details(path, curBranch.value!.name, filterModel.value, start, count).then((res) => {
+      commits.value = res 
+    }).catch((err) => {
+      window.$message.error(`获取提交数据失败: ${err.data}`) 
+    })
   }, 500, () => loading.value = false)
   
 }, 100)
@@ -99,6 +106,7 @@ onBeforeUnmount(() => {
     unlisten()
   }) 
 })
+
 // 监听路由变化，重新获取数据
 watch(()=> route.path, () => {
   if (route.path.startsWith('/main/commit')) {
@@ -123,6 +131,7 @@ const hasFilter = computed(() => {
   return !_.every(_.values(filterModel.value), _.isUndefined)
 })
 
+// 选择的分支
 const selectedBranch = computed({
   get() {
     if (curBranch.value) {
@@ -139,6 +148,8 @@ const selectedBranch = computed({
     }
   }
 })
+
+// 分支选项
 const branchOptions = computed(() => {
   return branches.value.map((branch) => {
     return {
