@@ -21,7 +21,6 @@ use git2::{BranchType, Oid, Repository, Revwalk, Status};
 use serde_json::Value;
 use similar::DiffOp;
 use similar::TextDiff;
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Pointer;
@@ -721,7 +720,9 @@ impl GitDataProvider {
         if let Some(count) = filter.count {
             cmd.args(&["--max-count", &count.to_string()]); 
         }
-
+        if let Some(message) = filter.message {
+            cmd.args(&["--grep", &message]);
+        }
         Ok(cmd)
     }
 

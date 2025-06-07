@@ -9,6 +9,7 @@ use super::author::Author;
 #[derive(Default, Debug)]
 pub struct FilterConditions {
     pub last_id: Option<String>,
+    pub message: Option<String>,
     pub offset: Option<usize>,
     pub count: Option<usize>,
     pub author: Option<Author>,
@@ -20,6 +21,7 @@ impl FilterConditions {
    pub fn build_from_sv_map(map: &HashMap<String, Value>) -> Self {
         let mut conditions = FilterConditions::default();
         conditions.last_id = deserialize_from_map::<Option<String>>(map, "lastId", None);
+        conditions.message = deserialize_from_map::<Option<String>>(map, "message", None);
         conditions.offset = deserialize_from_map::<Option<usize>>(map, "offset", None);
         conditions.count = deserialize_from_map::<Option<usize>>(map, "count", None);
         conditions.author = deserialize_from_map::<Option<Author>>(map, "author", None);

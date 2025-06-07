@@ -1,6 +1,5 @@
 use notify::{Config, Event, RecommendedWatcher, Watcher};
 use dashmap::DashMap;
-use dashmap::rayon::map::Iter;  // 并行迭代器 trait
 use parking_lot::RwLock;
 use std::path::PathBuf;
 use std::sync::{

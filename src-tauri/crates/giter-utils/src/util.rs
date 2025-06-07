@@ -302,11 +302,19 @@ pub fn str_to_oid(str: &str) -> Result<Oid, GitUtilsErrorCode> {
 }
 
 pub fn time_to_ymd(stamp: i64) -> Result<String> {
-    // 将时间戳转换为 DateTime<Utc> 类型
+    // 定义时间戳边界常量（秒级时间戳最大值 9999999999 -> 2001-09-09）
+    const MILLISECOND_THRESHOLD: i64 = 10_000_000_000;  // 11位开始是毫秒级时间戳
+    
+    // 自动识别并转换毫秒级时间戳（13位）和秒级时间戳（11位）
+    let stamp: i64 = if stamp >= MILLISECOND_THRESHOLD {
+        stamp / 1000  // 保留到秒级精度
+    } else {
+        stamp
+    };
     let datetime  = Utc.timestamp_opt(stamp, 0); 
     let t = match datetime {
         chrono::offset::LocalResult::Single(time) => Ok(time),
-        chrono::offset::LocalResult::Ambiguous(early, last) => Ok(last),
+        chrono::offset::LocalResult::Ambiguous(_, last) => Ok(last),
         chrono::offset::LocalResult::None => Err(anyhow!("Invalid timestamp".to_string())), 
     };
     let datetime = t?;

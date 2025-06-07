@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Author } from '@/types';
-import { NForm, NSelect, NInput, NFormItem, NDatePicker, NButton } from 'naive-ui';
+import { NForm, NSelect, NInput, NFormItem, NDatePicker, NButton, NGrid, NFormItemGi } from 'naive-ui';
 import { computed, PropType, watch } from 'vue';
 import { CommitFilter} from '@/types';
 
@@ -92,37 +92,29 @@ watch(model, (val) => {
   <NForm 
     :model="model"
     label-placement="left"
-    :disabled="props.disabled"
-    class="flex flex-wrap gap-y-[5px] gap-x-[10px]">
-    <NFormItem label="作者"
-        path="author"
-        class="h-[30px]">
-      <NSelect 
-        v-model:value="authorSelected" 
-        :options="authorOptions" 
-        clearable
-        size="small" 
-        class="w-[200px]"
-        placeholder="请选择"/>
-    </NFormItem>
-    <NFormItem 
-      label="内容" 
-      path="content"
-      class="h-[30px]">
-      <NInput v-model:value="model.message" size="small"/>
-    </NFormItem>
-    <NFormItem 
-      label="某次提交之前" 
-      path="lastId"
-      class="h-[30px]">
-      <NInput v-model:value="model.lastId" size="small" aria-placeholder="请填写提交ID，至少6位"/>
-    </NFormItem>
-    <NFormItem 
-      label="时间范围" 
-      path="content"
-      class="h-[30px]">
-      <NDatePicker type="datetimerange" clearable  v-model:value="timeRange" size="small"/>
-    </NFormItem>
+    :disabled="props.disabled">
+    <NGrid :cols="24" :x-gap="24">
+      <NFormItemGi label="作者" path="author" :span="12">
+        <NSelect 
+          v-model:value="authorSelected"
+          :options="authorOptions" 
+          clearable
+          size="small"
+          placeholder="请选择"/>
+      </NFormItemGi>
+      <NFormItemGi label="内容" path="content" :span="12">
+        <NInput v-model:value="model.message" size="small"/>
+      </NFormItemGi>
+      <NFormItemGi 
+        label="某次提交之前" 
+        path="lastId"
+        :span="12">
+        <NInput v-model:value="model.lastId" size="small" aria-placeholder="请填写提交ID，至少6位"/>
+      </NFormItemGi>
+      <NFormItemGi label="时间范围" path="content" :span="12">
+        <NDatePicker type="datetimerange" clearable  v-model:value="timeRange" size="small"/>
+      </NFormItemGi>
+    </NGrid>
   </NForm>
   <div class="flex justify-end gap-5 mt-1">
     <NButton type="error" @click="clear">重置</NButton>
