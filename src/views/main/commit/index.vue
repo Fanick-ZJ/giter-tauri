@@ -1,20 +1,22 @@
 <script setup lang="ts">
 import { useRepoStore } from '@/store/modules/repo';
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, Ref, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { Icon } from '@iconify/vue'
 import LayoutPage from '@/components/common/layout-page/index.vue'
 import { getAuthors, getBranches, getCurrentBranch, reference_commit_filter_count, reference_commit_filter_details } from '@/utils/command';
 import { Author, Branch, Commit, CommitFilter, Repository } from '@/types';
 import CommitItem from './components/commit-item.vue'
-import { NFlex, NPagination, NButton, NIcon, NSelect, NDropdown } from 'naive-ui';
-import FilterForm from './components/filter-form.vue'
+import { NFlex, NDropdown } from 'naive-ui';
 import { useContextMenu } from './hook';
 import { listen } from '@tauri-apps/api/event';
 import { STATUS_CHANGE, StatusChangePayloadType } from '@/const/listen';
+import FilterForm from './components/filter-form.vue'
 import _ from 'lodash';
 import { hasFlag, RepoStatus } from '@/enum';
 import { withMinDelay } from '@/utils/tool';
+import { reactive, watchEffect } from 'vue'
+import ActionHeader from './components/action-header.vue'
+import PaginationFooter from './components/pagination-footer.vue'
 
 const INIT_PAGE = 1
 const INIT_PAGE_SIZE = 10
@@ -24,23 +26,6 @@ const repoStore = useRepoStore()
 const loading = ref(false)
 const id = ref(parseInt(route.params.id as string))
 const repo = ref<Repository>()
-const page = ref(INIT_PAGE)
-const pageSize = ref(INIT_PAGE_SIZE)
-
-// 获取分支列表
-const branches = ref<Branch[]>([])
-const curBranch = ref<Branch>()
-const authors = ref<Author[]>([])
-const commits = ref<Commit[]>([])
-const commitsCount = ref(0)
-// 筛选模型
-const filterModel = ref<CommitFilter>({
-  lastId: undefined,
-  author: undefined,
-  startTime: undefined,
-  endTime: undefined,
-  message: undefined,
-})
 
 const init = async () => {
   loading.value = true
@@ -61,38 +46,10 @@ const init = async () => {
       curBranch.value = branches.value[0]
     }
     authors.value = await getAuthors(repo.value!.path, curBranch.value)
-    commitsCount.value = await reference_commit_filter_count(path, curBranch.value!.name, filterModel.value)
+    pagination.total = await reference_commit_filter_count(path, curBranch.value!.name, filterModel.value)
     getCommits()
   })
 }
-
-const filterChanged = _.debounce(async () => {
-  loading.value = true
-  let path = repo.value!.path
-  page.value = 1
-  reference_commit_filter_count(path, curBranch.value!.name, filterModel.value).then((res) => {
-    commitsCount.value
-  }).catch((err) => {
-    window.$message.error('获取提交总数失败') 
-  })
-  getCommits()
-}, 100 )
-
-const getCommits = _.debounce(async () => {
-  let path = repo.value!.path
-  loading.value = true
-  // 如果不足500ms，就等待500ms
-  withMinDelay(async () => {
-    const start = pageSize.value * (page.value - 1)
-    const count = pageSize.value
-    reference_commit_filter_details(path, curBranch.value!.name, filterModel.value, start, count).then((res) => {
-      commits.value = res 
-    }).catch((err) => {
-      window.$message.error(`获取提交数据失败: ${err.data}`) 
-    })
-  }, 500, () => loading.value = false)
-  
-}, 100)
 
 // 文件变更时，重新获取数据
 const changed_listen = listen<StatusChangePayloadType>(STATUS_CHANGE, (event) => {
@@ -107,74 +64,6 @@ onBeforeUnmount(() => {
   }) 
 })
 
-// 监听路由变化，重新获取数据
-watch(()=> route.path, () => {
-  if (route.path.startsWith('/main/commit')) {
-    id.value = parseInt(route.params.id as string)
-    repo.value = repoStore.getRepoById(id.value)
-    // 重置分页,筛选刷新
-    page.value = 1 
-    filterModel.value = {
-      lastId: undefined,
-      author: undefined,
-      startTime: undefined,
-      endTime: undefined,
-      message: undefined
-    }
-    init().catch((err) => {
-      window.$message.error(`获取数据失败: ${err.data}`) 
-    })
-  }
-}, {immediate: true})
-
-const hasFilter = computed(() => {
-  return !_.every(_.values(filterModel.value), _.isUndefined)
-})
-
-// 选择的分支
-const selectedBranch = computed({
-  get() {
-    if (curBranch.value) {
-      return curBranch.value.reference
-    } else {
-     return '' 
-    }
-  },
-  set(val) {
-    let branch = selectBranch(val)
-    if (branch) {
-      curBranch.value = branch
-      getCommits()
-    }
-  }
-})
-
-// 分支选项
-const branchOptions = computed(() => {
-  return branches.value.map((branch) => {
-    return {
-      label: branch.name,
-      value: branch.reference
-    }
-  }) 
-})
-
-const selectBranch = (reference: string) => {
-  let branch = branches.value.find((branch) => {
-    return branch.reference === reference 
-  })
-  return branch
-}
-
-const pageParamChanged = () => {
-  getCommits()
-}
-
-const showFilter = ref(false)
-const toggleFilter = () => {
-  showFilter.value = !showFilter.value
-}
-
 const { 
   menuX,
   menuY,
@@ -182,64 +71,169 @@ const {
   handleContextMenu,
   menuCloseOutside,
   handleSelect,
-  options} = useContextMenu()
+  options
+} = useContextMenu()
 
+// 组合式API逻辑
+const useBranchData = () => {
+  const branches = ref<Branch[]>([])
+  const curBranch = ref<Branch>()
+  const authors = ref<Author[]>([])
+  const commitsCount = ref(0)
+
+  const selectedBranch = computed({
+    get: () => curBranch.value?.reference || '',
+    set: (val: string) => {
+      const branch = branches.value.find(b => b.reference === val)
+      if (branch) curBranch.value = branch
+    }
+  })
+
+  const branchOptions = computed(() => 
+    branches.value.map(b => ({ label: b.name, value: b.reference }))
+  )
+
+  return { branches, curBranch, authors, selectedBranch, branchOptions, commitsCount }
+}
+
+const useCommitData = (repo: Ref<Repository|undefined>) => {
+  const commits = ref<Commit[]>([])
+  const pagination = reactive({
+    page: INIT_PAGE,
+    pageSize: INIT_PAGE_SIZE,
+    total: 0
+  })
+
+  const getCommits = _.debounce(async () => {
+    if (!repo.value?.path || !curBranch.value) return
+    
+    loading.value = true
+    try {
+      await withMinDelay(async () => {
+        const start = pagination.pageSize * (pagination.page - 1)
+        const data = await reference_commit_filter_details(
+          repo.value!.path,
+          curBranch.value!.name,
+          filterModel.value,
+          start,
+          pagination.pageSize
+        )
+        commits.value = data
+      }, 500)
+    } finally {
+      loading.value = false
+    }
+  }, 150, { leading: true, trailing: true })
+
+  watch(
+    () => [pagination.page, pagination.pageSize],
+    () => {
+      getCommits()
+    },
+    { immediate: true }
+  )
+  return { commits, pagination, getCommits }
+}
+
+const useFilter = () => {
+  const showFilter = ref(false)
+  const filterModel = ref<CommitFilter>({
+    lastId: undefined,
+    author: undefined,
+    startTime: undefined,
+    endTime: undefined,
+    message: undefined,
+  })
+
+  const hasFilter = computed(() => 
+    !_.every(_.values(filterModel.value), _.isUndefined)
+  )
+
+  const filterChanged = _.debounce(() => {
+    pagination.page = 1
+    getCommits()
+  }, 200)
+
+  return { 
+    filterModel, 
+    hasFilter, 
+    filterChanged,
+    showFilter,
+    toggleFilter: () => { showFilter.value = !showFilter.value} 
+    }
+}
+
+// 主逻辑组合
+const { branches, curBranch, selectedBranch, branchOptions, authors} = useBranchData()
+const { commits, pagination, getCommits } = useCommitData(repo)
+const { filterModel, hasFilter, filterChanged, showFilter ,toggleFilter } = useFilter()
+
+// 监听路由变化，重新获取数据
+watch(
+  [() => route.path, () => route.params.id],
+  ([newPath, newId]) => {
+    if (newPath.startsWith('/main/commit')) {
+      id.value = parseInt(newId as string)
+      repo.value = repoStore.getRepoById(id.value)
+      
+      // 重置状态
+      pagination.page = 1
+      filterModel.value = _.mapValues(filterModel.value, () => undefined)
+      
+      // 统一初始化逻辑
+      init().catch((err) => {
+        window.$message.error(`获取数据失败: ${err.data}`)
+      })
+    }
+  },
+  { immediate: true, flush: 'post' }
+)
 </script>
+
 <template>
   <LayoutPage title="提交记录" :subtitle="repo?.alias" :loading="loading">
     <template #header-extra>
-      <div class="flex gap-x-[10px]">
-        <NSelect v-model:value="selectedBranch" clearable :options="branchOptions" placeholder="选择分支" class="w-[200px]">
-        </NSelect>
-        <NButton :dashed='hasFilter' @click="toggleFilter">
-          <NIcon>
-            <Icon icon="mdi:filter-outline" width="100" height="100" />
-          </NIcon>
-        </NButton>
-        <NButton :dashed='hasFilter' @click="getCommits">
-          <NIcon>
-            <Icon icon="mdi:reload" width="24" height="24" />
-          </NIcon>
-        </NButton>
-      </div>
+      <ActionHeader 
+        v-model:branch="selectedBranch"
+        :branch-options="branchOptions"
+        :has-filter="hasFilter"
+        @refresh="getCommits"
+        @toggle-filter="toggleFilter"
+      />
     </template>
     <template #filter-form>
-      <FilterForm :disabled="loading" v-if="showFilter" :author-list="authors" v-bind:model-value="filterModel" @filter="filterChanged"></FilterForm>
+      <FilterForm 
+        :disabled="loading" 
+        v-if="showFilter" 
+        :author-list="authors" 
+        v-model="filterModel"
+        @filter="filterChanged"/>
     </template>
     <NFlex @contextmenu="handleContextMenu" :data-repo="repo?.path">
-      <template v-for="c in commits">
-        <CommitItem :commit="c"/>
-      </template>
+      <CommitItem 
+        v-for="c in commits"
+        :key="c.commitId"
+        :commit="c"
+      />
     </NFlex>
+    <NDropdown 
+      placement="bottom-start"
+      trigger="manual"
+      :x="menuX"
+      :y="menuY"
+      :show="showMenu"
+      :options="options"
+      :disabled="loading"
+      @clickoutside="menuCloseOutside"
+      @select="handleSelect">
+    </NDropdown>
     <template #footer>
-      <NFlex justify="center">
-        <NPagination 
-          :disabled="loading"
-          :item-count="commitsCount" 
-          v-model:page="page"
-          v-model:page-size="pageSize"
-          :page-sizes="[10, 20, 30]"
-          @update:page="pageParamChanged"
-          @update:page-size="pageParamChanged"
-          show-size-picker>
-        </NPagination>
-      </NFlex>
+      <PaginationFooter
+        v-model:page="pagination.page"
+        v-model:page-size="pagination.pageSize"
+        :total="pagination.total"
+        :loading="loading"
+      />
     </template>
   </LayoutPage>
-  <NDropdown 
-    placement="bottom-start"
-    trigger="manual"
-    :x="menuX"
-    :y="menuY"
-    :show="showMenu"
-    :options="options"
-    :disabled="loading"
-    @clickoutside="menuCloseOutside"
-    @select="handleSelect">
-  </NDropdown>
 </template>
-
-
-<style scoped>
-
-</style>

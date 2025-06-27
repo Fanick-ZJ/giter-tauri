@@ -3,6 +3,7 @@ import { Author } from '@/types';
 import { NForm, NSelect, NInput, NFormItem, NDatePicker, NButton, NGrid, NFormItemGi } from 'naive-ui';
 import { computed, PropType, watch } from 'vue';
 import { CommitFilter} from '@/types';
+import _ from 'lodash'
 
 const AUTHOR_EMAIL_INTERVAL = "<author-email-interval>"
 
@@ -46,10 +47,10 @@ const timeRange = computed({
 
 const authorSelected = computed({
   get: () => {
-    return model.value.author?.email
+    return model.value.author?.email || null
   },
   set: (key: string) => {
-    if (key == null) {
+    if (!key) {
       model.value.author = undefined
       return
     }
@@ -80,13 +81,17 @@ const clear = () => {
   model.value.message = undefined
 }
 
-const emit = defineEmits(['filter'])
+const emit = defineEmits(['filter', 'clear'])
 
-watch(model, (val) => {
-  emit('filter', val)
-}, {
-  deep: true
-})
+watch(
+  () => _.cloneDeep(model.value),
+  (newVal, oldVal) => {
+    if (!_.isEqual(newVal, oldVal)) {
+       emit('filter', newVal)
+    }
+  },
+  { deep: true, immediate: true }
+)
 </script>
 <template>
   <NForm 
