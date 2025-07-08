@@ -1,4 +1,4 @@
-import { FileStatus } from "@/enum";
+import { FileStatus, TreeFileMode } from "@/enum";
 import { CommonErrorCode } from "@/enum/error"
 import { MessageApiInjection } from "naive-ui/es/message/src/MessageProvider";
 import { NotificationApiInjection } from "naive-ui/es/notification/src/NotificationProvider";
@@ -100,6 +100,23 @@ export type CommitFilter = {
 export type FileHistoryItem = {
   commit: Commit,
   file: CommitFile,
+}
+
+export type TreeFileMetadata = {
+  size: number,
+  file_mode: TreeFileMode,
+}
+
+export type TreeFile = {
+  name: string,
+  path: string,
+  metadata: TreeFileMetadata
+}
+
+export type TreeDir = {
+    path: String,
+    name: String,
+    children: (TreeFile | TreeDir)[],
 }
 
 declare global {

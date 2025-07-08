@@ -1,6 +1,8 @@
-use crate::types::file_tree::FileTree;
+use crate::types::fs;
+use crate::types::fs::Dir;
 use crate::util::build_commit;
 use crate::util::change_status_to_file_status;
+use crate::util::get_blob_from_entry;
 use crate::util::get_file_content;
 use crate::util::is_binary_file;
 use crate::util::is_binary_file_content;
@@ -15,9 +17,11 @@ use git2::build::CheckoutBuilder;
 use git2::Cred;
 use git2::CredentialType;
 use git2::FetchOptions;
+use git2::FileMode;
 use git2::PushOptions;
 use git2::RemoteCallbacks;
 use git2::TreeWalkMode;
+use git2::TreeWalkResult;
 use git2::{BranchType, Oid, Repository, Revwalk, Status};
 use serde_json::Value;
 use similar::DiffOp;
@@ -26,6 +30,8 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Pointer;
 use std::i32;
+use std::ops::Index;
+use std::ops::IndexMut;
 use std::process::Command;
 use std::io::{self, ErrorKind};
 use std::path::Path;
@@ -1089,7 +1095,93 @@ impl GitDataProvider {
         Ok(history)
     }
 
-    pub fn get_commit_file_tree(&self, commit: &Commit) -> Result<FileTree, GitUtilsErrorCode> {
-        todo!()
+    /// 根据提交id获取对应的文件树
+    pub fn get_commit_file_tree(&self, commit_id: Oid) -> Result<fs::Dir, GitUtilsErrorCode> {
+        /*
+         * 
+            1. GIT_FILEMODE_UNREADABLE (0o000000)
+                用途：表示文件不可读。
+                场景：通常用于特殊情况，比如某些文件在 Git 的索引中被标记为不可读，可能是由于权限问题或文件损坏。
+            2. GIT_FILEMODE_TREE (0o040000)
+                用途：表示这是一个目录（tree）。
+                场景：在 Git 的树对象中，用于标识目录。Git 使用树对象来组织文件和子目录的层级结构。每个目录都有一个对应的树对象，其模式为 0o040000。
+            3. GIT_FILEMODE_BLOB (0o100644)
+                用途：表示一个普通文件（blob），并且具有默认的文件权限（只读）。
+                场景：这是最常见的文件模式，用于普通文件。文件权限为 0o644，表示所有者有读写权限，组内用户和其他用户有读权限。
+            4. GIT_FILEMODE_BLOB_GROUP_WRITABLE (0o100664)
+                用途：表示一个普通文件（blob），并且具有组可写的权限。
+                场景：这种模式较少见，通常用于需要组内用户可以修改文件的场景。文件权限为 0o664，表示所有者和组内用户有读写权限，其他用户有读权限。
+            5. GIT_FILEMODE_BLOB_EXECUTABLE (0o100755)
+                用途：表示一个可执行文件（blob）。
+                场景：用于标记可执行脚本或程序。文件权限为 0o755，表示所有者有读写执行权限，组内用户和其他用户有读执行权限。
+            6. GIT_FILEMODE_LINK (0o120000)
+                用途：表示一个符号链接（symlink）。
+                场景：符号链接是文件系统中的一个特殊文件，它指向另一个文件或目录。在 Git 中，符号链接的模式为 0o120000。
+            7. GIT_FILEMODE_COMMIT (0o160000)
+                用途：表示一个子模块（submodule）的提交对象。
+                场景：子模块是 Git 中的一个特性，允许一个仓库嵌套另一个仓库。子模块的模式为 0o160000，表示它指向一个提交对象，而不是一个普通的文件或目录。
+         */
+
+        let commit = self.repository.find_commit(commit_id)?;
+        let tree = commit.tree()?;
+
+        fn find_dir<'a>(path: &str, dir_stack: &'a mut Vec<*mut fs::Dir>) -> Option<&'a mut Dir> {
+            unsafe {
+                if path.is_empty() {
+                    dir_stack.truncate(1);
+                    return dir_stack[0].as_mut();
+                } else {
+                    for i in (0..dir_stack.len()).rev(){
+                        let dir_path = (*dir_stack[i]).abs_path();
+                        if dir_path.to_str() == Some(path) {
+                            return dir_stack[i].as_mut();
+                        }
+                        if (*dir_stack[i]).path != "" {
+                            dir_stack.pop();
+                        }
+                    }
+                }
+                None
+            }
+        }
+
+        let mut root = Box::new(fs::Dir::new_dir("".into(), "".into()));
+        let mut dir_stack: Vec<*mut fs::Dir> = vec![root.as_mut() as *mut fs::Dir];
+        let _ = tree.walk(TreeWalkMode::PreOrder, |path, entry| {
+            let file_mode: fs::FileMode = entry.filemode().into();
+            let name = match entry.name() {
+                Some(name) => name.to_string(),
+                None => {
+                    return TreeWalkResult::Skip
+                },
+            };
+            eprintln!("path: {:?}, name: {:?}, file mode: {:?}", path, name, file_mode);
+            if let Some(parent_dir) = find_dir(path, &mut dir_stack) {
+                if file_mode == fs::FileMode::Tree {
+                    let dir = Box::new(fs::Dir::new_dir(path.into(), name));
+                    parent_dir.add(fs::FsNode::Dir(*dir));
+                    // 从parent_dir中获取新的指针，避免重复使用Box
+                    if let Some(fs::FsNode::Dir(added_dir)) = parent_dir.children.last_mut() {
+                        let new_dir_ptr = added_dir as *mut fs::Dir;
+                        dir_stack.push(new_dir_ptr);
+                    } else {
+                        eprintln!("Failed to get new directory reference for: {}", path);
+                        return TreeWalkResult::Skip;
+                    }
+                } else {
+                    let size = match get_blob_from_entry(entry, &self.repository) {
+                        Ok(blob) => blob.size(),
+                        Err(e) => return e,
+                    };
+                    let file = Box::new(fs::File::new_file(path.into(), name, size, file_mode));
+                    parent_dir.add(fs::FsNode::File(*file));
+                }
+            } else {
+                // eprintln!("Failed to get parent directory for: {}", path);
+                return TreeWalkResult::Skip;
+            }
+            TreeWalkResult::Ok
+        });
+        Ok(*root)
     }
 }

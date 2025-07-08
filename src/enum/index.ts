@@ -22,6 +22,16 @@ export enum FileStatus {
   Ok = 'Ok',
 }
 
+export enum TreeFileMode {
+  Unreadable = 0o000000,
+  Tree = 0o040000,
+  Blob = 0o100644,
+  BlobGroupWritable = 0o100664,
+  BlobExecutable = 0o100755,
+  Link = 0o120000,
+  Commit = 0o160000,
+}
+
 export type RepoStatus = typeof RepoStatus[keyof typeof RepoStatus];
 
 export const hasFlag = (status: RepoStatus, flag: RepoStatus) => {

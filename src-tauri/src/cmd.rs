@@ -16,7 +16,7 @@ use crate::{
 use giter_macros::command_result;
 use giter_utils::{
     types::{
-        author::Author, branch::Branch, cache::Cache, 
+        author::Author, branch::Branch,
         commit::Commit, diff::ContentDiff, error::GitUtilsErrorCode, 
         file::{ChangedFile, CommittedFile, FileHistoryEntry}, git_data_provider::GitDataProvider, 
         status::WorkStatus
@@ -344,6 +344,13 @@ pub async fn switch_branch(repo: RepoPath, branch: Branch) -> DataResult<()> {
 pub async fn file_history(repo: RepoPath, file_path: String) -> DataResult<Vec<FileHistoryEntry>> {
     let provider = get_provider(&repo)?;
     provider.file_history(file_path)
+}
+#[tauri::command]
+#[command_result]
+pub async fn commit_tree(repo: RepoPath, commit_id: String) -> DataResult<giter_utils::types::fs::Dir> {
+    let provider = get_provider(&repo)?;
+    let commit_id = str_to_oid(&commit_id)?;
+    provider.get_commit_file_tree(commit_id)
 }
 
 #[tauri::command]

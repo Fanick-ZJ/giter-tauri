@@ -10,4 +10,4 @@ pub mod diff;
 pub mod contribution;
 pub mod error;
 pub mod credential;
-pub mod file_tree;
+pub mod fs;
