@@ -2,7 +2,7 @@ use std::path::{PathBuf};
 use serde::Serialize;
 
 #[derive(Serialize, Debug, PartialEq)]
-pub enum FileMode {
+pub enum EntryMode {
     #[serde(rename = "blob")]
     Blob = 0o100644,
     #[serde(rename = "blob_executable")]
@@ -19,31 +19,32 @@ pub enum FileMode {
     BlobGroupWritable = 0o100664
 }
 
-impl From<i32> for FileMode {
+impl From<i32> for EntryMode {
     fn from(value: i32) -> Self {
         return match value {
-            0o000000 => FileMode::Unreadable,
-            0o040000 => FileMode::Tree,
-            0o100644 => FileMode::Blob,
-            0o100664 => FileMode::BlobGroupWritable,
-            0o100755 => FileMode::BlobExecutable,
-            0o120000 => FileMode::Link,
-            0o160000 => FileMode::Commit,
-            _ => FileMode::Unreadable
+            0o000000 => EntryMode::Unreadable,
+            0o040000 => EntryMode::Tree,
+            0o100644 => EntryMode::Blob,
+            0o100664 => EntryMode::BlobGroupWritable,
+            0o100755 => EntryMode::BlobExecutable,
+            0o120000 => EntryMode::Link,
+            0o160000 => EntryMode::Commit,
+            _ => EntryMode::Unreadable
         }
     }
 }
 
 #[derive(Debug, Serialize)]
-pub struct FileMetadata {
+pub struct EntryMetadata {
     pub size: usize,
-    pub file_mode: FileMode,
+    pub mode: EntryMode,
+    pub object_id: String,
 }
 #[derive(Debug, Serialize)]
 pub struct File {
     pub name: String,
     pub path: String,
-    pub metadata: FileMetadata,
+    pub metadata: EntryMetadata,
 }
 
 #[derive(Debug, Serialize)]
@@ -51,6 +52,7 @@ pub struct Dir {
     pub path: String,
     pub name: String,
     pub children: Vec<FsNode>,
+    pub metadata: EntryMetadata,
 }
 
 #[derive(Debug, Serialize)]
@@ -64,24 +66,26 @@ pub enum FsNode {
 }
 
 impl File {
-    pub fn new_file(path: String, name: String, size: usize, file_mode: FileMode) -> Self {
+    pub fn new(path: String, name: String, object_id: String, size: usize, mode: EntryMode) -> Self {
         File {
             name,
             path,
-            metadata: FileMetadata {
+            metadata: EntryMetadata {
                 size,
-                file_mode
+                object_id,
+                mode
             },
         }
     }
 }
 
 impl Dir {
-    pub fn new_dir(path: String, name: String) -> Self {
+    pub fn new(path: String, name: String, object_id: String) -> Self {
         Dir {
             path,
             name,
             children: Vec::new(),
+            metadata: EntryMetadata { size: 0, mode: EntryMode::Tree, object_id }
         }
     }
     pub fn get_children_mut(&mut self) -> &mut Vec<FsNode> {

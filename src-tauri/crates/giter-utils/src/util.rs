@@ -320,18 +320,3 @@ pub fn time_to_ymd(stamp: i64) -> Result<String> {
     let datetime = t?;
     Ok(datetime.format("%Y-%m-%d").to_string())
 }
-
-pub fn get_blob_from_entry<'repo>(
-    entry: &git2::TreeEntry<'_>, // 注意这里省略了生命周期，Rust 会自动推导
-    repo: &'repo git2::Repository,
-) -> Result<git2::Blob<'repo>, TreeWalkResult> {
-    let obj = entry.to_object(repo).map_err(|e| {
-        eprintln!("Failed to load object for {}: {}", entry.name().unwrap_or("<unknown>"), e);
-        TreeWalkResult::Skip
-    })?;
-
-    obj.into_blob().map_err(|e| {
-        eprintln!("Entry {} is not a blob: {:?}", entry.name().unwrap_or("<unknown>"), e);
-        TreeWalkResult::Skip
-    })
-}

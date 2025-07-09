@@ -1,14 +1,16 @@
-use std::path::{Path, PathBuf};
+use std::{path::{Path, PathBuf}, time};
 
 use giter_utils::{types::{error::GitUtilsErrorCode, git_data_provider::GitDataProvider}, util::str_to_oid};
 
 #[test]
 fn test_get_commit_file_tree() -> Result<(), GitUtilsErrorCode> {
-    let path = Path::new("E:\\workSpace\\Rust\\tauri");
-    let oid = str_to_oid("85b19125294917e10e89fc9e09722eaaa4f69962")?;
+    let path = Path::new(r"E:\workSpace\linux");
+    let oid = str_to_oid("7cdabafc001202de9984f22c973305f424e0a8b7")?;
     let repo = GitDataProvider::new(path)?;
+    let t1 = time::Instant::now();
     let tree = repo.get_commit_file_tree(oid);
-
+    let t2 = time::Instant::now();
+    eprintln!("cost time: {:?} ms", t2 - t1);
     Ok(())
 }
 

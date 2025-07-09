@@ -2,7 +2,6 @@ use crate::types::fs;
 use crate::types::fs::Dir;
 use crate::util::build_commit;
 use crate::util::change_status_to_file_status;
-use crate::util::get_blob_from_entry;
 use crate::util::get_file_content;
 use crate::util::is_binary_file;
 use crate::util::is_binary_file_content;
@@ -1144,21 +1143,25 @@ impl GitDataProvider {
                 None
             }
         }
-
-        let mut root = Box::new(fs::Dir::new_dir("".into(), "".into()));
+        let mut root = Box::new(fs::Dir::new("".into(), "".into(), "0".into()));
         let mut dir_stack: Vec<*mut fs::Dir> = vec![root.as_mut() as *mut fs::Dir];
         let _ = tree.walk(TreeWalkMode::PreOrder, |path, entry| {
-            let file_mode: fs::FileMode = entry.filemode().into();
+            let file_mode: fs::EntryMode = entry.filemode().into();
             let name = match entry.name() {
                 Some(name) => name.to_string(),
                 None => {
                     return TreeWalkResult::Skip
                 },
             };
-            eprintln!("path: {:?}, name: {:?}, file mode: {:?}", path, name, file_mode);
+            let obj = match entry.to_object(&self.repository) {
+                Ok(obj) => obj,
+                Err(_) => return TreeWalkResult::Skip,
+            };
+            let object_id = obj.id().to_string();
+            // eprintln!("path: {:?}, name: {:?}, file mode: {:?}", path, name, file_mode);
             if let Some(parent_dir) = find_dir(path, &mut dir_stack) {
-                if file_mode == fs::FileMode::Tree {
-                    let dir = Box::new(fs::Dir::new_dir(path.into(), name));
+                if file_mode == fs::EntryMode::Tree {
+                    let dir = Box::new(fs::Dir::new(path.into(), name, object_id));
                     parent_dir.add(fs::FsNode::Dir(*dir));
                     // 从parent_dir中获取新的指针，避免重复使用Box
                     if let Some(fs::FsNode::Dir(added_dir)) = parent_dir.children.last_mut() {
@@ -1169,11 +1172,12 @@ impl GitDataProvider {
                         return TreeWalkResult::Skip;
                     }
                 } else {
-                    let size = match get_blob_from_entry(entry, &self.repository) {
-                        Ok(blob) => blob.size(),
-                        Err(e) => return e,
+                    let blob = match obj.into_blob() {
+                        Ok(blob) => blob,
+                        Err(_) => return TreeWalkResult::Skip,
                     };
-                    let file = Box::new(fs::File::new_file(path.into(), name, size, file_mode));
+                    let size = blob.size();
+                    let file = Box::new(fs::File::new(path.into(), name, object_id, size, file_mode));
                     parent_dir.add(fs::FsNode::File(*file));
                 }
             } else {

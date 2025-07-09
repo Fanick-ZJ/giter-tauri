@@ -102,21 +102,25 @@ export type FileHistoryItem = {
   file: CommitFile,
 }
 
-export type TreeFileMetadata = {
+export type TreeEntryMetadata = {
   size: number,
-  file_mode: TreeFileMode,
+  mode: TreeFileMode,
+  object_id: string
 }
 
 export type TreeFile = {
   name: string,
   path: string,
-  metadata: TreeFileMetadata
+  metadata: TreeEntryMetadata
+  type: 'file'
 }
 
 export type TreeDir = {
-    path: String,
-    name: String,
-    children: (TreeFile | TreeDir)[],
+  path: String,
+  name: String,
+  children: (TreeFile | TreeDir)[],
+  metadata: TreeEntryMetadata
+  type: 'dir'
 }
 
 declare global {
