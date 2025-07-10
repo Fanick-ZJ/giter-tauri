@@ -347,10 +347,10 @@ pub async fn file_history(repo: RepoPath, file_path: String) -> DataResult<Vec<F
 }
 #[tauri::command]
 #[command_result]
-pub async fn commit_tree(repo: RepoPath, commit_id: String) -> DataResult<giter_utils::types::fs::Dir> {
+pub async fn get_commit_tree_recursive(repo: RepoPath, commit_id: String) -> DataResult<giter_utils::types::fs::Dir> {
     let provider = get_provider(&repo)?;
     let commit_id = str_to_oid(&commit_id)?;
-    provider.get_commit_file_tree(commit_id)
+    provider.get_tree_recursive(commit_id, None, None)
 }
 
 #[tauri::command]

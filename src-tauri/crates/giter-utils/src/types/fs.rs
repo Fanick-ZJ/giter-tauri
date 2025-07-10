@@ -67,6 +67,11 @@ pub enum FsNode {
 
 impl File {
     pub fn new(path: String, name: String, object_id: String, size: usize, mode: EntryMode) -> Self {
+        let path = if path.ends_with("/") {
+            path[0..path.len() - 1].to_string()
+        } else {
+            path
+        };
         File {
             name,
             path,
@@ -79,8 +84,15 @@ impl File {
     }
 }
 
+/// path: 输入可以为 "a/b/c"也可为 "a/b/c/"，在新建的时候会自动去除最后一项
+/// name: 就为单个单词
 impl Dir {
     pub fn new(path: String, name: String, object_id: String) -> Self {
+        let path = if path.ends_with("/") {
+            path[0..path.len() - 1].to_string()
+        } else {
+            path
+        };
         Dir {
             path,
             name,
@@ -92,12 +104,16 @@ impl Dir {
         &mut self.children
     }
 
-    pub fn abs_path(&self) -> PathBuf {
-        if self.path.is_empty() && self.name.is_empty() {
-            return PathBuf::from("")
+    pub fn abs_path(&self) -> String {
+        if self.path.is_empty() {
+            if self.name.is_empty() {
+                return "".into()
+            } else {
+                return format!("{}/", self.name)
+            }
+        } else {
+            format!("{}/{}/", self.path, self.name)
         }
-        let path_buf = PathBuf::from(&self.path);
-        return path_buf.join(self.name.to_string() + "/")
     }
 
     pub fn add(&mut self, node: FsNode) {

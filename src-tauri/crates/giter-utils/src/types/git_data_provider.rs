@@ -16,9 +16,9 @@ use git2::build::CheckoutBuilder;
 use git2::Cred;
 use git2::CredentialType;
 use git2::FetchOptions;
-use git2::FileMode;
 use git2::PushOptions;
 use git2::RemoteCallbacks;
+use git2::Tree;
 use git2::TreeWalkMode;
 use git2::TreeWalkResult;
 use git2::{BranchType, Oid, Repository, Revwalk, Status};
@@ -27,10 +27,9 @@ use similar::DiffOp;
 use similar::TextDiff;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::ffi::OsStr;
 use std::fmt::Pointer;
 use std::i32;
-use std::ops::Index;
-use std::ops::IndexMut;
 use std::process::Command;
 use std::io::{self, ErrorKind};
 use std::path::Path;
@@ -50,7 +49,6 @@ use super::file::UntrackedFile;
 use super::status::status_to_changed_status;
 use super::status::FileStatus;
 use super::error::GitUtilsErrorCode;
-
 
 pub struct GitDataProvider {
     pub repository: Repository,
@@ -1094,8 +1092,41 @@ impl GitDataProvider {
         Ok(history)
     }
 
-    /// 根据提交id获取对应的文件树
-    pub fn get_commit_file_tree(&self, commit_id: Oid) -> Result<fs::Dir, GitUtilsErrorCode> {
+    fn resolve_tree(
+        &self,
+        object_id: Oid,
+        tree_path: Option<String>,
+    ) -> Result<(Tree<'_>, String), GitUtilsErrorCode> {
+        let object = self.repository.find_object(object_id, None)?;
+        let kind = object.kind().ok_or(GitUtilsErrorCode::OtherError(format!(
+            "Unknown object kind: {}",
+            object_id
+        )))?;
+
+        let (tree, tree_path) = match kind {
+            git2::ObjectType::Commit => {
+                let commit = object.as_commit().unwrap();
+                (commit.tree()?, "".into())
+            }
+            git2::ObjectType::Tree => {
+                if tree_path.is_none() {
+                    return Err(GitUtilsErrorCode::OtherError("tree_name and tree_path is not empty when the object is a tree".into()));
+                }
+                (object.into_tree().unwrap(), tree_path.unwrap())
+            }
+            _ => {
+                return Err(GitUtilsErrorCode::OtherError(format!("Invalid Object Kind: {}", object_id)));
+            }
+        };
+
+        Ok((tree, tree_path))
+    }
+
+    /// 根据提交id获取对应的文件树，object_id所指的对象应该为tree或comit，
+    /// 如果是tree，则tree_name, tree_path必填，如果是commit，则会自动变为空值
+    /// 
+    /// tree_path的格式为：arch/alpha/boot
+    pub fn get_tree_recursive(&self, object_id: Oid, tree_path: Option<String>) -> Result<fs::Dir, GitUtilsErrorCode> {
         /*
          * 
             1. GIT_FILEMODE_UNREADABLE (0o000000)
@@ -1120,9 +1151,9 @@ impl GitDataProvider {
                 用途：表示一个子模块（submodule）的提交对象。
                 场景：子模块是 Git 中的一个特性，允许一个仓库嵌套另一个仓库。子模块的模式为 0o160000，表示它指向一个提交对象，而不是一个普通的文件或目录。
          */
-
-        let commit = self.repository.find_commit(commit_id)?;
-        let tree = commit.tree()?;
+        let (tree, tree_path) = self.resolve_tree(object_id, tree_path)?;
+        // let commit = self.repository.find_commit(commit_id)?;
+        // let tree = commit.tree()?;
 
         fn find_dir<'a>(path: &str, dir_stack: &'a mut Vec<*mut fs::Dir>) -> Option<&'a mut Dir> {
             unsafe {
@@ -1132,10 +1163,11 @@ impl GitDataProvider {
                 } else {
                     for i in (0..dir_stack.len()).rev(){
                         let dir_path = (*dir_stack[i]).abs_path();
-                        if dir_path.to_str() == Some(path) {
+                        // eprintln!("dir_path: {} path: {}", dir_path, path);
+                        if dir_path == path {
                             return dir_stack[i].as_mut();
                         }
-                        if (*dir_stack[i]).path != "" {
+                        if i != 0{
                             dir_stack.pop();
                         }
                     }
@@ -1143,9 +1175,26 @@ impl GitDataProvider {
                 None
             }
         }
-        let mut root = Box::new(fs::Dir::new("".into(), "".into(), "0".into()));
+        let _path = PathBuf::from(&tree_path);
+        let basename =  _path.file_name().and_then(|n| n.to_str()).unwrap_or_default().to_string();
+        let dirname = _path.parent().and_then(|n| n.to_str()).unwrap_or_default().to_string();
+        let mut root = Box::new(fs::Dir::new(dirname, basename, "0".into()));
         let mut dir_stack: Vec<*mut fs::Dir> = vec![root.as_mut() as *mut fs::Dir];
         let _ = tree.walk(TreeWalkMode::PreOrder, |path, entry| {
+            /*
+            拼接path，如果传入的tree_path不为None，就要拼接
+            例如：tree_path为：arch/alpha/boot，path为tools/，则path为arch/alpha/boot/tools/
+            如果tree_path为：arch/alpha/boot，path为""，则path为arch/alpha/boot/
+            如果tree_path为""，path也为""，则path为""
+            如果tree_path为""，path为"arch/"，则path为arch/
+             */
+            let path = if tree_path.is_empty() {
+                path
+            } else if path.is_empty() {
+                &format!("{}/", tree_path)
+            } else {
+                &format!("{}/{}", tree_path, path)
+            };
             let file_mode: fs::EntryMode = entry.filemode().into();
             let name = match entry.name() {
                 Some(name) => name.to_string(),
@@ -1158,6 +1207,7 @@ impl GitDataProvider {
                 Err(_) => return TreeWalkResult::Skip,
             };
             let object_id = obj.id().to_string();
+            // eprintln!("=======================================");
             // eprintln!("path: {:?}, name: {:?}, file mode: {:?}", path, name, file_mode);
             if let Some(parent_dir) = find_dir(path, &mut dir_stack) {
                 if file_mode == fs::EntryMode::Tree {
@@ -1187,5 +1237,42 @@ impl GitDataProvider {
             TreeWalkResult::Ok
         });
         Ok(*root)
+    }
+
+    /// 根据提交获取根节点树(只获取一级)，object_id所指的对象应该为tree或comit，
+    /// 如果是tree，则tree_name, tree_path必填，如果是commit，则会自动变为空值
+    pub fn get_tree(&self, object_id: Oid, tree_path: Option<String>) -> Result<fs::Dir, GitUtilsErrorCode> {
+        let (tree, tree_path) = self.resolve_tree(object_id, tree_path)?;
+        let _path = PathBuf::from(&tree_path);
+        let basename =  _path.file_name().and_then(|n| n.to_str()).unwrap_or_default().to_string();
+        let dirname = _path.parent().and_then(|n| n.to_str()).unwrap_or_default().to_string();
+        let mut root = fs::Dir::new(dirname, basename, "0".into());
+        for entry in tree.iter() {
+            let entry_mode: fs::EntryMode = entry.filemode().into();
+            let obj = match entry.to_object(&self.repository) {
+                Ok(obj) => obj,
+                Err(_) => continue,
+            };
+            let object_id = obj.id().to_string();
+            let name = match entry.name() {
+                Some(name) => name.to_string(),
+                None => {
+                    continue;
+                },
+            };
+            if entry_mode == fs::EntryMode::Tree {
+                let dir = fs::Dir::new("".into(), name, object_id);
+                root.add(fs::FsNode::Dir(dir));
+            } else {
+                let blob = match obj.into_blob() {
+                    Ok(blob) => blob,
+                    Err(_) => continue,
+                };
+                let size = blob.size();
+                let file = fs::File::new("".into(), name, object_id, size, entry_mode);
+                root.add(fs::FsNode::File(file));
+            }
+        }
+        Ok(root)
     }
 }

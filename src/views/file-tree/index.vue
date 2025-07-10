@@ -5,7 +5,7 @@ const router = useRouter()
 const route = useRoute()
 const {repo, commitId} = route.params;
 console.log(repo, commitId)
-console.log(await commitTree(repo, commitId))
+// console.log(await commitTree(repo, commitId))
 
 </script>
 
