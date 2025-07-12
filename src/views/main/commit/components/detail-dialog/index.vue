@@ -161,7 +161,7 @@ watch(() => page.value, async () => {
           </div>
         </div>
       </template>
-      <div class="h-full relative" ref="containerRef">
+      <div class="h-[calc(100%-30px)] relative" ref="containerRef">
         <NLayout 
           ref="contentRef"
           class="absolute w-full"
@@ -172,16 +172,18 @@ watch(() => page.value, async () => {
             <template v-for="item in pageItems" :key="item.objectId + item.path">
               <DiffDetailComponent ref="diffDetailRefs" :repo="repo" :file="item" />
             </template>
-            <NPagination
-              v-if="(commitFiles?.length || 0) > pageSize"
-              :item-count="commitFiles?.length"
-              v-model:page="page"
-              v-model:page-size="pageSize"
-              :page-sizes="[10, 20, 30]"
-              @update-page="handlePageChange" 
-              show-size-picker/>
           </NFlex>
         </NLayout>
+      </div>
+      <div class="absolute flex justify-center bottom-3 h-[30px] w-full z-10">
+        <NPagination
+        v-if="(commitFiles?.length || 0) > 10"
+        :item-count="commitFiles?.length"
+        v-model:page="page"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 30]"
+        @update-page="handlePageChange" 
+        show-size-picker/>
       </div>
     </NCard>
   </div>
