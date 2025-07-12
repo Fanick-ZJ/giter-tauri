@@ -46,9 +46,7 @@ const viewToShrink = () => {
 provide(viewExtend, viewToExtend)
 provide(viewShrink, viewToShrink)
 
-onMounted(() => {
-  useRepoStore().init_repo()
-})
+useRepoStore().init_repo()
 </script>
 
 <template>

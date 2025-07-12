@@ -102,7 +102,7 @@ export const getFolders = (path: string) => {
   return bus.invoke(GET_FOLDERS, { path });
 }
 
-export const isRepo = (repo: RepoPath) => {
+export const isRepo = (repo: RepoPath): Promise<boolean> => {
   return bus.invoke(IS_REPO, { repo });
 }
 
