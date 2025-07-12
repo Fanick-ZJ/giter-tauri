@@ -119,6 +119,7 @@ const useCommitData = (repo: Ref<Repository|undefined>) => {
           pagination.pageSize
         )
         commits.value = data
+        pagination.total = await reference_commit_filter_count(repo.value!.path, curBranch.value!.name, filterModel.value)
       }, 500)
     } finally {
       loading.value = false

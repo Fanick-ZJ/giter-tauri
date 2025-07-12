@@ -5,6 +5,7 @@ use crate::util::change_status_to_file_status;
 use crate::util::get_file_content;
 use crate::util::is_binary_file;
 use crate::util::is_binary_file_content;
+use crate::util::object_is_binary;
 use crate::util::size_by_path;
 use crate::util::stamp_to_ymd;
 use crate::util::str_to_oid;
@@ -179,8 +180,7 @@ impl GitDataProvider {
         let blob = self.repository
             .find_blob(oid)
             .map_err(|_| GitUtilsErrorCode::BlobNotFound(oid.to_string()))?;
-        let content = blob.content();
-        let is = is_binary_file_content(content.to_vec());
+        let is = blob.is_binary();
         Ok(is)
 
     }
@@ -568,7 +568,7 @@ impl GitDataProvider {
                 .ok_or_else(|| anyhow::anyhow!("new file path is not valid utf-8"))?
                 .to_string();
             // git2的is_blob函数好像有问题，直接用文件内容判断吧
-            let (is_binary, old_is_binary) = (new_file.is_binary(), old_file.is_binary());
+            let (is_binary, old_is_binary) = (object_is_binary(new_file.id(), repo), object_is_binary(old_file.id(), repo));
             let size = new_file.size();
             let status = change_status_to_file_status(&delta.status());
             let new_blob = repo.find_blob(delta.new_file().id());

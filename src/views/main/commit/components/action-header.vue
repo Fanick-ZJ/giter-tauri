@@ -19,7 +19,7 @@ const emit = defineEmits<{
   <div class="flex gap-x-[10px]">
     <NSelect 
       :value="branch"
-      @update:value="val => emit('update:branch', val)"
+      @update:value="val => {emit('update:branch', val); emit('refresh')}"
       :options="branchOptions"
       clearable
       placeholder="选择分支"

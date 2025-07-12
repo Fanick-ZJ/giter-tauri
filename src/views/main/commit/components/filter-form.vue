@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Author } from '@/types';
-import { NForm, NSelect, NInput, NFormItem, NDatePicker, NButton, NGrid, NFormItemGi } from 'naive-ui';
+import { NForm, NSelect, NInput, NButtonGroup, NDatePicker, NButton, NGrid, NFormItemGi } from 'naive-ui';
 import { computed, PropType, watch } from 'vue';
 import { CommitFilter} from '@/types';
 import _ from 'lodash'
@@ -74,24 +74,24 @@ const authorOptions = computed(() => {
 })
 
 const clear = () => {
+  // 如果model.value的属性都是undefined的话，就不用刷新
+  if (_.every(model.value, (item) => item === undefined)) {
+    return
+  }
+
   model.value.lastId = undefined
   model.value.author = undefined
   model.value.startTime = undefined
   model.value.endTime = undefined
   model.value.message = undefined
+  emit('filter', model.value)
+}
+
+const search = () => {
+  emit('filter', model.value)
 }
 
 const emit = defineEmits(['filter', 'clear'])
-
-watch(
-  () => _.cloneDeep(model.value),
-  (newVal, oldVal) => {
-    if (!_.isEqual(newVal, oldVal)) {
-       emit('filter', newVal)
-    }
-  },
-  { deep: true, immediate: true }
-)
 </script>
 <template>
   <NForm 
@@ -121,8 +121,9 @@ watch(
       </NFormItemGi>
     </NGrid>
   </NForm>
-  <div class="flex justify-end gap-5 mt-1">
-    <NButton type="error" @click="clear">重置</NButton>
+  <div class="flex justify-end gap-5">
+    <NButton :disabled="props.disabled" type="info" @click="search">查询</NButton>
+    <NButton :disabled="props.disabled" type="error" @click="clear">重置</NButton>
   </div>
 </template>
 
