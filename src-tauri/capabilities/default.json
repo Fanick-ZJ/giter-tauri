@@ -41,7 +41,7 @@
     },
     {
       "identifier": "core:event:allow-listen",
-      "windows": ["file-history"],
+      "windows": ["file-history", "file-tree"],
       "allow": ["*"]
     }
   ]

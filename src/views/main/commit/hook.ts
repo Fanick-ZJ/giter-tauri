@@ -54,7 +54,8 @@ export const useContextMenu = () => {
       })
     }
     if (key === 'file-tree') {
-      new FileTreeWindow(repo.value, getCommitId())
+      let window = new FileTreeWindow(repo.value, getCommitId())
+      window.show()
     }
     showMenu.value = false
   }

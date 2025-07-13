@@ -21,7 +21,9 @@ onMounted(() => {
 </script>
 
 <template>
-  <NConfigProvider :theme="naviDarkTheme" :locale="zhCN">
+  <NConfigProvider 
+  :theme="naviDarkTheme" 
+  :locale="zhCN" >
     <AppProvider>
       <RouterView></RouterView>
     </AppProvider>

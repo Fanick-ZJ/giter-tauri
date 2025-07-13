@@ -354,6 +354,22 @@ pub async fn get_commit_tree_recursive(repo: RepoPath, commit_id: String) -> Dat
 }
 
 #[tauri::command]
+#[command_result]
+pub async fn get_tree(repo: RepoPath, object_id: String, tree_path: Option<String>) -> DataResult<giter_utils::types::fs::Dir> {
+    let provider = get_provider(&repo)?;
+    let object_id = str_to_oid(&object_id)?;
+    provider.get_tree(object_id, tree_path)
+}
+
+#[tauri::command]
+#[command_result]
+pub async fn object_is_binary(repo: RepoPath, object_id: String) -> DataResult<bool> {
+    let provider = get_provider(&repo)?;
+    let object_id = str_to_oid(&object_id)?;
+    provider.blob_is_binary(object_id)
+}
+
+#[tauri::command]
 pub fn create_window(
     app: tauri::AppHandle,
     label: &str,

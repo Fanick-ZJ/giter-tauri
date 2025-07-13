@@ -17,6 +17,7 @@ use git2::build::CheckoutBuilder;
 use git2::Cred;
 use git2::CredentialType;
 use git2::FetchOptions;
+use git2::ObjectType;
 use git2::PushOptions;
 use git2::RemoteCallbacks;
 use git2::Tree;
@@ -35,6 +36,7 @@ use std::process::Command;
 use std::io::{self, ErrorKind};
 use std::path::Path;
 use std::path::PathBuf;
+use std::string;
 use std::usize;
 use std::vec;
 use std::os::windows::process::CommandExt;
@@ -174,15 +176,6 @@ impl GitDataProvider {
            }
         }
         Ok(entry?.id())
-    }
-
-    fn blob_is_binary(&self, oid: Oid) -> Result<bool, GitUtilsErrorCode> {
-        let blob = self.repository
-            .find_blob(oid)
-            .map_err(|_| GitUtilsErrorCode::BlobNotFound(oid.to_string()))?;
-        let is = blob.is_binary();
-        Ok(is)
-
     }
 
     pub fn staged_files(&self) -> Result<Vec<ChangedFile>, GitUtilsErrorCode> {
@@ -1110,7 +1103,7 @@ impl GitDataProvider {
             }
             git2::ObjectType::Tree => {
                 if tree_path.is_none() {
-                    return Err(GitUtilsErrorCode::OtherError("tree_name and tree_path is not empty when the object is a tree".into()));
+                    return Err(GitUtilsErrorCode::OtherError("tree_path is not empty when the object is a tree".into()));
                 }
                 (object.into_tree().unwrap(), tree_path.unwrap())
             }
@@ -1210,7 +1203,7 @@ impl GitDataProvider {
             // eprintln!("=======================================");
             // eprintln!("path: {:?}, name: {:?}, file mode: {:?}", path, name, file_mode);
             if let Some(parent_dir) = find_dir(path, &mut dir_stack) {
-                if file_mode == fs::EntryMode::Tree {
+                if file_mode == fs::EntryMode::TREE {
                     let dir = Box::new(fs::Dir::new(path.into(), name, object_id));
                     parent_dir.add(fs::FsNode::Dir(*dir));
                     // 从parent_dir中获取新的指针，避免重复使用Box
@@ -1260,7 +1253,7 @@ impl GitDataProvider {
                     continue;
                 },
             };
-            if entry_mode == fs::EntryMode::Tree {
+            if entry_mode == fs::EntryMode::TREE {
                 let dir = fs::Dir::new("".into(), name, object_id);
                 root.add(fs::FsNode::Dir(dir));
             } else {
@@ -1274,5 +1267,9 @@ impl GitDataProvider {
             }
         }
         Ok(root)
+    }
+
+    pub fn blob_is_binary(&self, object_id: Oid) -> Result<bool, GitUtilsErrorCode> {
+        Ok(object_is_binary(object_id, &self.repository))
     }
 }

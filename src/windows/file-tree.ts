@@ -7,27 +7,19 @@ import { WindowOptions, Window, LogicalSize } from "@tauri-apps/api/window";
 export const LOCAL_STORAGE_FIRST_FILE_HISTORY = "first-file-history"
 
 class FileTreeWindow {
-  private static openedRepo = new Map<string, FileTreeWindow>()
   private window: WebviewWindow | null = null;
   private repo = '';
   private commitId = '';
 
   constructor(repo: string, commitId: string) {
-    if (FileTreeWindow.openedRepo.has(repo)) {
-      return FileTreeWindow.openedRepo.get(repo) as FileTreeWindow; 
-    }
     this.repo = repo;
     this.commitId = commitId;
     this.buildWindow()
-    FileTreeWindow.openedRepo.set(repo, this)
-    this.window?.once(TauriEvent.WINDOW_DESTROYED, () => {
-      FileTreeWindow.openedRepo.delete(repo)
-    })
 
   }
 
   private buildWindow() { 
-    this.window = new WebviewWindow("file-tree", this.options())
+    this.window = new WebviewWindow('file-tree', this.options())
     this.window.once(TauriEvent.WINDOW_CREATED, () => {
         this.window && this.window.setMinSize(new LogicalSize(800, 600))
         this.window && this.window.center()
@@ -45,12 +37,19 @@ class FileTreeWindow {
       url: `/file_tree/${encodeURIComponent(this.repo)}/${this.commitId}`,
       parent: 'main',
       center: true,
+      visible: false  // 新建时不显示窗口
 
     }
   }
 
   public async show() {
-    await this.window?.setFocus()
+    if (!this.window) {
+      this.window = new WebviewWindow("file-tree", this.options());
+    }
+    // 等待窗口真正创建完成
+    await this.window.once(TauriEvent.WINDOW_CREATED, () => {})
+    await this.window.show(); // 显式显示
+    await this.window.setFocus();
   }
 }
 

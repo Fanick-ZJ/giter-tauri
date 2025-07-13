@@ -76,6 +76,10 @@ function calculateEditorHeight() {
 onMounted(() => {
   initEditor()
 })
+
+watch(() => props.content, (newValue, oldValue) => {
+  editor.setValue(newValue)
+})
 </script>
 
 <template>

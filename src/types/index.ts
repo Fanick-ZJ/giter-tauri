@@ -116,8 +116,8 @@ export type TreeFile = {
 }
 
 export type TreeDir = {
-  path: String,
-  name: String,
+  path: string,
+  name: string,
   children: (TreeFile | TreeDir)[],
   metadata: TreeEntryMetadata
   type: 'dir'

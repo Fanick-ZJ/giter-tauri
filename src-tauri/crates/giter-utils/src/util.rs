@@ -167,7 +167,7 @@ pub fn object_is_binary(oid: Oid, repo: &Repository) -> bool {
 }
 
 // 判断文件是否为二进制文件(直接输入文件内容)
-/// 返回 `Ok(true)` 表示是二进制文件，`Ok(false)` 表示是文本文件
+/// 返回 `true` 表示是二进制文件，`false` 表示是文本文件
 pub fn is_binary_file_content(content: Vec<u8>) -> bool {
     
     // 读取前 1024 字节用于检测（可根据需要调整）
