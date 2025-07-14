@@ -74,6 +74,47 @@ const hasSideSizeProp = computed(() => {
   // 注意：HTML 模板中 prop 名是 kebab-case（side-width），不是 camelCase（sideWidth）
 })
 
+const useSizeProps = () => {
+    const hasMaxSizeProp = computed(() => {
+        let field = 'side_max_width'
+        if (!isVertical) {
+            field = 'side_max_height'
+        }
+        return instance?.vnode.props?.[field] !== undefined
+    })
+
+    const hasMinSizeProp = computed(() => {
+        let field = 'side_min_width'
+        if (!isVertical) {
+            field = 'side_min_height'
+        }
+        return instance?.vnode.props?.[field] !== undefined
+    })
+
+    const maxSize = computed(() => {
+        if (!isVertical) {
+            return hasMaxSizeProp.value ? props.side_max_height : window.innerHeight - 50
+        } else {
+            return hasMaxSizeProp.value ? props.side_max_width : window.innerWidth - 50
+        }
+    })
+
+    const minSize = computed(() => {
+        if (!isVertical) {
+            return hasMinSizeProp.value ? props.side_min_height : 50
+        } else {
+            return hasMinSizeProp.value ? props.side_min_width : 50
+        }
+    })
+
+    return {
+        minSize,
+        maxSize
+    }
+}
+
+const { minSize, maxSize} = useSizeProps()
+
 // 3. 本地状态（初始为 props.side_width）
 const localSize = ref<number>(isVertical ? props.side_width : props.side_height)
 
@@ -127,6 +168,8 @@ const useSidebar = () => {
     }
 
     let is_dragging = false
+    let startMousePos = 0
+    let startSize = 0
 
     const handleMouseUp = () => {
         is_dragging = false
@@ -137,26 +180,28 @@ const useSidebar = () => {
 
     const handleMouseMove = (event: MouseEvent) => {
         if (!is_dragging) return
-        const newSize = actualSize.value + (isVertical ? event.movementX : event.movementY)
-        const clampedSize = isVertical
-            ? Math.max(props.side_min_width, Math.min(props.side_max_width, newSize))
-            : Math.max(props.side_min_height, Math.min(props.side_max_height, newSize))
+        const currentMousePos = isVertical ? event.clientX : event.clientY
+        const delta = currentMousePos - startMousePos
+        const newSize = startSize + delta
+        const clampedSize = Math.max(minSize.value, Math.min(maxSize.value, newSize))
 
         if (hasSideSizeProp.value) {
-            // 父组件传入了 side_width，必须 emit 更新
             emit('update:side_size', clampedSize)
         } else {
-            // 父组件未传入，直接更新本地状态
             localSize.value = clampedSize
         }
     }
 
-    sider_bar.addEventListener('mousedown', (event) => {
+    const handleMouseDown = (event: MouseEvent) => {
         is_dragging = true
         sider_bar.style.backgroundColor = '#3b82f6'
+        startMousePos = isVertical ? event.clientX : event.clientY
+        startSize = actualSize.value
         document.addEventListener('mousemove', handleMouseMove)
         document.addEventListener('mouseup', handleMouseUp)
-    })
+    }
+
+    sider_bar.addEventListener('mousedown', handleMouseDown)
 }
 
 const {content_style, sider_style} = useStyle()
@@ -169,7 +214,7 @@ const emit = defineEmits(['update:side_size'])
 
 <template>
     <div class="flex" :class="isVertical ? '': 'flex-col'">
-        <div ref="siderRef" :style="sider_style">
+        <div ref="siderRef" :style="sider_style" class="shrink-0">
             <slot name="sider"></slot>
         </div>
         <div class="spliter__bar bg-gray-100" ref="spliterBarRef"></div>

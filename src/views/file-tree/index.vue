@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import Spliter from '@/components/common/spliter/index.vue'
 import Editor from '@/components/common/editor/editor.vue'
-import { useRouter, useRoute } from 'vue-router';
+import { useRoute } from 'vue-router';
 import Tree from './components/tree.vue'
 import { getBlobContent, objectIsBinary } from '@/utils/command';
 import { ref } from 'vue';
@@ -31,7 +31,6 @@ const selectedFile = async (object_id: string) => {
         class="h-screen" 
         :side_padding="10"
         :content_padding="10"
-        
     >
         <template #sider>
             <Tree 
