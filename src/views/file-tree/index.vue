@@ -21,7 +21,6 @@ const selectedFile = async (object_id: string) => {
     }
     let content = await getBlobContent(repo as string, object_id)
     fileContent.value = bytesToString(content)
-    console.log(fileContent.value)
 
 }
 </script>

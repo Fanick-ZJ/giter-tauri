@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { useElementSize } from '@vueuse/core';
-import * as monaco from 'monaco-editor';
-import { onMounted, ref, watch } from 'vue';
+import { registerLanguage } from '@/utils/edit'
+import hljs from 'highlight.js/lib/core'
+import * as monaco from 'monaco-editor'
+import { getCurrentInstance, onMounted, ref, watch } from 'vue'
 
 const props = defineProps({
   language: {
@@ -18,14 +19,26 @@ const props = defineProps({
   }
 })
 
+registerLanguage()
+const instance = getCurrentInstance()
 let editor: monaco.editor.IStandaloneCodeEditor;
 const editorBody = ref<HTMLElement>();
+
+const autoDetectLanguage = () => {
+  const has_language = instance?.vnode.props?.['language'] != undefined
+  if (has_language) {
+    return instance?.vnode.props?.['language']
+  }
+  const result = hljs.highlightAuto(props.content)
+  console.log(result.language)
+  return result.language
+}
 const initEditor = () => {
   if (!editorBody.value) return
 
   editor = monaco.editor.create(editorBody.value, {
     value: props.content,
-    language: props.language,
+    language: autoDetectLanguage(),
     minimap: {
       enabled: false,
     },
@@ -79,6 +92,7 @@ onMounted(() => {
 
 watch(() => props.content, (newValue, oldValue) => {
   editor.setValue(newValue)
+  monaco.editor.setModelLanguage(editor.getModel()!, autoDetectLanguage())
 })
 </script>
 
