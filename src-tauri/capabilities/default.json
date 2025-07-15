@@ -23,6 +23,7 @@
     "core:window:allow-set-max-size",
     "core:window:allow-set-size",
     "core:window:allow-close",
+    "core:window:allow-set-title",
     "core:window:allow-set-min-size",
     "core:window:allow-toggle-maximize",
     "core:window:allow-internal-toggle-maximize",
@@ -42,6 +43,11 @@
     {
       "identifier": "core:event:allow-listen",
       "windows": ["file-history", "file-tree"],
+      "allow": ["*"]
+    },
+    {
+      "identifier": "core:window:allow-set-title",
+      "windows": ["file-tree-*"],
       "allow": ["*"]
     }
   ]

@@ -6,7 +6,7 @@ mod utils;
 
 use std::collections::HashMap;
 
-use crate::{cmd::{get_commit_tree_recursive, get_tree, object_is_binary}, utils::resolve};
+use crate::{cmd::{get_commit_tree_recursive, get_repo_by_path, get_tree, object_is_binary}, utils::resolve};
 use cmd::{
     add_to_stage, add_watch, authors, before_reference_commits_count, blob_content, branch_commits, branches, checkout_file, commit, commit_content, create_window, current_branch, current_remote_branch, file_diff, file_history, get_branch_commit_contribution, get_changed_files, get_commit, get_db_path, get_driver, get_folders, get_global_author, get_repo_author, get_separator, get_staged_files, is_repo, pull, push, reference_commit_filter_count, reference_commit_filter_details, remove_from_stage, remove_watch, repos, set_repo_ownership, switch_branch, work_status
 };
@@ -93,7 +93,8 @@ pub fn run() {
             create_window,
             get_commit_tree_recursive,
             get_tree,
-            object_is_binary
+            object_is_binary,
+            get_repo_by_path
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

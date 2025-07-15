@@ -107,6 +107,20 @@ impl GitStore {
         Ok(result)
     }
 
+    pub fn get_repo_by_path(&self, path: String) -> Option<store::Repository> {
+        let conn = conn_db(self.path.clone()).unwrap();
+        conn.query_row("SELECT * FROM repository where path = ?", [path], |row| {
+            Ok(Repository {
+                    id: row.get(0)?,
+                    path: row.get(1)?,
+                    alias: row.get(2)?,
+                    has_watch: row.get(3)?,
+                    order: row.get(4)?,
+                    top: row.get(5)?,
+                })
+        }).ok()
+    }
+
     pub fn update_repo(&self, repo: store::Repository) -> Result<(), String> {
         let sql =
             "update repository set path=?1, alias=?2, has_watch=?3, `order`=?4, top=?5 where id=?6";

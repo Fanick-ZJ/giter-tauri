@@ -33,5 +33,6 @@ onMounted(() => {
 <style>
 * {
   user-select: none;
+  overscroll-behavior: none;   /* 禁止上下过度滚动 */
 }
 </style>

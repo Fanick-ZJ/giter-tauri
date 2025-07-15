@@ -57,7 +57,6 @@ const nodeClicked: TreeOverrideNodeClickBehavior = ({option})  => {
 const useTreeStyle = () => {
     const {height} = useElementSize(treeWrapperRef)
     const treeStyle = computed(() => {
-        console.log(`${height.value}px`)
         return {
             height: `${height.value}px`
         }

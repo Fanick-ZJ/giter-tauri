@@ -399,3 +399,10 @@ pub fn create_window(
     let webview = WebviewBuilder::new(label, url);
     window.add_child(webview, tauri::LogicalPosition::new(0, 0), window.inner_size().unwrap());
 }
+
+#[tauri::command]
+pub async fn get_repo_by_path(path: String) -> Option<store::Repository> {
+    let store = handle::Handle::global().store().unwrap();
+    return store.get_repo_by_path(path)
+
+}

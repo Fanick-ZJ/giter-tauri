@@ -30,7 +30,6 @@ const autoDetectLanguage = () => {
     return instance?.vnode.props?.['language']
   }
   const result = hljs.highlightAuto(props.content)
-  console.log(result.language)
   return result.language
 }
 const initEditor = () => {

@@ -1,8 +1,10 @@
 import { FileHistoryItem } from "@/types";
+import { getRepoByPath } from "@/utils/command";
+import { getRepositoryByPath } from "@/utils/store";
 import { TauriEvent } from "@tauri-apps/api/event";
 import { WebviewOptions } from "@tauri-apps/api/webview";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { WindowOptions, Window, LogicalSize } from "@tauri-apps/api/window";
+import { WindowOptions, LogicalSize } from "@tauri-apps/api/window";
 
 export const LOCAL_STORAGE_FIRST_FILE_HISTORY = "first-file-history"
 
@@ -18,8 +20,11 @@ class FileTreeWindow {
 
   }
 
-  private buildWindow() { 
-    this.window = new WebviewWindow('file-tree', this.options())
+  private buildWindow() {
+    this.window = new WebviewWindow(`file-tree-${this.commitId}`, this.options())
+    getRepoByPath(this.repo).then(repo => {
+      this.window?.setTitle("提交树-" + repo.alias + " : " + this.commitId)
+    })
     this.window.once(TauriEvent.WINDOW_CREATED, () => {
         this.window && this.window.setMinSize(new LogicalSize(800, 600))
         this.window && this.window.center()
