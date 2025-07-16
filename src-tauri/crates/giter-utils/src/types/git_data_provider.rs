@@ -4,7 +4,6 @@ use crate::util::build_commit;
 use crate::util::change_status_to_file_status;
 use crate::util::get_file_content;
 use crate::util::is_binary_file;
-use crate::util::is_binary_file_content;
 use crate::util::object_is_binary;
 use crate::util::size_by_path;
 use crate::util::stamp_to_ymd;
@@ -17,7 +16,6 @@ use git2::build::CheckoutBuilder;
 use git2::Cred;
 use git2::CredentialType;
 use git2::FetchOptions;
-use git2::ObjectType;
 use git2::PushOptions;
 use git2::RemoteCallbacks;
 use git2::Tree;
@@ -29,14 +27,12 @@ use similar::DiffOp;
 use similar::TextDiff;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::ffi::OsStr;
 use std::fmt::Pointer;
 use std::i32;
 use std::process::Command;
 use std::io::{self, ErrorKind};
 use std::path::Path;
 use std::path::PathBuf;
-use std::string;
 use std::time::Instant;
 use std::usize;
 use std::vec;
@@ -581,7 +577,6 @@ impl GitDataProvider {
     /// 根据oid获取文件内容
     /// oid: 提交id
     pub fn get_blob_content(&self, oid: impl Into<Oid>) -> Result<Vec<u8>, GitUtilsErrorCode> {
-        let t1 = Instant::now();
         let oid = oid.into();
         let blob = self.repository.find_blob(oid);
         if blob.is_err() {
@@ -589,8 +584,6 @@ impl GitDataProvider {
         }
         let blob = blob.unwrap();
         let content = blob.content().to_vec();
-        let t2 = Instant::now();
-        eprintln!("spend {:?}", t2 - t1);
         Ok(content)
     }
 
@@ -636,7 +629,7 @@ impl GitDataProvider {
 
     /// 获取分支的贡献者
     pub fn authors(&self, branch: &Branch) -> Result<Vec<Author>, GitUtilsErrorCode> {
-        let mut lasted_commit_id = Option::<Oid>::None;
+        let lasted_commit_id = Option::<Oid>::None;
         let mut author_set = HashSet::new();
         // 1. 获取分支的提交
         let branch_commit = self.branch_commit_inner(branch)?;
@@ -652,7 +645,6 @@ impl GitDataProvider {
             let author = self.get_commit_author(&commit)?;
             author_set.insert(author);
         }
-        let lasted_id = branch_commit.id();
         let authors: Vec<Author> = author_set.into_iter().collect();
         Ok(authors)
     }
@@ -809,7 +801,7 @@ impl GitDataProvider {
         let (username, password) = credentials.as_ref()
             .map(|(u, p)| (u.clone(), p.clone()))
             .unwrap_or_default();
-        move |url: &str, username_from_url: Option<&str>, allowed_types: CredentialType| {
+        move |_: &str, username_from_url: Option<&str>, allowed_types: CredentialType| {
             if let CredentialType::USER_PASS_PLAINTEXT = allowed_types {
                 if username.is_empty() || password.is_empty() {
                     return Err(git2::Error::new(

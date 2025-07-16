@@ -2,12 +2,10 @@ use std::fmt;
 
 use git2::{Oid, Repository};
 use serde::{
-    de::{Error as DeError, SeqAccess, Visitor},
+    de::{Error as DeError, Visitor},
     ser::SerializeStruct,
     Deserialize, Deserializer, Serialize, Serializer,
 };
-
-use crate::util::str_to_oid;
 
 use super::error::GitUtilsErrorCode;
 

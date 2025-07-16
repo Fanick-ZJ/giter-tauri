@@ -1,5 +1,5 @@
 import { STATUS_CHANGE } from "@/const/listen";
-import { RepoStatus, SetupStoreId } from "@/enum";
+import { parseStatus, RepoStatus, SetupStoreId } from "@/enum";
 import { Repository } from "@/types";
 import { addWatch, isRepo, removeWatch, workStatus } from "@/utils/command";
 import { readRepos, removeRepo, saveRepo, updateRepo } from "@/utils/store";
@@ -56,7 +56,8 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
     // 4. 异步获取状态（添加类型守卫确保类型安全）
     try {
       const rawStatus = await workStatus(validRepo.path);
-      if (Object.values(RepoStatus).includes(rawStatus as RepoStatus)) {
+      // 这里rawStaus是通过位运算出来的，不能简单地判断是否在RepoStatus中，进行修改
+      if (parseStatus(rawStatus).length > 0) {
         statusRef.value = rawStatus as RepoStatus;
       } else {
         throw new Error(`未知仓库状态: ${rawStatus}`);
@@ -64,8 +65,6 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
     } catch (err: any) {
       validRepo.valid = false
       window.$message.error(`获取仓库状态失败: ${err.message}`)
-      // 添加自动重试逻辑（示例：3秒后重试）
-      // setTimeout(() => void commonRepoInit(repo), 3000);
     }
     return validRepo;
   }
