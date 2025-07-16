@@ -1,4 +1,4 @@
-use tauri::{Manager, Url, WebviewBuilder};
+use tauri::{ipc::Response, Manager, Url, WebviewBuilder};
 use serde_json::Value;
 use std::{collections::HashMap, path::PathBuf, sync::Mutex, thread};
 use crate::{
@@ -219,10 +219,10 @@ pub async fn file_diff(repo: RepoPath, old: String, new: String) -> DataResult<C
 
 #[tauri::command]
 #[command_result]
-pub async fn blob_content(repo: RepoPath, cid: String) -> DataResult<Vec<u8>> {
+pub async fn blob_content(repo: RepoPath, cid: String) -> DataResult<Response> {
     let provider = get_provider(&repo)?;
     let oid = str_to_oid(&cid)?;
-    provider.get_blob_content(oid)
+    Ok(Response::new(provider.get_blob_content(oid)?))
 }
 
 #[tauri::command]

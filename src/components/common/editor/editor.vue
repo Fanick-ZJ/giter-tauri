@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { registerLanguage } from '@/utils/edit'
-import hljs from 'highlight.js/lib/core'
+import { extname, getMonacoLanguage } from '@/utils/tool'
 import * as monaco from 'monaco-editor'
 import { getCurrentInstance, onMounted, ref, watch } from 'vue'
 
@@ -8,6 +7,10 @@ const props = defineProps({
   language: {
     type: String,
     default: 'plain-text'
+  },
+  filename: {
+    type: String,
+    required: false,
   },
   content: {
     type: String,
@@ -19,7 +22,6 @@ const props = defineProps({
   }
 })
 
-registerLanguage()
 const instance = getCurrentInstance()
 let editor: monaco.editor.IStandaloneCodeEditor;
 const editorBody = ref<HTMLElement>();
@@ -29,8 +31,7 @@ const autoDetectLanguage = () => {
   if (has_language) {
     return instance?.vnode.props?.['language']
   }
-  const result = hljs.highlightAuto(props.content)
-  return result.language
+  return getMonacoLanguage(props.filename || '') 
 }
 const initEditor = () => {
   if (!editorBody.value) return

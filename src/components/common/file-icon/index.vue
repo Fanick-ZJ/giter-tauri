@@ -31,13 +31,15 @@ const svg = computed(() => {
   const file_name = basename(props.pathOrName)
   const ext = extname(file_name)
   let svg = ''
-  if (fileNameIconMap.has(file_name)) {
+  if (ext == undefined) {
+    return svg = fileIcons.defaultIcon.name
+  }
+  else if (fileNameIconMap.has(file_name)) {
     svg = fileNameIconMap.get(file_name)!
   }
   else if (fileExtensionIconMap.has(ext)) {
     svg = fileExtensionIconMap.get(ext)!
   }
-  else svg = fileIcons.defaultIcon.name
   return defineAsyncComponent(() => import(`@/assets/icons/${svg}.svg`))
 })
 

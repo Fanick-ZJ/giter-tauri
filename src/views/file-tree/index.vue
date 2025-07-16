@@ -5,20 +5,23 @@ import { useRoute } from 'vue-router';
 import Tree from './components/tree.vue'
 import { getBlobContent, objectIsBinary } from '@/utils/command';
 import { ref } from 'vue';
-import { bytesToString } from '@/utils/tool';
+import { basename, bytesToString } from '@/utils/tool';
+import { now } from 'lodash-es';
 
 const route = useRoute()
 const {repo: _repo, commitId: _commitId} = route.params;
 let repo = _repo as string
 let commitId = _commitId as string
-console.log(repo, commitId)
+
 const isBianry = ref(false)
 const fileContent = ref("")
-const selectedFile = async (object_id: string) => {
+const current_path = ref('')
+const selectedFile = async (path: string, object_id: string) => {
     if (await objectIsBinary(repo, object_id)) {
         isBianry.value = true
         console.error('暂不支持二进制文件')
     }
+    current_path.value = path
     let content = await getBlobContent(repo as string, object_id)
     fileContent.value = bytesToString(content)
 
@@ -39,7 +42,7 @@ const selectedFile = async (object_id: string) => {
                 />
         </template>
         <template #content>
-            <Editor :content="fileContent" :readonly="true"/>
+            <Editor :filename="basename(current_path)" :content="fileContent" :readonly="true"/>
         </template>
     </Spliter>
 </template>

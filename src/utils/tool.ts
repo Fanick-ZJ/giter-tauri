@@ -92,37 +92,168 @@ export function getMonacoLanguage(fileName: string) {
   const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
 
   const languageMapping = {
+    // ── JavaScript 系 ──
     ts: 'typescript',
     js: 'javascript',
     jsx: 'javascriptreact',
     tsx: 'typescriptreact',
-    html: 'html',
+    mjs: 'javascript',          // Node ES Module
+    cjs: 'javascript',          // Node CommonJS
+
+    // ── 样式表 ──
     css: 'css',
     scss: 'scss',
+    sass: 'sass',
     less: 'less',
+    stylus: 'stylus',
+
+    // ── HTML / 模板 ──
+    html: 'html',
+    htm: 'html',
+    svelte: 'svelte',
+    vue: 'vue',
+    astro: 'astro',
+    jinja: 'jinja',
+    jinja2: 'jinja',
+    njk: 'nunjucks',
+    hbs: 'handlebars',
+    mustache: 'handlebars',
+    ejs: 'ejs',
+    pug: 'pug',
+    twig: 'twig',
+
+    // ── JSON / 数据 ──
     json: 'json',
-    md: 'markdown',
+    jsonc: 'jsonc',             // 带注释的 JSON
+    json5: 'json5',
+    toml: 'toml',
+    yaml: 'yaml',
+    yml: 'yaml',
+
+    // ── 脚本 / Shell ──
+    sh: 'shell',
+    bash: 'shell',
+    zsh: 'shell',
+    fish: 'fish',
+    ps1: 'powershell',
+    pwsh: 'powershell',
+
+    // ── 后端 / 系统 ──
     py: 'python',
+    pyi: 'python',
     java: 'java',
-    c: 'c',
-    cpp: 'cpp',
+    kt: 'kotlin',
+    kts: 'kotlin',
+    scala: 'scala',
+    groovy: 'groovy',
+    gradle: 'groovy',           // build.gradle
     cs: 'csharp',
+    fs: 'fsharp',
+    vb: 'vb',
+    c: 'c',
+    h: 'c',
+    cc: 'cpp',
+    cpp: 'cpp',
+    cxx: 'cpp',
+    hpp: 'cpp',
+    mm: 'objective-c',
+    m: 'objective-c',
+    swift: 'swift',
+    rs: 'rust',
+    go: 'go',
     php: 'php',
     rb: 'ruby',
-    go: 'go',
-    sh: 'shell',
-    sql: 'sql',
-    xml: 'xml',
-    yml: 'yaml',
-    yaml: 'yaml',
-    dockerfile: 'dockerfile',
-    gitignore: 'plaintext',
-    txt: 'plaintext',
-    log: 'plaintext',
-  };
+    r: 'r',
+    dart: 'dart',
+    clj: 'clojure',
+    cljs: 'clojure',
+    elm: 'elm',
+    erl: 'erlang',
+    ex: 'elixir',
+    exs: 'elixir',
+    hs: 'haskell',
+    lhs: 'haskell',
+    nim: 'nim',
+    zig: 'zig',
+    v: 'v',
 
+    // ── 数据库 / 查询 ──
+    sql: 'sql',
+    mysql: 'sql',
+    pgsql: 'sql',
+    psql: 'sql',
+    sqlite: 'sql',
+
+    // ── 标记 / 文档 ──
+    md: 'markdown',
+    markdown: 'markdown',
+    rst: 'restructuredtext',
+    tex: 'latex',
+    latex: 'latex',
+    bib: 'bibtex',
+    adoc: 'asciidoc',
+    org: 'org',
+
+    // ── 配置 / DevOps ──
+    dockerfile: 'dockerfile',
+    nginx: 'nginx',
+    conf: 'properties',         // 通用 conf
+    ini: 'ini',
+    cfg: 'ini',
+    env: 'properties',
+    envrc: 'shell',
+    gitignore: 'gitignore',
+    gitattributes: 'gitattributes',
+    gitmodules: 'gitconfig',
+    prettierrc: 'json',
+    prettierrc_js: 'javascript',
+    prettierrc_ts: 'typescript',
+    eslintrc: 'json',
+    eslintrc_js: 'javascript',
+    eslintrc_ts: 'typescript',
+    babelrc: 'json',
+    babelrc_js: 'javascript',
+    stylelintrc: 'json',
+    stylelintrc_js: 'javascript',
+    svgo_yml: 'yaml',
+    prettierignore: 'ignore',
+    eslintignore: 'ignore',
+    npmignore: 'ignore',
+    dockerignore: 'ignore',
+
+    // ── 纯文本 / 日志 / 其他 ──
+    txt: 'plaintext',
+    log: 'log',
+    csv: 'csv',
+    tsv: 'tsv',
+    diff: 'diff',
+    patch: 'diff',
+    http: 'http',
+    graphql: 'graphql',
+    proto: 'proto3',            // Protocol Buffer
+    reg: 'reg',
+    wasm: 'wasm',
+    asm: 'asm',
+    vbs: 'vbscript',
+    bat: 'batch',
+    cmd: 'batch',
+    makefile: 'makefile',
+    mk: 'makefile',
+    cmake: 'cmake',
+    prisma: 'prisma',
+    graphqls: 'graphql',
+    mdx: 'mdx',
+    svx: 'markdown',            // Svelte MDX
+    rmd: 'r',                   // R Markdown
+    q: 'q',                     // kdb+/q
+    k: 'k',                     // kdb+/q
+    rego: 'rego',               // Open Policy Agent
+    cue: 'cue',
+    cue_mod: 'cue',
+    cue_sum: 'cue',
+  };
   // @ts-ignore
-  return languageMapping[fileExtension] || 'plaintext';
+  return languageMapping[fileExtension]  || 'plaintext'
 }
 
 export const getWeekNumber = (date: Date) => {
@@ -155,7 +286,7 @@ export const basename = (path: string) => {
 
 export const extname = (path: string) => {
   const idx = path.lastIndexOf('.')
-  if (idx === -1) return ''
+  if (idx === -1) return undefined
   return path.slice(idx + 1) 
 }
 

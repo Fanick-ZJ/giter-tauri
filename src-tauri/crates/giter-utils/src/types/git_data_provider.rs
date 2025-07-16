@@ -37,6 +37,7 @@ use std::io::{self, ErrorKind};
 use std::path::Path;
 use std::path::PathBuf;
 use std::string;
+use std::time::Instant;
 use std::usize;
 use std::vec;
 use std::os::windows::process::CommandExt;
@@ -580,13 +581,17 @@ impl GitDataProvider {
     /// 根据oid获取文件内容
     /// oid: 提交id
     pub fn get_blob_content(&self, oid: impl Into<Oid>) -> Result<Vec<u8>, GitUtilsErrorCode> {
+        let t1 = Instant::now();
         let oid = oid.into();
         let blob = self.repository.find_blob(oid);
         if blob.is_err() {
             return Err(GitUtilsErrorCode::BlobNotFound(oid.to_string()));
         }
         let blob = blob.unwrap();
-        Ok(blob.content().to_vec())
+        let content = blob.content().to_vec();
+        let t2 = Instant::now();
+        eprintln!("spend {:?}", t2 - t1);
+        Ok(content)
     }
 
     /// 获取文件的差异

@@ -5,6 +5,7 @@ import { ComponentPublicInstance, computed, onMounted, Ref, ref } from 'vue';
 import { commit, commitTree, getTree } from '@/utils/command';
 import { TreeFileMode } from '@/enum';
 import { useElementSize } from '@vueuse/core';
+import { basename } from '@/utils/tool';
 
 const KEY_INTERVAL = '|KEY_INTERVAL|'
 const props = defineProps<{
@@ -43,7 +44,7 @@ onMounted( async () => {
 const nodeClicked: TreeOverrideNodeClickBehavior = ({option})  => {
     let [path, object_id] = (option.key as string).split(KEY_INTERVAL)
     if (option.isLeaf) {
-        emit('selected', object_id)
+        emit('selected', path, object_id)
         return 'default'
     }
     else if (option.children!.length > 0) return 'toggleExpand'
