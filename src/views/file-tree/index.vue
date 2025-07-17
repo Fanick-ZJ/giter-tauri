@@ -6,7 +6,6 @@ import Tree from './components/tree.vue'
 import { getBlobContent, objectIsBinary } from '@/utils/command';
 import { ref } from 'vue';
 import { basename, bytesToString } from '@/utils/tool';
-import { now } from 'lodash-es';
 
 const route = useRoute()
 const {repo: _repo, commitId: _commitId} = route.params;

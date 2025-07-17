@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, PropType, Ref, ref, shallowRef } from 'vue';
+import { computed, inject, nextTick, onBeforeUnmount, PropType, Ref, ref, shallowRef } from 'vue';
 import { DiffContent, CommitFile } from '@/types';
 import { Icon } from '@iconify/vue';
 import { NCard, NWatermark, NFlex, NButton, useDialog } from 'naive-ui';
@@ -9,6 +9,7 @@ import LoadingView from '@/components/common/loading-view.vue';
 import { fileDiff, getBlobContent, fileHistory } from '@/utils/command';
 import { BinaryResult, processBinaryData } from './utils';
 import FileHistoryWindow from "@/windows/file-history";
+import { commitIdKey } from './keys';
 
 defineOptions({
   name: 'DiffDetailComponent' 
@@ -25,6 +26,7 @@ const props = defineProps({
   }
 })
 
+const commitId = inject(commitIdKey)
 const dialog = useDialog()
 const diffContent = ref<DiffContent>()
 let addedLines: Ref<number[]> = ref([])
@@ -254,7 +256,7 @@ const showFileHistory = () => {
   historyHandle.then(res => {
     if (cancled) return
     d.destroy()
-    FileHistoryWindow.addHistoryTab(props.repo, res)
+    FileHistoryWindow.addHistoryTab(props.repo, res, commitId)
   })
 }
 

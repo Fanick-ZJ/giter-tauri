@@ -52,15 +52,16 @@ class FileHistoryWindow {
     return FileHistoryWindow.window
   }
 
-  public static addHistoryTab(repo: string, history: FileHistoryItem[]) {
+  public static addHistoryTab(repo: string, history: FileHistoryItem[], focusCommit: string | undefined = undefined) {
+
     const path = history[0].file.path
     if (!FileHistoryWindow.hasWindow) {
       // 将初次打开时携带的参数，放在localStorage中，方便后续使用
-      localStorage.setItem(LOCAL_STORAGE_FIRST_FILE_HISTORY, JSON.stringify({ repo, path, history }))
+      localStorage.setItem(LOCAL_STORAGE_FIRST_FILE_HISTORY, JSON.stringify({ repo, path, history, focusCommit }))
       FileHistoryWindow.buildWindow()
     } else {
       FileHistoryWindow.show()
-      FileHistoryWindow.window.emit(FileHistoryWindow.FILE_ADD, { repo, path, history })   
+      FileHistoryWindow.window.emit(FileHistoryWindow.FILE_ADD, { repo, path, history, focusCommit })   
     } 
   }
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { NSpace, TreeInst, NTree, TreeOption, TreeOverrideNodeClickBehavior } from 'naive-ui';
+import { NSpace, TreeInst, NTree, TreeOption, TreeOverrideNodeClickBehavior, treeGetClickTarget, NDropdown } from 'naive-ui';
 import { TreeDir } from '@/types';
-import { ComponentPublicInstance, computed, h, onMounted, Ref, ref } from 'vue';
+import { ComponentPublicInstance, computed, h, nextTick, onMounted, Ref, ref } from 'vue';
 import { getTree } from '@/utils/command';
 import { TreeFileMode } from '@/enum';
 import { useElementSize } from '@vueuse/core';
@@ -42,6 +42,18 @@ onMounted( async () => {
     data.value = createData(root_dir)
 })
 
+// 定义node-props, 可以在其中定义一些触发函数
+const nodeProps = ({option}: {option: TreeOption}) => {
+    return {
+        // 记录右键点击时的option对象的filename和object_id
+        onContextmenu: (e) => {
+            if (option.isLeaf) {
+                selectedRef.value = (option.key as string).split(KEY_INTERVAL)
+            }
+        }
+    }
+}
+
 const nodeClicked: TreeOverrideNodeClickBehavior = ({option})  => {
     let [path, object_id] = (option.key as string).split(KEY_INTERVAL)
     if (option.isLeaf) {
@@ -68,6 +80,54 @@ const useTreeStyle = () => {
     }
 }
 const { treeStyle } = useTreeStyle()
+
+const useDropDown = () => {
+    const selectedRef: Ref<string[]> = ref([])
+    const showDropdownRef = ref(false)
+    const xRef = ref(0)
+    const yRef = ref(0)
+    const menus = ref([
+        {
+            label: '文件历史',
+            key: 'history'
+        }
+    ])
+    const selectRefClear = () => {
+        selectedRef.value = []
+    }
+
+    const handleSelected = (key: string) => {
+        showDropdownRef.value = false
+        selectRefClear()
+
+    }
+
+    const handleContextMenu = (e: MouseEvent) => {
+        if (selectedRef.value.length > 0) {
+            showDropdownRef.value = true
+            nextTick(() => {
+                xRef.value = e.clientX
+                yRef.value = e.clientY
+            })
+        }
+    }
+
+    const clickOutside = (e: MouseEvent) => {
+        showDropdownRef.value = false
+        selectRefClear()
+    }
+    return {
+        selectedRef,
+        showDropdownRef,
+        xRef,
+        yRef,
+        menus,
+        handleSelected,
+        handleContextMenu,
+        clickOutside
+    }
+}
+const {selectedRef, showDropdownRef, xRef, yRef, menus, handleSelected, handleContextMenu, clickOutside} = useDropDown()
 const emit = defineEmits(['selected'])
 </script>
 
@@ -77,13 +137,27 @@ const emit = defineEmits(['selected'])
             <NTree 
                 ref="treeInstRef"
                 :data="data"
+                show-line
+                block-line
                 virtual-scroll
+                @contextmenu="handleContextMenu"
                 :style="treeStyle"
                 :scrollbar-props="{
                     xScrollable: true
                 }"
                 :override-default-node-click-behavior="nodeClicked"
+                :node-props="nodeProps"
             />
+            <NDropdown
+                placement="bottom-start"
+                trigger="manual"
+                :x="xRef"
+                :y="yRef"
+                @select="handleSelected"
+                @clickoutside="clickOutside"
+                :options="menus"
+                :show="showDropdownRef">
+            </NDropdown>
         </NSpace>
     </div>
 </template>

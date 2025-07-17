@@ -1,5 +1,5 @@
 <script setup lang="tsx">
-import { computed, nextTick, onBeforeUnmount, onMounted, StyleValue, useTemplateRef, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, StyleValue, useTemplateRef, watch } from 'vue';
 import { Commit, CommitFile } from '@/types';
 
 import { ref } from 'vue';
@@ -7,6 +7,7 @@ import { NCard, NFlex, NLayout, NTag, NPagination } from 'naive-ui';
 import { commitContent, fileDiff, getCommit } from '@/utils/command';
 import { useElementSize } from '@vueuse/core';
 import DiffDetailComponent from './diff-detail-item.vue';
+import { commitIdKey } from './keys';
 
 defineOptions({
   name: 'CommitDetailComponent'
@@ -26,6 +27,7 @@ const props = defineProps({
 
 const commitFiles = ref<CommitFile[]>()
 const commit = ref<Commit>()
+provide(commitIdKey, props.commitId)
 
 // 懒加载, 滚动到可视区域再加载, 避免卡顿
 const diffDetailRefs = ref<InstanceType<typeof DiffDetailComponent>[]>([])
@@ -170,7 +172,8 @@ watch(() => page.value, async () => {
           >
           <NFlex justify="center">
             <template v-for="item in pageItems" :key="item.objectId + item.path">
-              <DiffDetailComponent ref="diffDetailRefs" :repo="repo" :file="item" />
+              <DiffDetailComponent ref="diffDetailRefs" :repo="repo" :file="item"/>
+
             </template>
           </NFlex>
         </NLayout>
