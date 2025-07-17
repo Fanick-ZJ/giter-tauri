@@ -28,18 +28,21 @@ const props = defineProps({
 
 
 const svg = computed(() => {
-  const file_name = basename(props.pathOrName)
+  const file_name = basename(props.pathOrName).toLowerCase()
   const ext = extname(file_name)
   let svg = ''
-  if (ext == undefined) {
-    return svg = fileIcons.defaultIcon.name
-  }
-  else if (fileNameIconMap.has(file_name)) {
+  if (fileNameIconMap.has(file_name)) {
     svg = fileNameIconMap.get(file_name)!
   }
-  else if (fileExtensionIconMap.has(ext)) {
-    svg = fileExtensionIconMap.get(ext)!
+  else {
+    if (ext == undefined) {
+      return svg = fileIcons.defaultIcon.name
+    }
+    if (fileExtensionIconMap.has(ext)) {
+      svg = fileExtensionIconMap.get(ext)!
+    }
   }
+  console.log(file_name, svg)
   return defineAsyncComponent(() => import(`@/assets/icons/${svg}.svg`))
 })
 

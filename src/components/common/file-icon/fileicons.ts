@@ -7,7 +7,7 @@ import { FileIcons, FileNamePattern } from "./types";
 export const fileIcons: FileIcons = {
   defaultIcon: { name: 'file' },
   icons: parseByPattern([
-    { name: 'html', fileExtensions: ['htm', 'xhtml', 'html_vm', 'asp'] },
+    { name: 'html', fileExtensions: ['html', 'htm', 'xhtml', 'html_vm', 'asp'] },
     {
       name: 'pug',
       fileExtensions: ['jade', 'pug'],
@@ -199,7 +199,7 @@ export const fileIcons: FileIcons = {
       ],
     },
     { name: 'palette', fileExtensions: ['pal', 'gpl', 'act'] },
-    { name: 'javascript', fileExtensions: ['esx', 'mjs'] },
+    { name: 'javascript', fileExtensions: ['js', 'esx', 'mjs'] },
     { name: 'react', fileExtensions: ['jsx'] },
     { name: 'react_ts', fileExtensions: ['tsx'] },
     {

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { NSpace, TreeInst, NTree, TreeOption, TreeOverrideNodeClickBehavior } from 'naive-ui';
 import { TreeDir } from '@/types';
-import { ComponentPublicInstance, computed, onMounted, Ref, ref } from 'vue';
-import { commit, commitTree, getTree } from '@/utils/command';
+import { ComponentPublicInstance, computed, h, onMounted, Ref, ref } from 'vue';
+import { getTree } from '@/utils/command';
 import { TreeFileMode } from '@/enum';
 import { useElementSize } from '@vueuse/core';
-import { basename } from '@/utils/tool';
+import FileIcon from '@/components/common/file-icon/index.vue'
 
 const KEY_INTERVAL = '|KEY_INTERVAL|'
 const props = defineProps<{
@@ -30,7 +30,8 @@ const createData = (tree: TreeDir): TreeOption[] => {
             label: child.name,
             key: path + KEY_INTERVAL + child.metadata.object_id,
             children: subchildren,
-            isLeaf: child.metadata.mode != TreeFileMode.Tree
+            isLeaf: child.metadata.mode != TreeFileMode.Tree,
+            prefix: () =>  h(FileIcon, {pathOrName: child.name, width: 15, height: 15})
         })
     })
     return children
