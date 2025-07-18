@@ -102,7 +102,7 @@ const useDropDown = () => {
     const handleSelected = (key: string) => {
         showDropdownRef.value = false
         let [path, object_id] = selectedRef.value
-        showFileHistory(dialog, props.repo, path, props.commit_id)
+        showFileHistory(dialog, props.repo, path)
         selectRefClear()
 
     }

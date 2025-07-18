@@ -3,44 +3,49 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useMessage, NLayout, NTabs, NTabPane, NLayoutSider } from 'naive-ui'
 import { computed, onMounted, provide, ref, watch } from 'vue';
 
-import FileHistoryWindow, { FileHistory, LOCAL_STORAGE_FIRST_FILE_HISTORY } from '@/windows/file-history';
+import FileHistoryEventDataWindow, { FileHistoryEventData, LOCAL_STORAGE_FIRST_FILE_HISTORY } from '@/windows/file-history';
 import { HistoryTabInjectKey } from './types';
 import HistoryPanel from './history-panel.vue';
 import { basename } from '@/utils/tool';
 import { useElementSize } from '@vueuse/core';
 
-const historyTab = ref<FileHistory[]>([])
+const historyTab = ref<FileHistoryEventData[]>([])
 window.$message = useMessage()
 
 const KEY_INTERVAL = "<KEY_INTERVAL>"
 provide(HistoryTabInjectKey, historyTab)
 
+const useRefProps = () => {
+  return {
+    curPanel: ref<string>(''),
+  }
+}
+const { curPanel } = useRefProps()
 onMounted(() => {
   const history = localStorage.getItem(LOCAL_STORAGE_FIRST_FILE_HISTORY);
   if (history) {
-    const historys = JSON.parse(history) as FileHistory
+    const historys = JSON.parse(history) as FileHistoryEventData
     historyTab.value.push(historys)
     curPanel.value = historyKey(historys)
   }
 })
 
 const curWindow = getCurrentWindow();
-curWindow.listen<FileHistory>(FileHistoryWindow.FILE_ADD, (evt) => {
+curWindow.listen<FileHistoryEventData>(FileHistoryEventDataWindow.FILE_ADD, (evt) => {
   const { payload } = evt;
   const index = historyTab.value.findIndex(item => item.path === payload.path && item.repo === payload.repo)
   if (index === -1) {
     historyTab.value.push(payload)
-  } else {
-    curPanel.value = historyKey(payload)
-  }
+  } 
   curPanel.value = historyKey(payload)
-
+  historyTab.value[index] = payload
 })
 
-const curPanel = ref<string>('')
-
-const closeHandler = (key: string) => {
+const closeHandler = async (key: string) => {
   const index = historyTab.value.findIndex(item => historyKey(item) === key)
+  if (historyTab.value.length === 1 && index > 0) {
+    await getCurrentWindow().close()
+  }
   if (index !== -1) {
     historyTab.value.splice(index, 1)
   }
@@ -55,13 +60,8 @@ const closeHandler = (key: string) => {
   }
 }
 
-const historyKey = (history: FileHistory) => {
+const historyKey = (history: FileHistoryEventData) => {
   return history.repo + KEY_INTERVAL + history.path 
-}
-
-const getHistoryByKey = (key: string) => {
-  const [repo, path] = key.split(KEY_INTERVAL)
-  return historyTab.value.find(item => item.path === path && item.repo === repo) 
 }
 
 const containerRef = ref<HTMLElement | null>(null)

@@ -6,11 +6,13 @@ import { WindowOptions, Window, LogicalSize } from "@tauri-apps/api/window";
 
 export const LOCAL_STORAGE_FIRST_FILE_HISTORY = "first-file-history"
 
-export type FileHistory = {
-  repo: string,
-  path: string,
-  history: FileHistoryItem[]
+export type FileHistoryEventData = {
+    repo: string
+    path: string
+    history: FileHistoryItem[]
+    focusCommit?: string
 }
+
 
 class FileHistoryWindow {
   static FILE_ADD = "file-add"
@@ -62,7 +64,7 @@ class FileHistoryWindow {
       FileHistoryWindow.buildWindow()
     } else {
       FileHistoryWindow.show()
-      FileHistoryWindow.window.emit(FileHistoryWindow.FILE_ADD, { repo, path, history, focusCommit })   
+      FileHistoryWindow.window.emit<FileHistoryEventData>(FileHistoryWindow.FILE_ADD, { repo, path, history, focusCommit })   
     } 
   }
 

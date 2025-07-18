@@ -4,12 +4,12 @@ import Editor from '@/components/common/editor/editor.vue';
 import { FileHistoryItem } from '@/types';
 import { getBlobContent } from '@/utils/command';
 import { bytesToString, getMonacoLanguage } from '@/utils/tool';
-import { FileHistory } from '@/windows/file-history';
 import { NTabs, NTabPane, NSpace, NEllipsis } from 'naive-ui'
-import { ref } from 'vue';
+import { nextTick, ref, watch } from 'vue';
+import { FileHistoryEventData } from '@/windows/file-history';
 
 const props = defineProps<{
-  history: FileHistory,
+  history: FileHistoryEventData,
   height: number,
 }>()
 
@@ -25,14 +25,20 @@ const getHistoryContent = (history: FileHistoryItem) => {
   })
 }
 
-const handlePaneChange = async (name: string) => {
-  const history = props.history.history.find(item => item.commit.commitId === name)
+const handlePaneChange = async (commitId: string) => {
+  const history = props.history.history.find(item => item.commit.commitId === commitId)
   if (!history) {
     window.$message.error('文件历史记录已被未找到')
   }
   currentHistoryFileContent.value = await getHistoryContent(history!)
   return true
 }
+watch(() => props.history.focusCommit, async (val) => {
+  curCommit.value = val || props.history.history[0].commit.commitId
+  handlePaneChange(curCommit.value)
+}, {
+  immediate: true,
+})
 </script>
 
 <template>
@@ -58,7 +64,7 @@ const handlePaneChange = async (name: string) => {
           </NEllipsis>
         </template>
         <Editor 
-          :language="getMonacoLanguage(props.history.path)" 
+          :filename="item.file.path"
           :content="currentHistoryFileContent"
           :readonly="true">
           <template #header>
