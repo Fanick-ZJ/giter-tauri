@@ -5,16 +5,16 @@ import { Icon } from '@iconify/vue';
 import { NCard, NWatermark, NFlex, NButton, useDialog } from 'naive-ui';
 import * as monaco from 'monaco-editor';
 import { bytesToString, getMonacoLanguage, withMinDelay } from '@/utils/tool';
+import { showFileHistory } from '@/utils/dialog';
 import LoadingView from '@/components/common/loading-view.vue';
 import { fileDiff, getBlobContent, fileHistory } from '@/utils/command';
 import { BinaryResult, processBinaryData } from './utils';
-import FileHistoryWindow from "@/windows/file-history";
 import { commitIdKey } from './keys';
 
 defineOptions({
   name: 'DiffDetailComponent' 
 })
-
+const dialog = useDialog()
 const props = defineProps({
   repo: {
     type: String,
@@ -27,7 +27,6 @@ const props = defineProps({
 })
 
 const commitId = inject(commitIdKey)
-const dialog = useDialog()
 const diffContent = ref<DiffContent>()
 let addedLines: Ref<number[]> = ref([])
 let deletedLines: Ref<number[]> = ref([])
@@ -40,7 +39,6 @@ const binaryComps:Ref<BinaryResult> = shallowRef([undefined, undefined])
 const load = async () => {
   if (props.file.isBinary) {
     processBinaryData(props.repo, props.file)!.then(res => {
-      console.log(res)
       binaryComps.value = res
       success.value = true	
     }).finally(() => {
@@ -235,31 +233,6 @@ const applyEditorStyle = () => {
   return decorations
 }
 
-const showFileHistory = () => {
-  const historyHandle = withMinDelay(() => fileHistory(props.repo, props.file.path), 500)
-  let cancled = false
-  const d = dialog.success({
-    title: '获取历史记录中....',
-    content: `正在获取${props.file.path}的历史记录`,
-    positiveText: '取消',
-    maskClosable: false,
-    onEsc: () => {
-      cancled = true
-    },
-    onClose: () => {
-      cancled = true
-    },
-    onPositiveClick: () => {
-      cancled = true
-    },
-  })
-  historyHandle.then(res => {
-    if (cancled) return
-    d.destroy()
-    FileHistoryWindow.addHistoryTab(props.repo, res, commitId)
-  })
-}
-
 </script>
 
 <template>
@@ -278,7 +251,7 @@ const showFileHistory = () => {
           {{ + deletedLines.length  }}
         </div>
         <div class="h-[10px] w-[30px]" :style="modifRatiStyle"></div>
-        <NButton quaternary @click="showFileHistory">
+        <NButton quaternary @click="() => showFileHistory(dialog, repo, file.path, commitId)">
           <template #icon>
             <Icon icon="material-symbols:history-rounded" width="24" height="24" />
           </template>

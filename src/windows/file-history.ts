@@ -38,6 +38,7 @@ class FileHistoryWindow {
       fullscreen: false,
       url: '/file_history',
       parent: 'main',
+      center: true
 
     }
   }

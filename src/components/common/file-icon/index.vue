@@ -42,7 +42,6 @@ const svg = computed(() => {
       svg = fileExtensionIconMap.get(ext)!
     }
   }
-  console.log(file_name, svg)
   return defineAsyncComponent(() => import(`@/assets/icons/${svg}.svg`))
 })
 

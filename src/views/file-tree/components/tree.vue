@@ -1,17 +1,20 @@
 <script setup lang="ts">
-import { NSpace, TreeInst, NTree, TreeOption, TreeOverrideNodeClickBehavior, treeGetClickTarget, NDropdown } from 'naive-ui';
+import { NSpace, TreeInst, NTree, TreeOption, TreeOverrideNodeClickBehavior, treeGetClickTarget, NDropdown, useDialog } from 'naive-ui';
 import { TreeDir } from '@/types';
 import { ComponentPublicInstance, computed, h, nextTick, onMounted, Ref, ref } from 'vue';
-import { getTree } from '@/utils/command';
+import { fileHistory, getTree } from '@/utils/command';
 import { TreeFileMode } from '@/enum';
 import { useElementSize } from '@vueuse/core';
 import FileIcon from '@/components/common/file-icon/index.vue'
+import FileHistoryWindow from '@/windows/file-history';
+import { showFileHistory } from '@/utils/dialog';
 
 const KEY_INTERVAL = '|KEY_INTERVAL|'
 const props = defineProps<{
     commit_id: string,
     repo: string
 }>()
+const dialog = useDialog()
 
 const treeInstRef = ref<ComponentPublicInstance<TreeInst> | null> (null)
 const data: Ref<TreeOption[]> = ref([])
@@ -98,6 +101,8 @@ const useDropDown = () => {
 
     const handleSelected = (key: string) => {
         showDropdownRef.value = false
+        let [path, object_id] = selectedRef.value
+        showFileHistory(dialog, props.repo, path, props.commit_id)
         selectRefClear()
 
     }

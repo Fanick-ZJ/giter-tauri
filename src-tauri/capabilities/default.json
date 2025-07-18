@@ -5,7 +5,7 @@
   "windows": [
     "main",
     "file-history",
-    "file-tree"
+    "file-tree-*"
   ],
   "permissions": [
     "core:default",
@@ -42,11 +42,21 @@
     },
     {
       "identifier": "core:event:allow-listen",
-      "windows": ["file-history", "file-tree"],
+      "windows": ["file-history"],
       "allow": ["*"]
     },
     {
       "identifier": "core:window:allow-set-title",
+      "windows": ["file-tree-*"],
+      "allow": ["*"]
+    },
+    {
+      "identifier": "core:event:allow-listen",
+      "windows": ["file-tree-*"],
+      "allow": ["*"]
+    },
+    {
+      "identifier": "core:event:allow-emit",
       "windows": ["file-tree-*"],
       "allow": ["*"]
     }

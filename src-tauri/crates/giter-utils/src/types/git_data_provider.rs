@@ -33,7 +33,6 @@ use std::process::Command;
 use std::io::{self, ErrorKind};
 use std::path::Path;
 use std::path::PathBuf;
-use std::time::Instant;
 use std::usize;
 use std::vec;
 use std::os::windows::process::CommandExt;
@@ -1238,20 +1237,20 @@ impl GitDataProvider {
         let dirname = _path.parent().and_then(|n| n.to_str()).unwrap_or_default().to_string();
         let mut root = fs::Dir::new(dirname, basename, "0".into());
         for entry in tree.iter() {
-            let entry_mode: fs::EntryMode = entry.filemode().into();
-            let obj = match entry.to_object(&self.repository) {
-                Ok(obj) => obj,
-                Err(_) => continue,
-            };
-            let object_id = obj.id().to_string();
             let name = match entry.name() {
                 Some(name) => name.to_string(),
                 None => {
                     continue;
                 },
             };
+            let entry_mode: fs::EntryMode = entry.filemode().into();
+            let obj = match entry.to_object(&self.repository) {
+                Ok(obj) => obj,
+                Err(_) => continue,
+            };
+            let object_id = obj.id().to_string();
             if entry_mode == fs::EntryMode::TREE {
-                let dir = fs::Dir::new("".into(), name, object_id);
+                let dir = fs::Dir::new(root.abs_path(), name, object_id);
                 root.add(fs::FsNode::Dir(dir));
             } else {
                 let blob = match obj.into_blob() {
@@ -1259,7 +1258,7 @@ impl GitDataProvider {
                     Err(_) => continue,
                 };
                 let size = blob.size();
-                let file = fs::File::new("".into(), name, object_id, size, entry_mode);
+                let file = fs::File::new(root.abs_path(), name, object_id, size, entry_mode);
                 root.add(fs::FsNode::File(file));
             }
         }
