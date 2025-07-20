@@ -16,18 +16,26 @@ const isExtend = ref(false)
 const homeStyle = ref<StyleValue>()
 const viewToExtend = async () => {
   if (isExtend.value) return
+  
+  // 先获取当前窗口尺寸
+  const curWind = getCurrentWindow()
+  const {width, height} = await curWind.innerSize()
+  const scaleFactor = await curWind.scaleFactor()
+  
   isExtend.value = true
   homeStyle.value = {
     maxWidth: isExtend.value? REPOLIST_WIDTH + 'px' : '100%',
     minWidth: isExtend.value? REPOLIST_WIDTH + 'px' : ''
   } 
+  
+  // 等待多个渲染周期确保布局稳定
   await nextTick()
-  const curWind = getCurrentWindow()
-  const {width, height} = await curWind.innerSize()
-  curWind.setSize(new LogicalSize(REPOLIST_WIDTH + 770, height))
+  await new Promise(resolve => setTimeout(resolve, 50))
+  
+  // 这里直接使用height会受到系统显示的缩放比影响，所以要除以缩放比
+  curWind.setSize(new LogicalSize(REPOLIST_WIDTH + 770, height / scaleFactor))
   curWind.setMinSize(new LogicalSize(EXPAND_MIN_WIDTH, MIN_HEIGHT))
   curWind.setMaxSize(null)
-  
 }
 
 const viewToShrink = () => {
@@ -51,7 +59,7 @@ useRepoStore().init_repo()
 
 <template>
   <div>
-    <NFlex :wrap="false" @contextmenu.prevent>
+    <NFlex :wrap="false" :size="0">
         <RepoHome ref="homeRef" :style="homeStyle"/>
         <div class="flex-1" v-show="isExtend">
           <ExtendPage/>

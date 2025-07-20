@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, nextTick, onBeforeUnmount, PropType, Ref, ref, shallowRef } from 'vue';
+import { computed, inject, nextTick, onBeforeUnmount, PropType, Ref, ref, shallowRef, watch } from 'vue';
 import { DiffContent, CommitFile } from '@/types';
 import { Icon } from '@iconify/vue';
 import { NCard, NWatermark, NFlex, NButton, useDialog } from 'naive-ui';
@@ -10,6 +10,7 @@ import LoadingView from '@/components/common/loading-view.vue';
 import { fileDiff, getBlobContent, fileHistory } from '@/utils/command';
 import { BinaryResult, processBinaryData } from './utils';
 import { commitIdKey } from './keys';
+import { useThemeStore } from '@/store/modules/theme'
 
 defineOptions({
   name: 'DiffDetailComponent' 
@@ -141,25 +142,34 @@ onBeforeUnmount(() => {
   editor && editor.dispose();	
 })
 
+const themeStore = useThemeStore()
+// 监听主题变化
+watch(() => themeStore.isDark, (isDark) => {
+  if (editor) {
+    monaco.editor.setTheme(isDark ? 'vs-dark' : 'vs')
+  }
+})
+
 const initEditor = (content: string) => {
   if (!editorContainer.value) return;
   editor = monaco.editor.create(editorContainer.value, {
     value: content,
     language: getMonacoLanguage(props.file.path),
+    theme: themeStore.isDark ? 'vs-dark' : 'vs', // 根据主题设置
     minimap: {
       enabled: false,
     },
-    scrollBeyondLastLine: false, // 禁用在最后一行之后滚动
-    automaticLayout: true, // 自动布局
-  scrollbar: {
-    vertical: 'hidden', // 禁用纵向滚动条
-    horizontal: 'auto', // 保持横向滚动条自动显示
-    handleMouseWheel: true, // 监听鼠标滚轮事件
-    alwaysConsumeMouseWheel: false, // 允许滚动事件冒泡
-  },
-  readOnly: true,
-	contextmenu: false,
-  lineNumbers: 'off'
+    scrollBeyondLastLine: false,
+    automaticLayout: true,
+    scrollbar: {
+      vertical: 'hidden',
+      horizontal: 'auto',
+      handleMouseWheel: true,
+      alwaysConsumeMouseWheel: false,
+    },
+    readOnly: true,
+    contextmenu: false,
+    lineNumbers: 'off'
   });
   updateEditorHeight()
 };
@@ -236,7 +246,7 @@ const applyEditorStyle = () => {
 </script>
 
 <template>
-  <NCard :header-style="{ position: 'sticky', top: '-1px', background: 'white', zIndex: 3 }">
+  <NCard :header-style="{ position: 'sticky', top: '-1px', zIndex: 3 }">
     <template #header>
       <div>
         {{ file.path }}

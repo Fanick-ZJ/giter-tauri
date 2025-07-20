@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NSpace, TreeInst, NTree, TreeOption, TreeOverrideNodeClickBehavior, treeGetClickTarget, NDropdown, useDialog } from 'naive-ui';
+import { NSpace, TreeInst, NTree, TreeOption, TreeOverrideNodeClickBehavior, treeGetClickTarget, NDropdown, useDialog, NLayout } from 'naive-ui';
 import { TreeDir } from '@/types';
 import { ComponentPublicInstance, computed, h, nextTick, onMounted, Ref, ref } from 'vue';
 import { fileHistory, getTree } from '@/utils/command';
@@ -137,7 +137,7 @@ const emit = defineEmits(['selected'])
 </script>
 
 <template>
-    <div class="h-full" ref="treeWrapperRef">
+    <NLayout :native-scrollbar="false" class="h-full" ref="treeWrapperRef">
         <NSpace vertical>
             <NTree 
                 ref="treeInstRef"
@@ -164,5 +164,5 @@ const emit = defineEmits(['selected'])
                 :show="showDropdownRef">
             </NDropdown>
         </NSpace>
-    </div>
+    </NLayout>
 </template>

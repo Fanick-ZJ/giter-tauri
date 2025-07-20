@@ -6,6 +6,7 @@ import Tree from './components/tree.vue'
 import { getBlobContent, objectIsBinary } from '@/utils/command';
 import { ref } from 'vue';
 import { basename, bytesToString } from '@/utils/tool';
+import { NSplit } from 'naive-ui';
 
 const route = useRoute()
 const {repo: _repo, commitId: _commitId} = route.params;
@@ -28,22 +29,18 @@ const selectedFile = async (path: string, object_id: string) => {
 </script>
 
 <template>
-    <Spliter 
-        class="h-screen" 
-        :side_padding="10"
-        :content_padding="10"
-    >
-        <template #sider>
+    <NSplit style="height: 100vh" :default-size="0.3">
+        <template #1>
             <Tree 
                 :commit_id="commitId" 
                 :repo="repo"
                 @selected="selectedFile"
                 />
         </template>
-        <template #content>
+        <template #2>
             <Editor :filename="basename(current_path)" :content="fileContent" :readonly="true"/>
         </template>
-    </Spliter>
+    </NSplit>
 </template>
 
 

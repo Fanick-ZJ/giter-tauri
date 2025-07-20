@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, provide, StyleValue, us
 import { Commit, CommitFile } from '@/types';
 
 import { ref } from 'vue';
-import { NCard, NFlex, NLayout, NTag, NPagination } from 'naive-ui';
+import { NCard, NFlex, NLayout, NTag, NPagination, darkTheme, NConfigProvider } from 'naive-ui';
 import { commitContent, fileDiff, getCommit } from '@/utils/command';
 import { useElementSize } from '@vueuse/core';
 import DiffDetailComponent from './diff-detail-item.vue';
@@ -139,44 +139,44 @@ watch(() => page.value, async () => {
     fixed top-0 
     left-0 z-[3]">
     <NCard title="提交详情" class="w-[80%] h-[80%]" closable @close="close">
-      <template #header-extra>
-        <div class="flex gap-3">
-          <div class="flex items-center">
-            <span class="font-medium text-gray-600">
-              父节点
-            </span>
-            <div class="flex gap-1">
-              <template v-for="item in commit?.parents">
-                <NTag :type="'info'" class="ml-2">
-                  {{item.slice(0, 7)}}
-                </NTag>
-              </template>
-            </div>
-          </div>
-          <div class="flex items-center">
-            <span class="font-medium text-gray-600">
-              当前节点
-            </span>
-            <NTag :type="'success'" class="ml-2">
+        <template #header-extra>
+          <NFlex :size="3">
+            <NFlex>
+              <span class="font-medium">
+                父节点
+              </span>
+              <div class="flex gap-1">
+                <template v-for="item in commit?.parents">
+                  <NTag :type="'info'" class="ml-2">
+                    {{item.slice(0, 7)}}
+                  </NTag>
+                </template>
+              </div>
+            </NFlex>
+            <div class="flex items-center">
+              <span class="font-medium">
+                当前节点
+              </span>
+              <NTag :type="'success'" class="ml-2">
               {{commit?.commitId.slice(0, 7)}}
             </NTag>
           </div>
-        </div>
+        </NFlex>
       </template>
       <div class="h-[calc(100%-30px)] relative" ref="containerRef">
         <NLayout 
-          ref="contentRef"
-          class="absolute w-full"
-          :style="containerStyle" 
-          :native-scrollbar="false"
-          >
-          <NFlex justify="center">
-            <template v-for="item in pageItems" :key="item.objectId + item.path">
-              <DiffDetailComponent ref="diffDetailRefs" :repo="repo" :file="item"/>
-
-            </template>
-          </NFlex>
-        </NLayout>
+        ref="contentRef"
+        class="absolute w-full"
+        :style="containerStyle" 
+        :native-scrollbar="false"
+        >
+        <NFlex justify="center">
+          <template v-for="item in pageItems" :key="item.objectId + item.path">
+            <DiffDetailComponent ref="diffDetailRefs" :repo="repo" :file="item"/>
+            
+          </template>
+        </NFlex>
+      </NLayout>
       </div>
       <div class="absolute flex justify-center bottom-3 h-[30px] w-full z-10">
         <NPagination

@@ -2,13 +2,42 @@
 @tailwind components;
 @tailwind utilities;
 
-
 .added-line {
   background: #abfac8;
 }
+
 .deleted-line {
   background: #faa3a3;
 }
+
 .diff-detail-line {
   background: #93d1f5;
+}
+
+/* 暗色模式适配 */
+@media (prefers-color-scheme: dark) {
+  .added-line {
+    background: #2d5a3d; /* 深绿色背景 */
+  }
+  
+  .deleted-line {
+    background: #5a2d2d; /* 深红色背景 */
+  }
+  
+  .diff-detail-line {
+    background: #2d4a5a; /* 深蓝色背景 */
+  }
+}
+
+/* 如果使用 Tailwind 的 dark: 类名方式 */
+.dark .added-line {
+  background: #2d5a3d;
+}
+
+.dark .deleted-line {
+  background: #5a2d2d;
+}
+
+.dark .diff-detail-line {
+  background: #2d4a5a;
 }

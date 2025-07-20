@@ -1,8 +1,9 @@
 import { SEPERATOR } from "@/const"
+import { useThemeStore } from "@/store/modules/theme";
 import { openPath } from '@tauri-apps/plugin-opener';
 import _ from "lodash";
-import { NDialogProvider } from "naive-ui";
-import { Component, ComponentPublicInstance, createVNode, render, VNode, VNodeProps } from "vue";
+import { darkTheme, NConfigProvider, NDialogProvider } from "naive-ui";
+import { Component, ComponentPublicInstance, computed, createVNode, render, VNode, VNodeProps, watchEffect } from "vue";
 
 // 打开指定路径的文件管理器
 export async function openFileManager(path: string) {
@@ -49,7 +50,7 @@ export function createSingletonComponent<T extends Component>(
     throw new Error(`Component with class name ${className} already exists`)
   }
 
-  // 创建容器，这里还需要为容器添加额外的NDialogProvider之类的组件
+  // 创建容器
   let container = document.querySelector(`.${className}`) as HTMLElement
   
   if (!container) {
@@ -57,17 +58,39 @@ export function createSingletonComponent<T extends Component>(
     container.className = className
     parent.appendChild(container)
   }
-  // 创建虚拟节点
-  const vm = createVNode(component, options.props)
-  const dialogProvider = createVNode(NDialogProvider, null, {
-    default: () => [vm]
-  })
 
-  // 挂载组件
-  render(dialogProvider, container)
+  let vm: VNode
+  let stopWatcher: (() => void) | null = null
+
+  // 创建响应式渲染函数
+  const renderWithTheme = () => {
+    vm = createVNode(component, options.props)
+    // 获取主题配置
+    const themeStore = useThemeStore()
+    const dialogProvider = createVNode(NConfigProvider, { 
+      theme: themeStore.isDark ? darkTheme : undefined 
+    }, {
+      default: () => [
+        createVNode(NDialogProvider, null, {
+          default: () => [vm]
+        })
+      ]
+    })
+    render(dialogProvider, container)
+    return vm
+  }
+
+  // 初始渲染并监听主题变化
+  vm = renderWithTheme()
+  stopWatcher = watchEffect(() => {
+    renderWithTheme()
+  })
 
   // 创建卸载方法
   const unmount = () => {
+    if (stopWatcher) {
+      stopWatcher()
+    }
     render(null, container)
     container.remove()
     instanceMap.delete(className)

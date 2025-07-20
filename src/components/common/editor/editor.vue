@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useThemeStore } from '@/store/modules/theme'
 import { extname, getMonacoLanguage } from '@/utils/tool'
 import * as monaco from 'monaco-editor'
 import { getCurrentInstance, onMounted, ref, watch } from 'vue'
@@ -33,12 +34,21 @@ const autoDetectLanguage = () => {
   }
   return getMonacoLanguage(props.filename || '') 
 }
+const themeStore = useThemeStore()
+// 监听主题变化
+watch(() => themeStore.isDark, (isDark) => {
+  if (editor) {
+    monaco.editor.setTheme(isDark ? 'vs-dark' : 'vs')
+  }
+})
+
 const initEditor = () => {
   if (!editorBody.value) return
 
   editor = monaco.editor.create(editorBody.value, {
     value: props.content,
     language: autoDetectLanguage(),
+    theme: themeStore.isDark ? 'vs-dark' : 'vs', // 根据主题设置
     minimap: {
       enabled: false,
     },
