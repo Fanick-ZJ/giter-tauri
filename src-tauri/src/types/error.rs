@@ -1,18 +1,18 @@
-use serde::{ser::SerializeStruct, Serialize};
 use giter_traits::ExposeError;
+use serde::{ser::SerializeStruct, Serialize};
 use strum_macros::{EnumDiscriminants, EnumIter};
 
 use thiserror::Error;
 
-
 #[derive(Debug)]
-pub struct CommandError<T>{
+pub struct CommandError<T> {
     pub func: String,
     pub error: Option<T>,
     pub etype: String,
 }
-impl <T> CommandError<T>
-where T: std::fmt::Display + giter_traits::ExposeError
+impl<T> CommandError<T>
+where
+    T: std::fmt::Display + giter_traits::ExposeError,
 {
     pub fn new(func: &str, e: T, etype: String) -> Self {
         Self {
@@ -23,8 +23,9 @@ where T: std::fmt::Display + giter_traits::ExposeError
     }
 }
 
-impl <T> CommandError<T>
-where T: AsRef<dyn giter_traits::ExposeError>
+impl<T> CommandError<T>
+where
+    T: AsRef<dyn giter_traits::ExposeError>,
 {
     pub fn from_command(func: &str, e: T, etype: String) -> Self {
         Self {
@@ -35,8 +36,9 @@ where T: AsRef<dyn giter_traits::ExposeError>
     }
 }
 
-impl <T> Serialize for CommandError<T>
-where T: std::fmt::Display + giter_traits::ExposeError
+impl<T> Serialize for CommandError<T>
+where
+    T: std::fmt::Display + giter_traits::ExposeError,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -51,7 +53,6 @@ where T: std::fmt::Display + giter_traits::ExposeError
         state.end()
     }
 }
-
 
 #[derive(Error, Debug, EnumDiscriminants)]
 #[strum_discriminants(derive(EnumIter))]
@@ -74,8 +75,8 @@ impl ExposeError for CommonErrorCode {
     fn code(&self) -> u32 {
         CommonErrorCodeDiscriminants::from(self) as u32
     }
-    
+
     fn module(&self) -> &str {
-        return "giter"
+        return "giter";
     }
 }

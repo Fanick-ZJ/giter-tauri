@@ -7,10 +7,12 @@ fn main() {
     tauri_build::build()
 }
 
-
 fn generaste_ts_error_enum() {
     let codes = vec![
-        (r"crates\giter-utils\src\types\error.rs", "GitUtilsErrorCode"),
+        (
+            r"crates\giter-utils\src\types\error.rs",
+            "GitUtilsErrorCode",
+        ),
         (r"crates\giter-watcher\src\error.rs", "WatcherErrorCode"),
         (r"src\types\error.rs", "CommonErrorCode"),
     ];
@@ -46,9 +48,11 @@ fn generate_ts_code((path, error_name): (&str, &str)) -> String {
         r#"
 export const {} = {{
   {}
-}} as const"#, 
-        error_name, 
-        variants.iter().enumerate()
+}} as const"#,
+        error_name,
+        variants
+            .iter()
+            .enumerate()
             .map(|(i, v)| format!("{}: {}", v, i))
             .collect::<Vec<_>>()
             .join(",\n  ")

@@ -25,10 +25,10 @@ impl Author {
         Self {
             name: DEFAULT_NAME.to_string(),
             email: DEFAULT_EMAIL.to_string(),
-        } 
+        }
     }
 
     pub fn is_default(&self) -> bool {
-        self.name == DEFAULT_NAME && self.email == DEFAULT_EMAIL 
+        self.name == DEFAULT_NAME && self.email == DEFAULT_EMAIL
     }
 }

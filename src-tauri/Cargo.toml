@@ -58,4 +58,6 @@ giter-watcher = { path = "crates/giter-watcher", version = "0.0.1"}
 giter-macros = { path = "crates/macros", version = "0.0.1"}
 tauri-plugin-shell = "2"
 giter-traits = { version = "0.1.0", path = "crates/giter-traits" }
-tauri-plugin-prevent-default = "2.1.2"
+tauri-plugin-fs = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-prevent-default = "2.1.3"

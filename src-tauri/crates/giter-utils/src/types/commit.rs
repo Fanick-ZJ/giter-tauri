@@ -2,9 +2,9 @@ use std::fmt;
 
 use git2::{Oid, Repository};
 use serde::{
+    Deserialize, Deserializer, Serialize, Serializer,
     de::{Error as DeError, Visitor},
     ser::SerializeStruct,
-    Deserialize, Deserializer, Serialize, Serializer,
 };
 
 use super::error::GitUtilsErrorCode;
@@ -64,7 +64,18 @@ impl Commit {
         let title = message.lines().next().unwrap_or("").to_string();
         let commit_id = commit.id().to_string();
         let repo = repo.path().to_str().unwrap().to_string();
-        Ok(Commit::new(commit_id, author_name, author_email, comitter_name, comitter_email, title, message, time * 1000, parents, repo))
+        Ok(Commit::new(
+            commit_id,
+            author_name,
+            author_email,
+            comitter_name,
+            comitter_email,
+            title,
+            message,
+            time * 1000,
+            parents,
+            repo,
+        ))
     }
 }
 

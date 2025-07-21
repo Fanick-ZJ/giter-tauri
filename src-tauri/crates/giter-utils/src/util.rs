@@ -2,9 +2,9 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::Path;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
+use chrono::{TimeZone, Utc};
 use git2::{Commit as Git2Commit, Config, Delta, Oid, Repository, TreeWalkResult};
-use chrono::{Utc, TimeZone};
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -31,7 +31,11 @@ pub fn build_commit(commit: &Git2Commit, repo: &Repository) -> Commit {
     let author = commit.author();
     let mut parents = commit.parent_ids().into_iter().collect::<Vec<Oid>>();
     parents.sort_by(|a, b| {
-        repo.find_commit(*b).unwrap().time().seconds().cmp(&repo.find_commit(*a).unwrap().time().seconds())
+        repo.find_commit(*b)
+            .unwrap()
+            .time()
+            .seconds()
+            .cmp(&repo.find_commit(*a).unwrap().time().seconds())
     });
     let path = repo.workdir().unwrap().to_str().unwrap().to_string();
     Commit::new(
@@ -117,10 +121,10 @@ pub fn is_git_repo(path: &str) -> bool {
         Ok(_) => true,
         Err(e) => {
             if e.code() == git2::ErrorCode::Owner {
-               return true
+                return true;
             }
             false
-        }, 
+        }
     }
 }
 
@@ -158,20 +162,20 @@ pub fn set_owner(path: &str) -> Result<bool, git2::Error> {
 
 pub fn object_is_binary(oid: Oid, repo: &Repository) -> bool {
     match repo.find_blob(oid) {
-        Ok(blob) => {
-            is_binary_file_content(blob.content().into())
-        },
-        Err(_) => return false
+        Ok(blob) => is_binary_file_content(blob.content().into()),
+        Err(_) => return false,
     }
-
 }
 
 // 判断文件是否为二进制文件(直接输入文件内容)
 /// 返回 `true` 表示是二进制文件，`false` 表示是文本文件
 pub fn is_binary_file_content(content: Vec<u8>) -> bool {
-    
     // 读取前 1024 字节用于检测（可根据需要调整）
-    let head_len = if content.len() < 1024 { content.len() } else { 1024 };
+    let head_len = if content.len() < 1024 {
+        content.len()
+    } else {
+        1024
+    };
     let head = content[..head_len].to_vec();
 
     // 空字节检查
@@ -180,27 +184,19 @@ pub fn is_binary_file_content(content: Vec<u8>) -> bool {
     }
 
     // 统计不可打印的 ASCII 字符数量
-    let non_printable_count = content.iter().filter(|&&byte| {
-        !matches!(
-            byte,
-            0x09 | 0x0A | 0x0D |
-            0x20 ..= 0xFF
-        )
-    }).count();
+    let non_printable_count = content
+        .iter()
+        .filter(|&&byte| !matches!(byte, 0x09 | 0x0A | 0x0D | 0x20..=0xFF))
+        .count();
 
-    let non_printable = content.iter().filter(|&&byte| {
-        !matches!(
-            byte,
-            0x09 | 0x0A | 0x0D |
-            0x20 ..= 0xFF
-        )
-    });
+    let non_printable = content
+        .iter()
+        .filter(|&&byte| !matches!(byte, 0x09 | 0x0A | 0x0D | 0x20..=0xFF));
 
     // 如果不可打印字符超过 5%，视为二进制文件
     let threshold = content.len() / 20; // 5%
     if non_printable_count > threshold {
         println!("{:?}", non_printable);
-        
     }
     non_printable_count > threshold
 }
@@ -210,7 +206,7 @@ pub fn is_binary_file_content(content: Vec<u8>) -> bool {
 pub fn is_binary_file<P: AsRef<Path>>(path: P) -> std::io::Result<bool> {
     // 打开文件
     let mut file = std::fs::File::open(path)?;
-    
+
     // 读取前 1024 字节用于检测（可根据需要调整）
     let mut buffer = [0; 1024];
     let bytes_read = file.read(&mut buffer)?;
@@ -224,18 +220,18 @@ pub fn get_file_content<P: AsRef<Path>>(path: P) -> Result<Vec<u8>> {
     let mut file = std::fs::File::open(path)?;
     let mut content = Vec::new();
     file.read_to_end(&mut content);
-    Ok(content) 
+    Ok(content)
 }
 
 pub fn write_file<P: AsRef<Path>>(path: P, content: &[u8]) -> Result<()> {
     let mut file = std::fs::File::create(path)?;
     file.write_all(content);
-    Ok(()) 
+    Ok(())
 }
 
 pub fn stamp_to_ymd(stamp: i64) -> Result<String, String> {
     // 将时间戳转换为 DateTime<Utc> 类型
-    let datetime  = Utc.timestamp_opt(stamp, 0);
+    let datetime = Utc.timestamp_opt(stamp, 0);
     let t = match datetime {
         chrono::offset::LocalResult::Single(time) => Ok(time),
         chrono::offset::LocalResult::Ambiguous(_early, last) => Ok(last),
@@ -251,7 +247,6 @@ pub fn valid_date(data: &str) -> bool {
     date_regex.is_match(data)
 }
 
-
 fn get_git_config(key: &str) -> Result<String, String> {
     let output = std::process::Command::new("git")
         .args(["config", "--get", key])
@@ -259,10 +254,8 @@ fn get_git_config(key: &str) -> Result<String, String> {
         .map_err(|e| format!("Failed to execute git command: {e}"))?;
 
     if output.status.success() {
-        let value = String::from_utf8_lossy(&output.stdout)
-            .trim()
-            .to_string();
-        
+        let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
         if value.is_empty() {
             Err(format!("Git config '{key}' exists but is empty"))
         } else {
@@ -300,31 +293,34 @@ where
 pub fn size_by_path<P: AsRef<Path>>(path: P) -> Result<u64> {
     let path = path.as_ref();
     let metadata = std::fs::metadata(path)?;
-    Ok(metadata.len()) 
+    Ok(metadata.len())
 }
 pub fn str_to_oid(str: &str) -> Result<Oid, GitUtilsErrorCode> {
     let oid = Oid::from_str(str);
     match oid {
         Ok(oid) => Ok(oid),
-        Err(_) => Err(GitUtilsErrorCode::OtherError(format!("invalid object id: {}", str))), 
+        Err(_) => Err(GitUtilsErrorCode::OtherError(format!(
+            "invalid object id: {}",
+            str
+        ))),
     }
 }
 
 pub fn time_to_ymd(stamp: i64) -> Result<String> {
     // 定义时间戳边界常量（秒级时间戳最大值 9999999999 -> 2001-09-09）
-    const MILLISECOND_THRESHOLD: i64 = 10_000_000_000;  // 11位开始是毫秒级时间戳
-    
+    const MILLISECOND_THRESHOLD: i64 = 10_000_000_000; // 11位开始是毫秒级时间戳
+
     // 自动识别并转换毫秒级时间戳（13位）和秒级时间戳（11位）
     let stamp: i64 = if stamp >= MILLISECOND_THRESHOLD {
-        stamp / 1000  // 保留到秒级精度
+        stamp / 1000 // 保留到秒级精度
     } else {
         stamp
     };
-    let datetime  = Utc.timestamp_opt(stamp, 0); 
+    let datetime = Utc.timestamp_opt(stamp, 0);
     let t = match datetime {
         chrono::offset::LocalResult::Single(time) => Ok(time),
         chrono::offset::LocalResult::Ambiguous(_, last) => Ok(last),
-        chrono::offset::LocalResult::None => Err(anyhow!("Invalid timestamp".to_string())), 
+        chrono::offset::LocalResult::None => Err(anyhow!("Invalid timestamp".to_string())),
     };
     let datetime = t?;
     Ok(datetime.format("%Y-%m-%d").to_string())

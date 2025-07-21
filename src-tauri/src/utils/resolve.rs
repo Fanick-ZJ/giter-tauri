@@ -1,11 +1,11 @@
-use crate::{core::handle, emit::changed_emit};
 use crate::emit::{repo_single_emit, satatus_change_emit};
 use crate::utils::init;
+use crate::{core::handle, emit::changed_emit};
 use anyhow::Result;
 use giter_watcher::modify_watcher::ModifyWatcher;
+use std::sync::Mutex;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use std::sync::Mutex;
 use tauri::{App, Manager};
 
 pub async fn resolve_setup(app: &mut App) -> Result<()> {
@@ -28,7 +28,6 @@ pub async fn resolve_setup(app: &mut App) -> Result<()> {
     Ok(())
 }
 
-
 pub async fn init_tray(app: &mut App) -> Result<()> {
     let tray = TrayIconBuilder::new()
         .icon(app.default_window_icon().unwrap().clone())
@@ -41,16 +40,20 @@ pub async fn init_tray(app: &mut App) -> Result<()> {
 
     tray.on_menu_event(|app, event| match event.id.as_ref() {
         "quit" => {
-          println!("quit menu item was clicked");
-          app.exit(0);
-        },
+            println!("quit menu item was clicked");
+            app.exit(0);
+        }
         _ => {
-          println!("menu item {:?} not handled", event.id);
+            println!("menu item {:?} not handled", event.id);
         }
     });
 
     tray.on_tray_icon_event(|tray, event| match event {
-        TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } => {
+        TrayIconEvent::Click {
+            button: MouseButton::Left,
+            button_state: MouseButtonState::Up,
+            ..
+        } => {
             let app = tray.app_handle();
             let main_window = app.get_window("main").unwrap();
             if main_window.is_visible().unwrap() {

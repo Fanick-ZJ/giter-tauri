@@ -18,7 +18,7 @@ pub struct FilterConditions {
 }
 
 impl FilterConditions {
-   pub fn build_from_sv_map(map: &HashMap<String, Value>) -> Self {
+    pub fn build_from_sv_map(map: &HashMap<String, Value>) -> Self {
         let mut conditions = FilterConditions::default();
         conditions.last_id = deserialize_from_map::<Option<String>>(map, "lastId", None);
         conditions.message = deserialize_from_map::<Option<String>>(map, "message", None);
@@ -28,5 +28,5 @@ impl FilterConditions {
         conditions.start_time = deserialize_from_map::<Option<i64>>(map, "startTime", None);
         conditions.end_time = deserialize_from_map::<Option<i64>>(map, "endTime", None);
         conditions
-   }
+    }
 }

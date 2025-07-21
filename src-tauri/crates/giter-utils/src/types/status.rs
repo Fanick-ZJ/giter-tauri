@@ -36,13 +36,12 @@ pub enum FileStatus {
     Ok,
 }
 
-
-  /// git2中的状态转化为文件状态（是否添加、修改删除）
+/// git2中的状态转化为文件状态（是否添加、修改删除）
 pub fn status_to_changed_status(status: Status) -> FileStatus {
     match status {
         Status::WT_NEW | Status::INDEX_NEW => FileStatus::Added,
         Status::WT_MODIFIED | Status::INDEX_MODIFIED => FileStatus::Modified,
-        Status::WT_DELETED | Status::INDEX_DELETED => FileStatus::Deleted, 
+        Status::WT_DELETED | Status::INDEX_DELETED => FileStatus::Deleted,
         Status::WT_RENAMED | Status::INDEX_RENAMED => FileStatus::Renamed,
         Status::CONFLICTED => FileStatus::Conflicted,
         _ => FileStatus::Ok,

@@ -1,37 +1,39 @@
-use tauri::{ipc::Response, Manager, Url, WebviewBuilder};
-use serde_json::Value;
-use std::{collections::HashMap, path::PathBuf, sync::Mutex, thread};
 use crate::{
-    core::handle, emit::emit_branch_contribution, types::{
-        cache::RepoPath, 
-        error::{
-            CommandError, CommonErrorCode as CommonError
-        },
-        fs::Dir, store
-    }, utils::{
+    core::handle,
+    emit::emit_branch_contribution,
+    types::{
+        cache::RepoPath,
+        error::{CommandError, CommonErrorCode as CommonError},
+        fs::Dir,
+        store,
+    },
+    utils::{
         dirs,
         fs::{get_first_level_dirs, get_logical_driver},
-    }
+    },
 };
 use giter_macros::command_result;
 use giter_utils::{
     types::{
-        author::Author, branch::Branch,
-        commit::Commit, diff::ContentDiff, error::GitUtilsErrorCode, 
-        file::{ChangedFile, CommittedFile, FileHistoryEntry}, git_data_provider::GitDataProvider, 
-        status::WorkStatus
+        author::Author,
+        branch::Branch,
+        commit::Commit,
+        diff::ContentDiff,
+        error::GitUtilsErrorCode,
+        file::{ChangedFile, CommittedFile, FileHistoryEntry},
+        git_data_provider::GitDataProvider,
+        status::WorkStatus,
     },
     util::{is_git_repo, set_owner, str_to_oid},
 };
-use giter_watcher::{
-    modify_watcher::ModifyWatcher, error::WatcherErrorCode as WatcherError
-};
+use giter_watcher::{error::WatcherErrorCode as WatcherError, modify_watcher::ModifyWatcher};
+use serde_json::Value;
+use std::{collections::HashMap, path::PathBuf, sync::Mutex, thread};
+use tauri::{ipc::Response, Manager, Url, WebviewBuilder};
 
 type DataResult<T> = std::result::Result<T, CommandError<GitUtilsErrorCode>>;
 type CommonResult<T> = std::result::Result<T, CommandError<CommonError>>;
 type WatcherResult<T> = std::result::Result<T, CommandError<WatcherError>>;
-
-
 
 fn get_provider(repo: &str) -> Result<GitDataProvider, GitUtilsErrorCode> {
     let handle = handle::Handle::global();
@@ -42,13 +44,14 @@ fn get_provider(repo: &str) -> Result<GitDataProvider, GitUtilsErrorCode> {
 fn watch(repo: RepoPath) -> Result<(), WatcherError> {
     let app = handle::Handle::global().app_handle().unwrap();
     let watch_center = app.state::<Mutex<ModifyWatcher>>();
-    
-    // 修复1: 移除多余的 match 结构
-    let mut watcher = watch_center.lock()
-    .map_err(|e| WatcherError::Other(format!("Failed to lock watcher center: {:?}", e)))?;
 
-// 修复2: 直接返回转换后的结果
-watcher.add_watch(repo)
+    // 修复1: 移除多余的 match 结构
+    let mut watcher = watch_center
+        .lock()
+        .map_err(|e| WatcherError::Other(format!("Failed to lock watcher center: {:?}", e)))?;
+
+    // 修复2: 直接返回转换后的结果
+    watcher.add_watch(repo)
 }
 
 #[tauri::command]
@@ -56,12 +59,12 @@ watcher.add_watch(repo)
 pub async fn remove_watch(repo: RepoPath) -> CommonResult<()> {
     let app = handle::Handle::global().app_handle().unwrap();
     let watch_center = app.state::<Mutex<ModifyWatcher>>();
-    let mut watcher = watch_center.lock()
+    let mut watcher = watch_center
+        .lock()
         .map_err(|_| CommonError::GetWatcherCenterFailed)?;
     let _ = watcher.remove_watch(repo);
     Ok(())
 }
-
 
 #[tauri::command]
 #[command_result]
@@ -177,13 +180,13 @@ pub async fn set_repo_ownership(repo: RepoPath) -> CommonResult<bool> {
 pub async fn branch_commits(repo: RepoPath, branch: Branch, count: i32) -> DataResult<Vec<Commit>> {
     let provider = get_provider(&repo)?;
     provider.branch_commits(&branch, count)
-} 
+}
 
 #[tauri::command]
 #[command_result]
 pub async fn before_reference_commits_count(repo: RepoPath, reference: String) -> DataResult<i32> {
     let provider = get_provider(&repo)?;
-    provider.before_reference_commits_count(&reference) 
+    provider.before_reference_commits_count(&reference)
 }
 
 #[tauri::command]
@@ -193,7 +196,7 @@ pub async fn current_branch(repo: RepoPath) -> DataResult<Branch> {
     provider.current_branch()
 }
 
-#[tauri::command] 
+#[tauri::command]
 #[command_result]
 pub async fn current_remote_branch(repo: RepoPath) -> DataResult<Branch> {
     let provider = get_provider(&repo)?;
@@ -202,7 +205,7 @@ pub async fn current_remote_branch(repo: RepoPath) -> DataResult<Branch> {
 
 #[tauri::command]
 #[command_result]
-pub async fn commit_content (repo: RepoPath, cid: String) -> DataResult<Vec<CommittedFile>> {
+pub async fn commit_content(repo: RepoPath, cid: String) -> DataResult<Vec<CommittedFile>> {
     let provider = get_provider(&repo)?;
     let oid = str_to_oid(&cid)?;
     provider.commit_content(oid)
@@ -235,7 +238,11 @@ pub async fn get_commit(repo: RepoPath, cid: String) -> DataResult<Commit> {
 
 #[tauri::command]
 #[command_result]
-pub async fn get_branch_commit_contribution(key: String, repo: RepoPath, branch: Branch) -> DataResult<()> {
+pub async fn get_branch_commit_contribution(
+    key: String,
+    repo: RepoPath,
+    branch: Branch,
+) -> DataResult<()> {
     let provider = get_provider(&repo)?;
     // 由于第一次执行时间很长，所以开一个线程执行
     thread::spawn(move || {
@@ -251,7 +258,7 @@ pub async fn get_global_author() -> CommonResult<Author> {
     let author = giter_utils::util::get_global_git_author();
     match author {
         Ok(author) => Ok(author),
-        Err(e) => Err(CommonError::GetGlobalConfigError(e.to_string())), 
+        Err(e) => Err(CommonError::GetGlobalConfigError(e.to_string())),
     }
 }
 
@@ -264,14 +271,26 @@ pub async fn get_repo_author(repo: RepoPath) -> DataResult<Author> {
 
 #[tauri::command]
 #[command_result]
-pub async fn reference_commit_filter_details(repo: RepoPath, reference: String, filter: HashMap<String, Value>, offset: Option<i32>, count: Option<i32>) -> DataResult<Vec<Commit>> {
+pub async fn reference_commit_filter_details(
+    repo: RepoPath,
+    reference: String,
+    filter: HashMap<String, Value>,
+    offset: Option<i32>,
+    count: Option<i32>,
+) -> DataResult<Vec<Commit>> {
     let provider = get_provider(&repo)?;
     provider.reference_commit_filter_details(&reference, &filter, offset, count)
 }
 
 #[tauri::command]
 #[command_result]
-pub async fn reference_commit_filter_count(repo: RepoPath, reference: String, filter: HashMap<String, Value>, offset: Option<i32>, count: Option<i32>) -> DataResult<i32> {
+pub async fn reference_commit_filter_count(
+    repo: RepoPath,
+    reference: String,
+    filter: HashMap<String, Value>,
+    offset: Option<i32>,
+    count: Option<i32>,
+) -> DataResult<i32> {
     let provider = get_provider(&repo)?;
     provider.reference_commit_filter_count(&reference, &filter, offset, count)
 }
@@ -321,13 +340,23 @@ pub async fn commit(repo: RepoPath, message: &str, update_ref: Option<&str>) -> 
 
 #[tauri::command]
 #[command_result]
-pub async fn push(repo: RepoPath, remote: String, branch: String, credentials: Option<(String, String)>) -> DataResult<()> {
+pub async fn push(
+    repo: RepoPath,
+    remote: String,
+    branch: String,
+    credentials: Option<(String, String)>,
+) -> DataResult<()> {
     let provider = get_provider(&repo)?;
     provider.push(&remote, &branch, credentials)
 }
 #[tauri::command]
 #[command_result]
-pub async fn pull(repo: RepoPath, remote: String, branch: String, credentials: Option<(String, String)>) -> DataResult<()> {
+pub async fn pull(
+    repo: RepoPath,
+    remote: String,
+    branch: String,
+    credentials: Option<(String, String)>,
+) -> DataResult<()> {
     let provider = get_provider(&repo)?;
     provider.pull(&remote, &branch, credentials)
 }
@@ -336,7 +365,7 @@ pub async fn pull(repo: RepoPath, remote: String, branch: String, credentials: O
 #[command_result]
 pub async fn switch_branch(repo: RepoPath, branch: Branch) -> DataResult<()> {
     let provider = get_provider(&repo)?;
-    provider.switch_branch(&branch) 
+    provider.switch_branch(&branch)
 }
 
 #[tauri::command]
@@ -347,7 +376,10 @@ pub async fn file_history(repo: RepoPath, file_path: String) -> DataResult<Vec<F
 }
 #[tauri::command]
 #[command_result]
-pub async fn get_commit_tree_recursive(repo: RepoPath, commit_id: String) -> DataResult<giter_utils::types::fs::Dir> {
+pub async fn get_commit_tree_recursive(
+    repo: RepoPath,
+    commit_id: String,
+) -> DataResult<giter_utils::types::fs::Dir> {
     let provider = get_provider(&repo)?;
     let commit_id = str_to_oid(&commit_id)?;
     provider.get_tree_recursive(commit_id, None)
@@ -355,7 +387,11 @@ pub async fn get_commit_tree_recursive(repo: RepoPath, commit_id: String) -> Dat
 
 #[tauri::command]
 #[command_result]
-pub async fn get_tree(repo: RepoPath, object_id: String, tree_path: Option<String>) -> DataResult<giter_utils::types::fs::Dir> {
+pub async fn get_tree(
+    repo: RepoPath,
+    object_id: String,
+    tree_path: Option<String>,
+) -> DataResult<giter_utils::types::fs::Dir> {
     let provider = get_provider(&repo)?;
     let object_id = str_to_oid(&object_id)?;
     provider.get_tree(object_id, tree_path)
@@ -370,6 +406,15 @@ pub async fn object_is_binary(repo: RepoPath, object_id: String) -> DataResult<b
 }
 
 #[tauri::command]
+#[command_result]
+pub async fn save_blob(repo: RepoPath, object_id: String, path: String) -> DataResult<()> {
+    let provider = get_provider(&repo)?;
+    let object_id = str_to_oid(&object_id)?;
+    provider.save_blob(object_id, &path)?;
+    Ok(())
+}
+
+#[tauri::command]
 pub fn create_window(
     app: tauri::AppHandle,
     label: &str,
@@ -378,31 +423,33 @@ pub fn create_window(
     width: f64,
     height: f64,
     fullscreen: bool,
-    resizable: bool
+    resizable: bool,
 ) {
     let windows = app.windows();
     if windows.get(label).is_some() {
-        return; 
+        return;
     }
     let window = tauri::window::WindowBuilder::new(
-        &app,
-        label, // 必须唯一
-        )
-        .title(title)
-        .inner_size(width, height)
-        .fullscreen(fullscreen)
-        .resizable(resizable)
-        .build()
-        .expect("无法创建窗口");
-    
+        &app, label, // 必须唯一
+    )
+    .title(title)
+    .inner_size(width, height)
+    .fullscreen(fullscreen)
+    .resizable(resizable)
+    .build()
+    .expect("无法创建窗口");
+
     let url = tauri::WebviewUrl::External(Url::parse(url).unwrap());
     let webview = WebviewBuilder::new(label, url);
-    window.add_child(webview, tauri::LogicalPosition::new(0, 0), window.inner_size().unwrap());
+    let _ = window.add_child(
+        webview,
+        tauri::LogicalPosition::new(0, 0),
+        window.inner_size().unwrap(),
+    );
 }
 
 #[tauri::command]
 pub async fn get_repo_by_path(path: String) -> Option<store::Repository> {
     let store = handle::Handle::global().store().unwrap();
-    return store.get_repo_by_path(path)
-
+    return store.get_repo_by_path(path);
 }

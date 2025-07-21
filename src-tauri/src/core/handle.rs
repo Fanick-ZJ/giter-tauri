@@ -3,7 +3,7 @@ use parking_lot::RwLock;
 use std::sync::Arc;
 use tauri::AppHandle;
 
-use super::{store::GitStore};
+use super::store::GitStore;
 
 // 全局唯一实例
 static HANDLE: OnceCell<Handle> = OnceCell::new();

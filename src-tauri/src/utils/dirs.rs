@@ -1,7 +1,4 @@
-use crate::{
-    core::handle,
-    types::cache::RepoPath
-};
+use crate::{core::handle, types::cache::RepoPath};
 use anyhow::Result;
 use std::path::PathBuf;
 use tauri::Manager;

@@ -2,12 +2,15 @@
 import { NSpace, TreeInst, NTree, TreeOption, TreeOverrideNodeClickBehavior, treeGetClickTarget, NDropdown, useDialog, NLayout } from 'naive-ui';
 import { TreeDir } from '@/types';
 import { ComponentPublicInstance, computed, h, nextTick, onMounted, Ref, ref } from 'vue';
-import { fileHistory, getTree } from '@/utils/command';
+import { fileHistory, getTree, saveBlob } from '@/utils/command';
 import { TreeFileMode } from '@/enum';
 import { useElementSize } from '@vueuse/core';
 import FileIcon from '@/components/common/file-icon/index.vue'
-import FileHistoryWindow from '@/windows/file-history';
 import { showFileHistory } from '@/utils/dialog';
+import * as path from '@tauri-apps/api/path';
+import { save } from '@tauri-apps/plugin-dialog';
+import { basename } from '@/utils/tool';
+import { getLocalStage, setLocalStage } from '@/utils/storage';
 
 const KEY_INTERVAL = '|KEY_INTERVAL|'
 const props = defineProps<{
@@ -93,16 +96,38 @@ const useDropDown = () => {
         {
             label: '文件历史',
             key: 'history'
+        }, 
+        {
+            label: '文件导出',
+            key: 'export'
         }
     ])
     const selectRefClear = () => {
         selectedRef.value = []
     }
 
-    const handleSelected = (key: string) => {
+    const handleSelected = async (key: string) => {
         showDropdownRef.value = false
-        let [path, object_id] = selectedRef.value
-        showFileHistory(dialog, props.repo, path)
+        let [abs_path, object_id] = selectedRef.value
+        if (key == 'history') {
+            showFileHistory(dialog, props.repo, abs_path)
+        } else if (key == 'export') {
+            let last_save_path = getLocalStage('LAST_SAVE_PATH') || await path.homeDir()
+            save({
+                defaultPath: await path.join(last_save_path, await path.basename(abs_path)),
+            }).then(async (save_path) => {
+                if (save_path) {
+                    setLocalStage('LAST_SAVE_PATH', await path.dirname(save_path))
+                    saveBlob(props.repo, object_id, save_path).then(() => {
+                        window.$message.success('导出成功')
+                    }).catch((err) => {
+                        console.error(err)
+                        window.$message.error(err)
+
+                    })
+                }
+            })
+        }
         selectRefClear()
 
     }

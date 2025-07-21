@@ -1,3 +1,5 @@
+use super::file::FileHistoryEntry;
+use super::{author::Author, branch::Branch, commit::Commit, status::WorkStatus};
 use crate::types::fs;
 use crate::types::fs::Dir;
 use crate::util::build_commit;
@@ -10,9 +12,8 @@ use crate::util::stamp_to_ymd;
 use crate::util::str_to_oid;
 use crate::util::time_to_ymd;
 use crate::util::write_file;
-use anyhow::anyhow;
 use anyhow::Result;
-use git2::build::CheckoutBuilder;
+use anyhow::anyhow;
 use git2::Cred;
 use git2::CredentialType;
 use git2::FetchOptions;
@@ -21,6 +22,7 @@ use git2::RemoteCallbacks;
 use git2::Tree;
 use git2::TreeWalkMode;
 use git2::TreeWalkResult;
+use git2::build::CheckoutBuilder;
 use git2::{BranchType, Oid, Repository, Revwalk, Status};
 use serde_json::Value;
 use similar::DiffOp;
@@ -29,25 +31,23 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Pointer;
 use std::i32;
-use std::process::Command;
 use std::io::{self, ErrorKind};
+use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::path::PathBuf;
+use std::process::Command;
 use std::usize;
 use std::vec;
-use std::os::windows::process::CommandExt;
-use super::file::FileHistoryEntry;
-use super::{author::Author, branch::Branch, commit::Commit, status::WorkStatus};
 
 use super::commit_filter::FilterConditions;
 use super::contribution::CommitStatistic;
 use super::diff::ContentDiff;
+use super::error::GitUtilsErrorCode;
 use super::file::ChangedFile;
 use super::file::CommittedFile;
 use super::file::UntrackedFile;
-use super::status::status_to_changed_status;
 use super::status::FileStatus;
-use super::error::GitUtilsErrorCode;
+use super::status::status_to_changed_status;
 
 pub struct GitDataProvider {
     pub repository: Repository,
@@ -68,16 +68,16 @@ impl GitDataProvider {
     pub fn new<P: AsRef<Path>>(repository: P) -> Result<Self, GitUtilsErrorCode> {
         let repo = Repository::open(&repository);
         match repo {
-            Ok(repo) => Ok(GitDataProvider {
-                repository: repo,
-            }),
-            Err(err) => {
-                match err.code() {
-                    git2::ErrorCode::NotFound => Err(GitUtilsErrorCode::RepoNotFound(repository.as_ref().display().to_string())),
-                    git2::ErrorCode::Owner => Err(GitUtilsErrorCode::NoOwner(repository.as_ref().display().to_string())),
-                    _ => Err(GitUtilsErrorCode::OtherError(err.message().to_string())),
-                }
-            }
+            Ok(repo) => Ok(GitDataProvider { repository: repo }),
+            Err(err) => match err.code() {
+                git2::ErrorCode::NotFound => Err(GitUtilsErrorCode::RepoNotFound(
+                    repository.as_ref().display().to_string(),
+                )),
+                git2::ErrorCode::Owner => Err(GitUtilsErrorCode::NoOwner(
+                    repository.as_ref().display().to_string(),
+                )),
+                _ => Err(GitUtilsErrorCode::OtherError(err.message().to_string())),
+            },
         }
     }
 
@@ -93,7 +93,7 @@ impl GitDataProvider {
     }
 
     /// 根据仓库文件的相对地址，获取文件的绝对地址
-    /// 
+    ///
     fn blob_path<T: AsRef<Path>>(&self, path: T) -> PathBuf {
         let path = path.as_ref();
         let path = self.workdir().join(path);
@@ -164,12 +164,12 @@ impl GitDataProvider {
         // 从树对象中查找路径对应的条目
         let entry = tree.get_path(&path);
         if let Err(_) = entry {
-           let index = self.repository.index()?; 
-           for item in index.iter() {
+            let index = self.repository.index()?;
+            for item in index.iter() {
                 if String::from_utf8(item.path.to_vec())? == path.to_str().unwrap().to_string() {
                     return Ok(item.id);
                 }
-           }
+            }
         }
         Ok(entry?.id())
     }
@@ -186,30 +186,34 @@ impl GitDataProvider {
                 | Status::INDEX_TYPECHANGE.bits();
             if (bits & index_status) > 0 {
                 let path = PathBuf::from(item.path().unwrap());
-                let oid = self.get_path_oid(&path).unwrap_or(Oid::from_str("0").unwrap());
+                let oid = self
+                    .get_path_oid(&path)
+                    .unwrap_or(Oid::from_str("0").unwrap());
                 let status = status_to_changed_status(item.status());
                 let changed_file = ChangedFile::new(path, oid, status);
-                modified.push(changed_file); 
-            } 
-        } 
+                modified.push(changed_file);
+            }
+        }
         Ok(modified)
     }
 
     pub fn changed_files(&self) -> Result<Vec<ChangedFile>, GitUtilsErrorCode> {
         let status = self.repository.statuses(None)?;
-        let mut modified: Vec<ChangedFile> = Vec::new(); 
+        let mut modified: Vec<ChangedFile> = Vec::new();
         for item in &status {
             let bits = item.status().bits();
             let index_status = Status::WT_DELETED.bits()
-            | Status::WT_MODIFIED.bits()
-            | Status::CONFLICTED.bits()
-            | Status::WT_NEW.bits()
-            | Status::WT_RENAMED.bits()
-            | Status::WT_TYPECHANGE.bits()
-            | Status::WT_NEW.bits();
+                | Status::WT_MODIFIED.bits()
+                | Status::CONFLICTED.bits()
+                | Status::WT_NEW.bits()
+                | Status::WT_RENAMED.bits()
+                | Status::WT_TYPECHANGE.bits()
+                | Status::WT_NEW.bits();
             if (bits & index_status) > 0 {
                 let path = PathBuf::from(item.path().unwrap());
-                let oid = self.get_path_oid(&path).unwrap_or(Oid::from_str("0").unwrap());
+                let oid = self
+                    .get_path_oid(&path)
+                    .unwrap_or(Oid::from_str("0").unwrap());
                 let status = status_to_changed_status(item.status());
                 let changed_file = ChangedFile::new(path, oid, status);
                 modified.push(changed_file);
@@ -221,7 +225,7 @@ impl GitDataProvider {
     pub fn relative_path(&self, path: &PathBuf) -> Result<PathBuf> {
         let workdir = self.workdir();
         let relative_path = path.strip_prefix(workdir)?;
-        Ok(relative_path.to_path_buf()) 
+        Ok(relative_path.to_path_buf())
     }
 
     pub fn add_to_stage(&self, path: &PathBuf) -> Result<(), GitUtilsErrorCode> {
@@ -229,7 +233,7 @@ impl GitDataProvider {
         let mut index = repo.index()?;
         index.add_path(&path)?;
         index.write()?;
-        Ok(()) 
+        Ok(())
     }
 
     pub fn remove_from_stage(&self, path: &PathBuf) -> Result<(), GitUtilsErrorCode> {
@@ -249,20 +253,25 @@ impl GitDataProvider {
                 let entry = tree.get_path(&path)?;
                 let blob = repo.find_blob(entry.id())?;
                 // 如果能在索引库中找到文件，就把HEAD库中的文件添加到索引库中，以实现移除索引的效果
-                let entry = index.iter().find(|e| String::from_utf8(e.path.to_vec()).unwrap() == path.to_str().unwrap().to_string());
+                let entry = index.iter().find(|e| {
+                    String::from_utf8(e.path.to_vec()).unwrap()
+                        == path.to_str().unwrap().to_string()
+                });
                 if let Some(entry) = entry {
                     index.add_frombuffer(&entry, blob.content())?;
                 } else {
-                    return Err(GitUtilsErrorCode::OtherError("File not found in index".to_string()));
+                    return Err(GitUtilsErrorCode::OtherError(
+                        "File not found in index".to_string(),
+                    ));
                 }
-            } 
+            }
         }
         index.write()?;
         Ok(())
     }
 
     /// 暂存区文件恢复到工作区
-    pub fn checkout_file (&self, path: &PathBuf) -> Result<(), GitUtilsErrorCode> {
+    pub fn checkout_file(&self, path: &PathBuf) -> Result<(), GitUtilsErrorCode> {
         let repo = &self.repository;
         // 判断当前的文件是不是新加的
         let status = self.changed_files()?;
@@ -289,7 +298,9 @@ impl GitDataProvider {
                 return Ok(Branch::from(branch.into_reference()));
             }
         }
-        Err(GitUtilsErrorCode::CurrentBranchNotFound("No current branch found".to_string()))
+        Err(GitUtilsErrorCode::CurrentBranchNotFound(
+            "No current branch found".to_string(),
+        ))
     }
 
     /// 获取分支列表
@@ -305,16 +316,14 @@ impl GitDataProvider {
     }
 
     /// 获取当前分支对应的远程分支
-    pub fn current_remote_branch(&self) -> Result<Branch, GitUtilsErrorCode>{
+    pub fn current_remote_branch(&self) -> Result<Branch, GitUtilsErrorCode> {
         let current = self.current_branch()?;
         let remote = self
             .repository
             .find_branch(&current.reference, BranchType::Local)?
             .upstream();
         match remote {
-            Ok(remote) => {
-                Ok(Branch::from(remote.into_reference()))
-            }
+            Ok(remote) => Ok(Branch::from(remote.into_reference())),
             Err(_) => Err(GitUtilsErrorCode::RemoteNotFound(current.name)),
         }
     }
@@ -372,25 +381,29 @@ impl GitDataProvider {
         let mut statuses = WorkStatus::None;
 
         // 统一错误处理，使用 map_err 转换错误类型
-        let untracked = self.untracked_files()
+        let untracked = self
+            .untracked_files()
             .map(|v| !v.is_empty())
             .map_err(|e| anyhow::anyhow!(e).context("Failed to get untracked files"))?;
 
-        let modified = self.workspace_change()
+        let modified = self
+            .workspace_change()
             .map(|v| !v.is_empty())
             .map_err(|e| anyhow::anyhow!(e).context("Failed to get workspace changes"))?;
 
-        let uncommitted = self.uncommitted()
+        let uncommitted = self
+            .uncommitted()
             .map_err(|e| anyhow::anyhow!(e).context("Failed to check uncommitted changes"))?;
 
-        let unpushed = self.unpushed_commits()
+        let unpushed = self
+            .unpushed_commits()
             .map_err(|e| anyhow::anyhow!(e).context("Failed to check unpushed commits"))?;
         // 使用组合的 Result 处理
         let results = vec![
-            (untracked, WorkStatus::Untracked), 
-            (modified, WorkStatus::Modified), 
-            (uncommitted, WorkStatus::Uncommitted), 
-            (unpushed, WorkStatus::Unpushed)
+            (untracked, WorkStatus::Untracked),
+            (modified, WorkStatus::Modified),
+            (uncommitted, WorkStatus::Uncommitted),
+            (unpushed, WorkStatus::Unpushed),
         ];
         for (result, status) in results {
             match result {
@@ -439,11 +452,7 @@ impl GitDataProvider {
 
     /// 根据commit_id 获取之前的指定数量提交
     ///
-    pub fn get_commits_before(
-        &self,
-        commit_id: impl Into<Oid>,
-        count: i32,
-    ) -> Result<Vec<Commit>> {
+    pub fn get_commits_before(&self, commit_id: impl Into<Oid>, count: i32) -> Result<Vec<Commit>> {
         let commits = self.repository.find_commit(commit_id.into())?;
         let mut revwalk = self.repository.revwalk()?;
         revwalk.push(commits.id())?;
@@ -472,7 +481,11 @@ impl GitDataProvider {
 
     /// 获取分支的提交，返回提交对象和此分支的提交总数
     ///
-    pub fn branch_commits(&self, branch: &Branch, count: i32) -> Result<Vec<Commit>, GitUtilsErrorCode> {
+    pub fn branch_commits(
+        &self,
+        branch: &Branch,
+        count: i32,
+    ) -> Result<Vec<Commit>, GitUtilsErrorCode> {
         // 获取分支所在的提交
         let commit = self.branch_commit_inner(branch)?;
         let mut revwalk = self.repository.revwalk()?;
@@ -482,7 +495,10 @@ impl GitDataProvider {
     }
 
     /// 在某些情况下，使用git命令获取提交数量会更快，因为git命令是直接调用底层的git库，而不是通过rust的git2库
-    pub fn before_reference_commits_count(&self, reference: &str) -> Result<i32, GitUtilsErrorCode> {
+    pub fn before_reference_commits_count(
+        &self,
+        reference: &str,
+    ) -> Result<i32, GitUtilsErrorCode> {
         let output = Command::new("git")
             .args(&["rev-list", "--count", reference])
             .current_dir(self.workdir())
@@ -506,24 +522,46 @@ impl GitDataProvider {
         let mut files: Vec<CommittedFile> = Vec::new();
         let _ = tree.walk(TreeWalkMode::PostOrder, |root, entry| {
             let path = Path::new(root);
-            let path = path.join(entry.name().unwrap()).to_str().unwrap().to_string();
+            let path = path
+                .join(entry.name().unwrap())
+                .to_str()
+                .unwrap()
+                .to_string();
             let blob = self.repository.find_blob(entry.id());
             if blob.is_err() {
-                files.push(CommittedFile::new(path, 0, FileStatus::Added, entry.id().to_string(), "0".repeat(20), false, false, false));
+                files.push(CommittedFile::new(
+                    path,
+                    0,
+                    FileStatus::Added,
+                    entry.id().to_string(),
+                    "0".repeat(20),
+                    false,
+                    false,
+                    false,
+                ));
             } else {
                 let blob = blob.unwrap();
                 let size = blob.size();
                 let status = FileStatus::Added;
                 let object_id = entry.id().to_string();
                 let is_binary = blob.is_binary();
-                files.push(CommittedFile::new(path, size, status, object_id, "0".repeat(20), true, is_binary, false));
+                files.push(CommittedFile::new(
+                    path,
+                    size,
+                    status,
+                    object_id,
+                    "0".repeat(20),
+                    true,
+                    is_binary,
+                    false,
+                ));
             }
             1
         });
         files
     }
 
-    pub fn get_commit (&self, commit_id: impl Into<Oid>) -> Result<Commit, GitUtilsErrorCode> {
+    pub fn get_commit(&self, commit_id: impl Into<Oid>) -> Result<Commit, GitUtilsErrorCode> {
         let commit = self.repository.find_commit(commit_id.into())?;
         let commit = build_commit(&commit, &self.repository);
         Ok(commit)
@@ -531,12 +569,16 @@ impl GitDataProvider {
 
     /// 获取一个提交的内容
     ///
-    pub fn commit_content(&self, commit_id: impl Into<Oid>) -> Result<Vec<CommittedFile>, GitUtilsErrorCode> {
+    pub fn commit_content(
+        &self,
+        commit_id: impl Into<Oid>,
+    ) -> Result<Vec<CommittedFile>, GitUtilsErrorCode> {
         let repo = &self.repository;
         // 获取父提交
         let commit = repo.find_commit(commit_id.into())?;
         let now_tree = commit.tree()?;
-        let old_tree = commit.parents()
+        let old_tree = commit
+            .parents()
             .next()
             .and_then(|parent| parent.tree().ok());
         // 当没找到父提交时，说明是第一个提交，单独处理
@@ -551,13 +593,17 @@ impl GitDataProvider {
         // 遍历差异, 获取差异的文件
         for delta in deltas {
             let (old_file, new_file) = (delta.old_file(), delta.new_file());
-            let path = new_file.path()
+            let path = new_file
+                .path()
                 .ok_or_else(|| anyhow::anyhow!("new file path is not valid utf-8"))?
                 .to_str()
                 .ok_or_else(|| anyhow::anyhow!("new file path is not valid utf-8"))?
                 .to_string();
             // git2的is_blob函数好像有问题，直接用文件内容判断吧
-            let (is_binary, old_is_binary) = (object_is_binary(new_file.id(), repo), object_is_binary(old_file.id(), repo));
+            let (is_binary, old_is_binary) = (
+                object_is_binary(new_file.id(), repo),
+                object_is_binary(old_file.id(), repo),
+            );
             let size = new_file.size();
             let status = change_status_to_file_status(&delta.status());
             let new_blob = repo.find_blob(delta.new_file().id());
@@ -567,7 +613,16 @@ impl GitDataProvider {
                 Ok(_) => true,
                 Err(_) => false,
             };
-            let file = CommittedFile::new(path, size as usize, status, new_id, old_id, exist, is_binary, old_is_binary);
+            let file = CommittedFile::new(
+                path,
+                size as usize,
+                status,
+                new_id,
+                old_id,
+                exist,
+                is_binary,
+                old_is_binary,
+            );
             files.push(file);
         }
         Ok(files)
@@ -590,7 +645,11 @@ impl GitDataProvider {
     /// old: 旧的文件内容
     /// new: 新的文件内容
     ///
-    pub fn get_file_diff(&self, old: impl Into<Oid>, new: impl Into<Oid>) -> Result<(Vec<DiffOp>, String), GitUtilsErrorCode> {
+    pub fn get_file_diff(
+        &self,
+        old: impl Into<Oid>,
+        new: impl Into<Oid>,
+    ) -> Result<(Vec<DiffOp>, String), GitUtilsErrorCode> {
         let old = old.into();
         let new = new.into();
         let old_blob = self.repository.find_blob(old);
@@ -607,12 +666,19 @@ impl GitDataProvider {
         let new_content = String::from_utf8(new_blob.content().to_vec())?;
         let diff = TextDiff::from_lines(&old_content, &new_content);
         let diff_display = diff.unified_diff().missing_newline_hint(false).to_string();
-        Ok((diff.ops().iter().map(|op| op.clone()).collect(), diff_display))
+        Ok((
+            diff.ops().iter().map(|op| op.clone()).collect(),
+            diff_display,
+        ))
     }
 
     /// 获取文件内容、差异
-    /// 
-    pub fn get_file_content_diff(&self, old: impl Into<Oid>, new: impl Into<Oid>) -> Result<ContentDiff, GitUtilsErrorCode> {
+    ///
+    pub fn get_file_content_diff(
+        &self,
+        old: impl Into<Oid>,
+        new: impl Into<Oid>,
+    ) -> Result<ContentDiff, GitUtilsErrorCode> {
         let old = old.into();
         let new = new.into();
         let old_blob = self.get_blob_content(old)?;
@@ -622,7 +688,7 @@ impl GitDataProvider {
             old: String::from_utf8(old_blob)?,
             new: String::from_utf8(new_blob)?,
             ops: diff.0,
-            display: diff.1
+            display: diff.1,
         })
     }
 
@@ -656,12 +722,10 @@ impl GitDataProvider {
         let email_bytes = author.email_bytes();
         let name = String::from_utf8_lossy(name_bytes).into_owned();
         let email = String::from_utf8_lossy(email_bytes).into_owned();
-        
+
         Ok(Author::new(name, email))
-            
     }
 
-    
     /// 获取分支提交贡献统计
     pub fn get_branch_commit_contribution(&self, branch: &Branch) -> Result<Vec<CommitStatistic>> {
         let commits = self.branch_commit_inner(branch)?;
@@ -673,12 +737,19 @@ impl GitDataProvider {
                 let author = self.get_commit_author(&commit)?;
                 let commit = self.repository.find_commit(commit)?;
                 let time = stamp_to_ymd(commit.time().seconds());
-                if let Err(_) = time{
+                if let Err(_) = time {
                     continue;
                 }
                 let time = time.unwrap();
                 if !map.contains_key(author.email.as_str()) {
-                    map.insert(author.email.clone(), CommitStatistic::new(self.workdir().to_path_buf(), branch.clone(), author.clone()));      
+                    map.insert(
+                        author.email.clone(),
+                        CommitStatistic::new(
+                            self.workdir().to_path_buf(),
+                            branch.clone(),
+                            author.clone(),
+                        ),
+                    );
                 }
                 let stat = map.get_mut(author.email.as_str()).unwrap();
                 let _ = stat.add(time, 1);
@@ -690,28 +761,32 @@ impl GitDataProvider {
     }
 
     /// 获取根据筛选条件过滤后的命令行
-    pub fn build_cinnut_filter(&self, reference: &str, filter: &HashMap<String, Value>) -> Result<Command, GitUtilsErrorCode> {
+    pub fn build_cinnut_filter(
+        &self,
+        reference: &str,
+        filter: &HashMap<String, Value>,
+    ) -> Result<Command, GitUtilsErrorCode> {
         let filter = FilterConditions::build_from_sv_map(filter);
         let mut cmd = Command::new("git");
         cmd.creation_flags(0x08000000);
         cmd.current_dir(self.workdir());
         cmd.args(&["rev-list", reference]);
         if let Some(author) = filter.author {
-            cmd.args(&["--author", &format!("{}", author.name)]); 
+            cmd.args(&["--author", &format!("{}", author.name)]);
         }
         if let Some(start_time) = filter.start_time {
             let formated = time_to_ymd(start_time)?;
-            cmd.args(&["--since", & formated]); 
+            cmd.args(&["--since", &formated]);
         }
         if let Some(end_time) = filter.end_time {
             let formated = time_to_ymd(end_time)?;
-            cmd.args(&["--until", & formated]); 
+            cmd.args(&["--until", &formated]);
         }
         if let Some(offset) = filter.offset {
             cmd.args(&["--skip", &offset.to_string()]);
         }
         if let Some(count) = filter.count {
-            cmd.args(&["--max-count", &count.to_string()]); 
+            cmd.args(&["--max-count", &count.to_string()]);
         }
         if let Some(message) = filter.message {
             cmd.args(&["--grep", &message]);
@@ -719,58 +794,85 @@ impl GitDataProvider {
         Ok(cmd)
     }
 
-    pub fn reference_commit_filter_count(&self, reference: &str, filter: &HashMap<String, Value>, offset: Option<i32>, size: Option<i32>) -> Result<i32, GitUtilsErrorCode> {
+    pub fn reference_commit_filter_count(
+        &self,
+        reference: &str,
+        filter: &HashMap<String, Value>,
+        offset: Option<i32>,
+        size: Option<i32>,
+    ) -> Result<i32, GitUtilsErrorCode> {
         let mut filter = filter.clone();
-        filter.entry("offset".to_string()).or_insert(Value::from(offset.unwrap_or(0)));
-        filter.entry("count".to_string()).or_insert(Value::from(size.unwrap_or(i32::MAX)));
+        filter
+            .entry("offset".to_string())
+            .or_insert(Value::from(offset.unwrap_or(0)));
+        filter
+            .entry("count".to_string())
+            .or_insert(Value::from(size.unwrap_or(i32::MAX)));
         let mut cmd = self.build_cinnut_filter(reference, &filter)?;
         cmd.args(&["--count"]);
         let output = cmd.output()?;
         let count = String::from_utf8_lossy(&output.stdout)
-           .trim()
-           .parse::<usize>().map_err(|e| anyhow!(e.to_string()))?; 
+            .trim()
+            .parse::<usize>()
+            .map_err(|e| anyhow!(e.to_string()))?;
         Ok(count as i32)
     }
 
-    pub fn reference_commit_filter_details(&self, reference: &str, filter: &HashMap<String, Value>, offset: Option<i32>, size: Option<i32>) -> Result<Vec<Commit>, GitUtilsErrorCode> {
+    pub fn reference_commit_filter_details(
+        &self,
+        reference: &str,
+        filter: &HashMap<String, Value>,
+        offset: Option<i32>,
+        size: Option<i32>,
+    ) -> Result<Vec<Commit>, GitUtilsErrorCode> {
         let mut filter = filter.clone();
-        filter.entry("offset".to_string()).or_insert(Value::from(offset.unwrap_or(0)));
-        filter.entry("count".to_string()).or_insert(Value::from(size.unwrap_or(i32::MAX)));
+        filter
+            .entry("offset".to_string())
+            .or_insert(Value::from(offset.unwrap_or(0)));
+        filter
+            .entry("count".to_string())
+            .or_insert(Value::from(size.unwrap_or(i32::MAX)));
         let mut cmd = self.build_cinnut_filter(reference, &filter)?;
         let output = cmd.output()?;
         let commit_ids = String::from_utf8_lossy(&output.stdout)
-          .trim()
-         .split("\n")
-         .map(|s| s.to_string())
-         .collect::<Vec<String>>();
+            .trim()
+            .split("\n")
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>();
         if commit_ids.len() == 1 && commit_ids[0].is_empty() {
             return Ok(vec![]);
         }
         let mut commits = Vec::<Commit>::new();
         for commit_id in commit_ids {
-           let commit = Commit::from_oid(str_to_oid(&commit_id)?, &self.repository)?; 
-           commits.push(commit);
+            let commit = Commit::from_oid(str_to_oid(&commit_id)?, &self.repository)?;
+            commits.push(commit);
         }
         Ok(commits)
-
     }
 
- 
-    pub fn commit (&self, message: &str, update_ref: Option<&str>) -> Result<Oid, GitUtilsErrorCode> {
+    pub fn commit(
+        &self,
+        message: &str,
+        update_ref: Option<&str>,
+    ) -> Result<Oid, GitUtilsErrorCode> {
         // 如果没有指定更新的分支，默认更新当前分支
-        let update_ref =  if update_ref.is_none() {
-           Some("HEAD")
-        } else  {
+        let update_ref = if update_ref.is_none() {
+            Some("HEAD")
+        } else {
             update_ref
         };
         let repo = &self.repository;
         if repo.is_bare() {
-            return Err(GitUtilsErrorCode::RepoIsBare(repo.path().display().to_string()));
+            return Err(GitUtilsErrorCode::RepoIsBare(
+                repo.path().display().to_string(),
+            ));
         }
         let mut index = repo.index()?;
         let conflicts = index.conflicts()?;
         if conflicts.into_iter().count() > 0 {
-            return Err(GitUtilsErrorCode::RepoHasConflicts(repo.path().display().to_string())); 
+            return Err(GitUtilsErrorCode::RepoHasConflicts(
+                repo.path().display().to_string(),
+            ));
         }
         let author = repo.signature();
         if author.is_err() {
@@ -796,8 +898,12 @@ impl GitDataProvider {
         }
     }
 
-    fn build_remote_credentials_cb(&self, credentials: &Option<(String, String)>) -> impl Fn(&str, Option<&str>, CredentialType) -> Result<Cred, git2::Error> + '_ {
-        let (username, password) = credentials.as_ref()
+    fn build_remote_credentials_cb(
+        &self,
+        credentials: &Option<(String, String)>,
+    ) -> impl Fn(&str, Option<&str>, CredentialType) -> Result<Cred, git2::Error> + '_ {
+        let (username, password) = credentials
+            .as_ref()
             .map(|(u, p)| (u.clone(), p.clone()))
             .unwrap_or_default();
         move |_: &str, username_from_url: Option<&str>, allowed_types: CredentialType| {
@@ -811,29 +917,38 @@ impl GitDataProvider {
                 }
                 return Cred::userpass_plaintext(&username, &password);
             }
-    
+
             match allowed_types {
-                CredentialType::SSH_KEY => 
-                    Cred::ssh_key_from_agent(username_from_url.unwrap_or("git")),
-                _ => Cred::default()
+                CredentialType::SSH_KEY => {
+                    Cred::ssh_key_from_agent(username_from_url.unwrap_or("git"))
+                }
+                _ => Cred::default(),
             }
         }
     }
 
-
-    pub fn push(&self, remote: &str, branch_name: &str, credentials: Option<(String, String)>) -> Result<(), GitUtilsErrorCode> {
+    pub fn push(
+        &self,
+        remote: &str,
+        branch_name: &str,
+        credentials: Option<(String, String)>,
+    ) -> Result<(), GitUtilsErrorCode> {
         let repo = &self.repository;
-        
+
         // 提取远程获取和分支验证逻辑
-        let mut remote = repo.find_remote(remote)
+        let mut remote = repo
+            .find_remote(remote)
             .map_err(|_| GitUtilsErrorCode::RemoteNotFound(branch_name.to_string()))?;
 
-        let branch = repo.find_branch(branch_name, BranchType::Local)
+        let branch = repo
+            .find_branch(branch_name, BranchType::Local)
             .map_err(|_| GitUtilsErrorCode::BranchNotFound(branch_name.to_string()))?;
-        
+
         // 验证分支跟踪状态
         if !self.has_tracking(&branch) {
-            return Err(GitUtilsErrorCode::BranchNotTrackAny(branch_name.to_string()));
+            return Err(GitUtilsErrorCode::BranchNotTrackAny(
+                branch_name.to_string(),
+            ));
         }
 
         // 提取公共回调配置
@@ -848,7 +963,7 @@ impl GitDataProvider {
             log::error!("Git operation error: {:?}", e);
             match e.code() {
                 git2::ErrorCode::User => GitUtilsErrorCode::PushNeedNameAndPassword,
-                _ => return GitUtilsErrorCode::PushOtherError.into()
+                _ => return GitUtilsErrorCode::PushOtherError.into(),
             }
         };
 
@@ -860,7 +975,8 @@ impl GitDataProvider {
         // 执行fetch操作
         let mut fetch_opt = FetchOptions::new();
         fetch_opt.remote_callbacks(build_callbacks());
-        remote.fetch(&[branch_ref_name], Some(&mut fetch_opt), None)
+        remote
+            .fetch(&[branch_ref_name], Some(&mut fetch_opt), None)
             .map_err(handle_error)?;
 
         // 验证祖先关系
@@ -874,20 +990,25 @@ impl GitDataProvider {
         // 执行push操作
         let mut push_opt = PushOptions::new();
         push_opt.remote_callbacks(build_callbacks());
-        remote.push(&[branch_ref_name], Some(&mut push_opt))
+        remote
+            .push(&[branch_ref_name], Some(&mut push_opt))
             .map_err(handle_error)?;
         Ok(())
     }
 
-    pub fn pull(&self, remote: &str, branch: &str, credentials: Option<(String, String)>) -> Result<(), GitUtilsErrorCode> {
+    pub fn pull(
+        &self,
+        remote: &str,
+        branch: &str,
+        credentials: Option<(String, String)>,
+    ) -> Result<(), GitUtilsErrorCode> {
         let repo = &self.repository;
-    
+
         // 1. 获取远程引用
-        let mut remote = repo.find_remote(remote)
-            .map_err(|e| {
-                log::error!("Find remote error: {:?}", e);
-                GitUtilsErrorCode::RemoteNotFound(remote.to_string())
-            })?;
+        let mut remote = repo.find_remote(remote).map_err(|e| {
+            log::error!("Find remote error: {:?}", e);
+            GitUtilsErrorCode::RemoteNotFound(remote.to_string())
+        })?;
         // 2. 配置回调（复用已有的凭证处理逻辑）
         let callbacks = self.build_remote_credentials_cb(&credentials);
         // 3. 执行 fetch 操作
@@ -898,24 +1019,29 @@ impl GitDataProvider {
             cb
         });
         // 获取本地分支
-        let local_branch = repo.find_branch(branch, BranchType::Local)
+        let local_branch = repo
+            .find_branch(branch, BranchType::Local)
             .map_err(|_| GitUtilsErrorCode::BranchNotFound(branch.to_string()))?;
         let local_branch_ref = local_branch.into_reference();
 
         // 4. 获取FETCH_HEAD 提交
-        remote.fetch(&[local_branch_ref.name().unwrap()], Some(&mut fetch_opts), None)
-           .map_err(|e| {
-            log::error!("Fetch error: {:?}", e);
-            GitUtilsErrorCode::PushOtherError
-        })?;
+        remote
+            .fetch(
+                &[local_branch_ref.name().unwrap()],
+                Some(&mut fetch_opts),
+                None,
+            )
+            .map_err(|e| {
+                log::error!("Fetch error: {:?}", e);
+                GitUtilsErrorCode::PushOtherError
+            })?;
         let fetch_head = repo.find_reference("FETCH_HEAD")?;
         let fetch_commit = repo.reference_to_annotated_commit(&fetch_head)?;
         // 5. 执行合并操作
         let analysis = repo.merge_analysis(&[&fetch_commit])?;
         if analysis.0.is_up_to_date() {
             return Ok(());
-        }
-        else if analysis.0.is_fast_forward() {
+        } else if analysis.0.is_fast_forward() {
             let mut reference = local_branch_ref;
             /*
              * set_target 核心功能：
@@ -923,14 +1049,15 @@ impl GitDataProvider {
              * 实现快进合并：当远程分支是本地分支的直接祖先时，直接移动分支指针
              * 写入引用日志：第二个参数 "Fast-Forward" 会写入 .git/logs 中的引用日志
              */
-            let _ = reference.set_target(fetch_commit.id(), "Fast-Forward").map_err(|e| {
-                log::error!("Set target error: {:?}", e);
-                GitUtilsErrorCode::TargetReferenceNotDirect
-            })?;
+            let _ = reference
+                .set_target(fetch_commit.id(), "Fast-Forward")
+                .map_err(|e| {
+                    log::error!("Set target error: {:?}", e);
+                    GitUtilsErrorCode::TargetReferenceNotDirect
+                })?;
             repo.checkout_head(Some(CheckoutBuilder::default().force()))?;
             return Ok(());
-        }
-        else if analysis.0.is_normal() {
+        } else if analysis.0.is_normal() {
             // 创建提交的合并
             let head_commit = repo.head()?.peel_to_commit()?;
             repo.merge(&[&fetch_commit], None, None).map_err(|e| {
@@ -938,29 +1065,36 @@ impl GitDataProvider {
                 GitUtilsErrorCode::CommitBeforePullWouldBeOverwrittenByMerge
             })?;
             // 创建合并提交
-            let signature = repo.signature().map_err(|_| GitUtilsErrorCode::UserUnConfigured)?;
+            let signature = repo
+                .signature()
+                .map_err(|_| GitUtilsErrorCode::UserUnConfigured)?;
             let tree_id = repo.index()?.write_tree()?;
             let tree = repo.find_tree(tree_id)?;
-            let _ = repo.commit(
-                Some("HEAD"),
-                &signature, 
-                &signature, 
-                "Merge commit", 
-                &tree, 
-                &[&head_commit, &fetch_head.peel_to_commit()?])
+            let _ = repo
+                .commit(
+                    Some("HEAD"),
+                    &signature,
+                    &signature,
+                    "Merge commit",
+                    &tree,
+                    &[&head_commit, &fetch_head.peel_to_commit()?],
+                )
                 .map_err(|e| {
                     log::error!("Commit error: {:?}", e);
                     GitUtilsErrorCode::BuildMergeCommitError
                 })?;
-        }
-        else if analysis.0.is_none() {
+        } else if analysis.0.is_none() {
             return Err(GitUtilsErrorCode::CantPull.into());
         }
         Ok(())
     }
 
     /// 检查两个分支是否存在合并冲突
-    pub fn check_branch_conflict(&self, branch_a: impl Into<Branch>, branch_b: impl Into<Branch>) -> Result<bool, GitUtilsErrorCode> {
+    pub fn check_branch_conflict(
+        &self,
+        branch_a: impl Into<Branch>,
+        branch_b: impl Into<Branch>,
+    ) -> Result<bool, GitUtilsErrorCode> {
         let repo = &self.repository;
         let branch_a = branch_a.into();
         let branch_b = branch_b.into();
@@ -980,17 +1114,20 @@ impl GitDataProvider {
         // 执行三方合并
         let mut merge_opts = git2::MergeOptions::new();
         merge_opts.fail_on_conflict(false); // 允许继续检测冲突
-        let merged_index = repo.merge_trees(&ancestor_tree, &tree_a, &tree_b, Some(&mut merge_opts))?;
+        let merged_index =
+            repo.merge_trees(&ancestor_tree, &tree_a, &tree_b, Some(&mut merge_opts))?;
 
         // 检查冲突文件数量
         Ok(merged_index.has_conflicts())
     }
-    
+
     /// 切换分支
     pub fn switch_branch(&self, branch: &Branch) -> Result<(), GitUtilsErrorCode> {
         let staged = self.staged_files()?;
         if staged.len() > 0 {
-            return Err(GitUtilsErrorCode::OtherError("There are staged files, please commit them first".to_string())); 
+            return Err(GitUtilsErrorCode::OtherError(
+                "There are staged files, please commit them first".to_string(),
+            ));
         }
         let repo = &self.repository;
         let branch_name = branch.name.to_string();
@@ -998,8 +1135,9 @@ impl GitDataProvider {
         // 获取目标分支的树对象
         let target_commit = self.branch_commit_inner(branch)?;
         let target_tree = target_commit.tree()?;
-        let branch = repo.find_branch(&branch_name, BranchType::Local)
-           .map_err(|_| GitUtilsErrorCode::BranchNotFound(branch_name.clone()))?;
+        let branch = repo
+            .find_branch(&branch_name, BranchType::Local)
+            .map_err(|_| GitUtilsErrorCode::BranchNotFound(branch_name.clone()))?;
         let branch_ref = branch.into_reference();
         let branch_ref_name = branch_ref.name().ok_or(anyhow!(""))?;
 
@@ -1009,33 +1147,35 @@ impl GitDataProvider {
         // 比较工作区与目标分支的差异
         let diff = repo.diff_tree_to_workdir_with_index(Some(&target_tree), None)?;
         let deltas = diff.deltas();
-        
+
         // 收集冲突文件
         let mut conflicts = Vec::new();
         for delta in deltas {
             let new_file = delta.new_file();
-            
+
             if let Some(path) = new_file.path() {
                 let path = &path.to_string_lossy().into_owned();
                 // 如果冲突的文件不是工作区的修改文件，跳过
                 if !work_changed.contains(path) {
-                    continue; 
+                    continue;
                 }
                 conflicts.push(path.to_string());
             }
         }
         if conflicts.len() > 0 {
-            return Err(GitUtilsErrorCode::SwitchWillBeOverwrittenByMerge(conflicts.join("\n"))); 
+            return Err(GitUtilsErrorCode::SwitchWillBeOverwrittenByMerge(
+                conflicts.join("\n"),
+            ));
         }
         let mut blob_map = HashMap::new();
         // 获取修改的文件内容，在切换之后再恢复
         for file in work_changed {
-           let abs_path = self.blob_path(file); 
-           let blob = get_file_content(&abs_path)?;
-           blob_map.insert(abs_path, blob);
+            let abs_path = self.blob_path(file);
+            let blob = get_file_content(&abs_path)?;
+            blob_map.insert(abs_path, blob);
         }
         repo.set_head(branch_ref_name)
-          .map_err(|e| GitUtilsErrorCode::Git2Error(e))?;
+            .map_err(|e| GitUtilsErrorCode::Git2Error(e))?;
         let _ = repo.checkout_head(Some(CheckoutBuilder::default().force()));
         // 恢复修改的文件内容
         for (path, blob) in blob_map {
@@ -1045,16 +1185,22 @@ impl GitDataProvider {
     }
 
     /// 根据文件的oid获取文件的历史Oid和所在提交的oid
-    pub fn file_history(&self, file_path: String) -> Result<Vec<FileHistoryEntry>, GitUtilsErrorCode> {
+    pub fn file_history(
+        &self,
+        file_path: String,
+    ) -> Result<Vec<FileHistoryEntry>, GitUtilsErrorCode> {
         let repo = &self.repository;
         let mut cmd = Command::new("git");
         cmd.creation_flags(0x08000000);
         cmd.current_dir(self.workdir());
-        cmd.args(&["log", "--follow","--format=%H", "--", &file_path]);
+        cmd.args(&["log", "--follow", "--format=%H", "--", &file_path]);
 
         let output = cmd.output()?;
-        if!output.status.success() {
-            return Err(GitUtilsErrorCode::OtherError(format!("git log failed: {}", String::from_utf8_lossy(&output.stderr))));
+        if !output.status.success() {
+            return Err(GitUtilsErrorCode::OtherError(format!(
+                "git log failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )));
         }
         /*
          * collect 的魔法： collect::<Result<Vec<_>, _>>() 的特殊性在于，
@@ -1063,18 +1209,21 @@ impl GitDataProvider {
          * 如果遇到任何一个 Err(E)，则立即返回第一个遇到的错误
          */
         let commit_ids = String::from_utf8_lossy(&output.stdout)
-          .trim()
-          .split("\n")
-          .map(|s| str_to_oid(s))
-          .collect::<Result<Vec<_>, _>>()?;
+            .trim()
+            .split("\n")
+            .map(|s| str_to_oid(s))
+            .collect::<Result<Vec<_>, _>>()?;
         println!("commit_ids: {:?}", commit_ids.len());
         let mut history = Vec::new();
         for commit_oid in commit_ids {
             println!("commit_oid: {:?}", commit_oid);
-            let content = self.commit_content(commit_oid)?; 
+            let content = self.commit_content(commit_oid)?;
             for file in content.iter() {
                 if file.path == file_path {
-                    history.push(FileHistoryEntry::new(Commit::from_oid(commit_oid, repo)?, file.clone())); 
+                    history.push(FileHistoryEntry::new(
+                        Commit::from_oid(commit_oid, repo)?,
+                        file.clone(),
+                    ));
                 }
             }
         }
@@ -1099,12 +1248,17 @@ impl GitDataProvider {
             }
             git2::ObjectType::Tree => {
                 if tree_path.is_none() {
-                    return Err(GitUtilsErrorCode::OtherError("tree_path is not empty when the object is a tree".into()));
+                    return Err(GitUtilsErrorCode::OtherError(
+                        "tree_path is not empty when the object is a tree".into(),
+                    ));
                 }
                 (object.into_tree().unwrap(), tree_path.unwrap())
             }
             _ => {
-                return Err(GitUtilsErrorCode::OtherError(format!("Invalid Object Kind: {}", object_id)));
+                return Err(GitUtilsErrorCode::OtherError(format!(
+                    "Invalid Object Kind: {}",
+                    object_id
+                )));
             }
         };
 
@@ -1113,33 +1267,37 @@ impl GitDataProvider {
 
     /// 根据提交id获取对应的文件树，object_id所指的对象应该为tree或comit，
     /// 如果是tree，则tree_name, tree_path必填，如果是commit，则会自动变为空值
-    /// 
+    ///
     /// tree_path的格式为：arch/alpha/boot
-    pub fn get_tree_recursive(&self, object_id: Oid, tree_path: Option<String>) -> Result<fs::Dir, GitUtilsErrorCode> {
+    pub fn get_tree_recursive(
+        &self,
+        object_id: Oid,
+        tree_path: Option<String>,
+    ) -> Result<fs::Dir, GitUtilsErrorCode> {
         /*
-         * 
-            1. GIT_FILEMODE_UNREADABLE (0o000000)
-                用途：表示文件不可读。
-                场景：通常用于特殊情况，比如某些文件在 Git 的索引中被标记为不可读，可能是由于权限问题或文件损坏。
-            2. GIT_FILEMODE_TREE (0o040000)
-                用途：表示这是一个目录（tree）。
-                场景：在 Git 的树对象中，用于标识目录。Git 使用树对象来组织文件和子目录的层级结构。每个目录都有一个对应的树对象，其模式为 0o040000。
-            3. GIT_FILEMODE_BLOB (0o100644)
-                用途：表示一个普通文件（blob），并且具有默认的文件权限（只读）。
-                场景：这是最常见的文件模式，用于普通文件。文件权限为 0o644，表示所有者有读写权限，组内用户和其他用户有读权限。
-            4. GIT_FILEMODE_BLOB_GROUP_WRITABLE (0o100664)
-                用途：表示一个普通文件（blob），并且具有组可写的权限。
-                场景：这种模式较少见，通常用于需要组内用户可以修改文件的场景。文件权限为 0o664，表示所有者和组内用户有读写权限，其他用户有读权限。
-            5. GIT_FILEMODE_BLOB_EXECUTABLE (0o100755)
-                用途：表示一个可执行文件（blob）。
-                场景：用于标记可执行脚本或程序。文件权限为 0o755，表示所有者有读写执行权限，组内用户和其他用户有读执行权限。
-            6. GIT_FILEMODE_LINK (0o120000)
-                用途：表示一个符号链接（symlink）。
-                场景：符号链接是文件系统中的一个特殊文件，它指向另一个文件或目录。在 Git 中，符号链接的模式为 0o120000。
-            7. GIT_FILEMODE_COMMIT (0o160000)
-                用途：表示一个子模块（submodule）的提交对象。
-                场景：子模块是 Git 中的一个特性，允许一个仓库嵌套另一个仓库。子模块的模式为 0o160000，表示它指向一个提交对象，而不是一个普通的文件或目录。
-         */
+        *
+           1. GIT_FILEMODE_UNREADABLE (0o000000)
+               用途：表示文件不可读。
+               场景：通常用于特殊情况，比如某些文件在 Git 的索引中被标记为不可读，可能是由于权限问题或文件损坏。
+           2. GIT_FILEMODE_TREE (0o040000)
+               用途：表示这是一个目录（tree）。
+               场景：在 Git 的树对象中，用于标识目录。Git 使用树对象来组织文件和子目录的层级结构。每个目录都有一个对应的树对象，其模式为 0o040000。
+           3. GIT_FILEMODE_BLOB (0o100644)
+               用途：表示一个普通文件（blob），并且具有默认的文件权限（只读）。
+               场景：这是最常见的文件模式，用于普通文件。文件权限为 0o644，表示所有者有读写权限，组内用户和其他用户有读权限。
+           4. GIT_FILEMODE_BLOB_GROUP_WRITABLE (0o100664)
+               用途：表示一个普通文件（blob），并且具有组可写的权限。
+               场景：这种模式较少见，通常用于需要组内用户可以修改文件的场景。文件权限为 0o664，表示所有者和组内用户有读写权限，其他用户有读权限。
+           5. GIT_FILEMODE_BLOB_EXECUTABLE (0o100755)
+               用途：表示一个可执行文件（blob）。
+               场景：用于标记可执行脚本或程序。文件权限为 0o755，表示所有者有读写执行权限，组内用户和其他用户有读执行权限。
+           6. GIT_FILEMODE_LINK (0o120000)
+               用途：表示一个符号链接（symlink）。
+               场景：符号链接是文件系统中的一个特殊文件，它指向另一个文件或目录。在 Git 中，符号链接的模式为 0o120000。
+           7. GIT_FILEMODE_COMMIT (0o160000)
+               用途：表示一个子模块（submodule）的提交对象。
+               场景：子模块是 Git 中的一个特性，允许一个仓库嵌套另一个仓库。子模块的模式为 0o160000，表示它指向一个提交对象，而不是一个普通的文件或目录。
+        */
         let (tree, tree_path) = self.resolve_tree(object_id, tree_path)?;
         // let commit = self.repository.find_commit(commit_id)?;
         // let tree = commit.tree()?;
@@ -1150,13 +1308,13 @@ impl GitDataProvider {
                     dir_stack.truncate(1);
                     return dir_stack[0].as_mut();
                 } else {
-                    for i in (0..dir_stack.len()).rev(){
+                    for i in (0..dir_stack.len()).rev() {
                         let dir_path = (*dir_stack[i]).abs_path();
                         // eprintln!("dir_path: {} path: {}", dir_path, path);
                         if dir_path == path {
                             return dir_stack[i].as_mut();
                         }
-                        if i != 0{
+                        if i != 0 {
                             dir_stack.pop();
                         }
                     }
@@ -1165,8 +1323,16 @@ impl GitDataProvider {
             }
         }
         let _path = PathBuf::from(&tree_path);
-        let basename =  _path.file_name().and_then(|n| n.to_str()).unwrap_or_default().to_string();
-        let dirname = _path.parent().and_then(|n| n.to_str()).unwrap_or_default().to_string();
+        let basename = _path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default()
+            .to_string();
+        let dirname = _path
+            .parent()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default()
+            .to_string();
         let mut root = Box::new(fs::Dir::new(dirname, basename, "0".into()));
         let mut dir_stack: Vec<*mut fs::Dir> = vec![root.as_mut() as *mut fs::Dir];
         let _ = tree.walk(TreeWalkMode::PreOrder, |path, entry| {
@@ -1187,9 +1353,7 @@ impl GitDataProvider {
             let file_mode: fs::EntryMode = entry.filemode().into();
             let name = match entry.name() {
                 Some(name) => name.to_string(),
-                None => {
-                    return TreeWalkResult::Skip
-                },
+                None => return TreeWalkResult::Skip,
             };
             let obj = match entry.to_object(&self.repository) {
                 Ok(obj) => obj,
@@ -1216,7 +1380,8 @@ impl GitDataProvider {
                         Err(_) => return TreeWalkResult::Skip,
                     };
                     let size = blob.size();
-                    let file = Box::new(fs::File::new(path.into(), name, object_id, size, file_mode));
+                    let file =
+                        Box::new(fs::File::new(path.into(), name, object_id, size, file_mode));
                     parent_dir.add(fs::FsNode::File(*file));
                 }
             } else {
@@ -1230,18 +1395,30 @@ impl GitDataProvider {
 
     /// 根据提交获取根节点树(只获取一级)，object_id所指的对象应该为tree或comit，
     /// 如果是tree，则tree_name, tree_path必填，如果是commit，则会自动变为空值
-    pub fn get_tree(&self, object_id: Oid, tree_path: Option<String>) -> Result<fs::Dir, GitUtilsErrorCode> {
+    pub fn get_tree(
+        &self,
+        object_id: Oid,
+        tree_path: Option<String>,
+    ) -> Result<fs::Dir, GitUtilsErrorCode> {
         let (tree, tree_path) = self.resolve_tree(object_id, tree_path)?;
         let _path = PathBuf::from(&tree_path);
-        let basename =  _path.file_name().and_then(|n| n.to_str()).unwrap_or_default().to_string();
-        let dirname = _path.parent().and_then(|n| n.to_str()).unwrap_or_default().to_string();
+        let basename = _path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default()
+            .to_string();
+        let dirname = _path
+            .parent()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default()
+            .to_string();
         let mut root = fs::Dir::new(dirname, basename, "0".into());
         for entry in tree.iter() {
             let name = match entry.name() {
                 Some(name) => name.to_string(),
                 None => {
                     continue;
-                },
+                }
             };
             let entry_mode: fs::EntryMode = entry.filemode().into();
             let obj = match entry.to_object(&self.repository) {
@@ -1267,5 +1444,13 @@ impl GitDataProvider {
 
     pub fn blob_is_binary(&self, object_id: Oid) -> Result<bool, GitUtilsErrorCode> {
         Ok(object_is_binary(object_id, &self.repository))
+    }
+
+    pub fn save_blob(&self, object_id: Oid, path: &str) -> Result<(), GitUtilsErrorCode> {
+        let repo = &self.repository;
+        let blob = repo.find_blob(object_id)?;
+        let content = blob.content();
+        std::fs::write(path, content)?;
+        Ok(())
     }
 }

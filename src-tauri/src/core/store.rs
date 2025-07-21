@@ -111,14 +111,15 @@ impl GitStore {
         let conn = conn_db(self.path.clone()).unwrap();
         conn.query_row("SELECT * FROM repository where path = ?", [path], |row| {
             Ok(Repository {
-                    id: row.get(0)?,
-                    path: row.get(1)?,
-                    alias: row.get(2)?,
-                    has_watch: row.get(3)?,
-                    order: row.get(4)?,
-                    top: row.get(5)?,
-                })
-        }).ok()
+                id: row.get(0)?,
+                path: row.get(1)?,
+                alias: row.get(2)?,
+                has_watch: row.get(3)?,
+                order: row.get(4)?,
+                top: row.get(5)?,
+            })
+        })
+        .ok()
     }
 
     pub fn update_repo(&self, repo: store::Repository) -> Result<(), String> {

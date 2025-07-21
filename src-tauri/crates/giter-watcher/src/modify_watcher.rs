@@ -1,10 +1,10 @@
-use notify::{Config, Event, RecommendedWatcher, Watcher};
 use dashmap::DashMap;
+use notify::{Config, Event, RecommendedWatcher, Watcher};
 use parking_lot::RwLock;
 use std::path::PathBuf;
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     Arc,
+    atomic::{AtomicUsize, Ordering},
 };
 use std::time::Duration;
 
@@ -70,7 +70,8 @@ impl ModifyWatcher {
         if !repos.contains(&path) {
             repos.push(path.clone());
             if let Some(watcher) = &mut self.watcher {
-                watcher.watch(&path, notify::RecursiveMode::Recursive)
+                watcher
+                    .watch(&path, notify::RecursiveMode::Recursive)
                     .map_err(|e| WatcherErrorCode::AddWatcherFailed(e.to_string()))?;
             }
         }
@@ -83,7 +84,9 @@ impl ModifyWatcher {
         if let Some(index) = repos.iter().position(|x| x == &path) {
             repos.remove(index);
             if let Some(watcher) = &mut self.watcher {
-                watcher.unwatch(&path).map_err(|e| WatcherErrorCode::RemoveWatcherFailed(e.to_string()))?;
+                watcher
+                    .unwatch(&path)
+                    .map_err(|e| WatcherErrorCode::RemoveWatcherFailed(e.to_string()))?;
             }
         }
         Ok(())

@@ -6,21 +6,27 @@ mod utils;
 
 use std::collections::HashMap;
 
-use crate::{cmd::{get_commit_tree_recursive, get_repo_by_path, get_tree, object_is_binary}, utils::resolve};
+use crate::{
+    cmd::{get_commit_tree_recursive, get_repo_by_path, get_tree, object_is_binary, save_blob},
+    utils::resolve,
+};
 use cmd::{
-    add_to_stage, add_watch, authors, before_reference_commits_count, blob_content, branch_commits, branches, checkout_file, commit, commit_content, create_window, current_branch, current_remote_branch, file_diff, file_history, get_branch_commit_contribution, get_changed_files, get_commit, get_db_path, get_driver, get_folders, get_global_author, get_repo_author, get_separator, get_staged_files, is_repo, pull, push, reference_commit_filter_count, reference_commit_filter_details, remove_from_stage, remove_watch, repos, set_repo_ownership, switch_branch, work_status
+    add_to_stage, add_watch, authors, before_reference_commits_count, blob_content, branch_commits,
+    branches, checkout_file, commit, commit_content, create_window, current_branch,
+    current_remote_branch, file_diff, file_history, get_branch_commit_contribution,
+    get_changed_files, get_commit, get_db_path, get_driver, get_folders, get_global_author,
+    get_repo_author, get_separator, get_staged_files, is_repo, pull, push,
+    reference_commit_filter_count, reference_commit_filter_details, remove_from_stage,
+    remove_watch, repos, set_repo_ownership, switch_branch, work_status,
 };
 use parking_lot::RwLock;
 use types::cache::RepoPath;
-pub struct SingleRepoSubmit (RwLock<HashMap<String, i32>>);
-
+pub struct SingleRepoSubmit(RwLock<HashMap<String, i32>>);
 
 #[tauri::command]
 fn repo_single_submit(repo: RepoPath, state: tauri::State<SingleRepoSubmit>) {
     let mut map = state.inner().0.write();
-    map.entry(repo)
-        .and_modify(|v| *v += 1)
-        .or_insert(0);
+    map.entry(repo).and_modify(|v| *v += 1).or_insert(0);
 }
 
 #[tauri::command]
@@ -37,21 +43,23 @@ fn repo_single_unsubmit(repo: RepoPath, state: tauri::State<SingleRepoSubmit>) {
 
 #[cfg(debug_assertions)]
 fn prevent_default() -> tauri::plugin::TauriPlugin<tauri::Wry> {
-  use tauri_plugin_prevent_default::Flags;
+    use tauri_plugin_prevent_default::Flags;
 
-  tauri_plugin_prevent_default::Builder::new()
-    .with_flags(Flags::all().difference(Flags::DEV_TOOLS | Flags::RELOAD))
-    .build()
+    tauri_plugin_prevent_default::Builder::new()
+        .with_flags(Flags::all().difference(Flags::DEV_TOOLS | Flags::RELOAD))
+        .build()
 }
 
 #[cfg(not(debug_assertions))]
 fn prevent_default() -> tauri::plugin::TauriPlugin<tauri::Wry> {
-  tauri_plugin_prevent_default::init()
+    tauri_plugin_prevent_default::init()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .manage(SingleRepoSubmit(RwLock::new(HashMap::new())))
         .plugin(prevent_default())
         .plugin(tauri_plugin_shell::init())
@@ -109,7 +117,8 @@ pub fn run() {
             get_commit_tree_recursive,
             get_tree,
             object_is_binary,
-            get_repo_by_path
+            get_repo_by_path,
+            save_blob
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

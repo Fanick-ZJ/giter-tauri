@@ -1,12 +1,10 @@
 use std::collections::HashMap;
 
+use super::{
+    author::Author, contribution::CommitStatistic, credential::Credential, file::FileHistoryEntry,
+};
 use crate::types::branch::Branch;
 use git2::Oid;
-use super::{
-    author::Author,
-    contribution::CommitStatistic, 
-    credential::Credential, file::FileHistoryEntry
-};
 
 pub trait Cache {
     fn authors(&self, repo: &str) -> Option<Vec<Author>>;
@@ -16,8 +14,12 @@ pub trait Cache {
     fn branch_authors(&self, repo: &str, branch: &Branch) -> Option<(Vec<Author>, Oid)>;
 
     /// 获取分支的贡献者统计
-    /// 
-    fn branch_contribution(&self, repo: &str, branch: &Branch) -> Option<(HashMap<String, CommitStatistic>, Oid)>;
+    ///
+    fn branch_contribution(
+        &self,
+        repo: &str,
+        branch: &Branch,
+    ) -> Option<(HashMap<String, CommitStatistic>, Oid)>;
 
     fn set_branch_contribution(
         &mut self,

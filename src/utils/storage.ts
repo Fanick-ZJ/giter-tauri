@@ -20,3 +20,17 @@ export const get_cache_db = async () => {
 export const get_config_db = async () => {
   return get_db('config')
 }
+
+export const setLocalStage = async (key: string, value: string) => {
+  window.localStorage.setItem(key, value)
+}
+
+export const LOCAL_STORAGE_DICT = {
+  LAST_SAVE_PATH: 'LAST_SAVE_PATH',
+}
+export const getLocalStage = (key: keyof typeof LOCAL_STORAGE_DICT) => {
+
+  return window.localStorage.getItem(LOCAL_STORAGE_DICT[key])
+}
+
+getLocalStage('LAST_SAVE_PATH')

@@ -22,7 +22,7 @@ macro_rules! make_serializable {
           {
               // 引入trait到作用域
               use serde::ser::SerializeStruct;
-              
+
               let mut s = serializer.serialize_struct(stringify!($enum_name), 1)?;
               match self {
                   $(

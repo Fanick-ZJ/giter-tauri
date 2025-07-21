@@ -1,11 +1,11 @@
+extern crate dashmap;
+extern crate giter_traits;
 extern crate log;
 extern crate notify;
 extern crate parking_lot;
-extern crate dashmap;
 extern crate rayon;
-extern crate giter_traits;
 extern crate strum;
 extern crate strum_macros;
 extern crate thiserror;
-pub mod modify_watcher;
 pub mod error;
+pub mod modify_watcher;

@@ -1,6 +1,14 @@
-use std::{fs::File, io::Write, path::{Path, PathBuf}, time};
+use std::{
+    fs::File,
+    io::Write,
+    path::{Path, PathBuf},
+    time,
+};
 
-use giter_utils::{types::{error::GitUtilsErrorCode, git_data_provider::GitDataProvider}, util::str_to_oid};
+use giter_utils::{
+    types::{error::GitUtilsErrorCode, git_data_provider::GitDataProvider},
+    util::str_to_oid,
+};
 use serde_json::{json, to_string_pretty};
 
 #[test]

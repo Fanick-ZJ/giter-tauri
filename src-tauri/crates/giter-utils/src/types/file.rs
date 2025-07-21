@@ -1,10 +1,13 @@
-use std::{fmt, path::{Path, PathBuf}};
+use std::{
+    fmt,
+    path::{Path, PathBuf},
+};
 
 use git2::Oid;
 use serde::{
+    Deserialize, Deserializer, Serialize,
     de::{Error as DeError, Visitor},
     ser::SerializeStruct,
-    Deserialize, Deserializer, Serialize
 };
 
 use super::{commit::Commit, status::FileStatus};
@@ -58,12 +61,11 @@ impl Folder {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct UntrackedFile {
     pub path: Box<Path>,
     pub size: usize,
-    pub is_binary: bool
+    pub is_binary: bool,
 }
 
 impl UntrackedFile {
@@ -72,7 +74,7 @@ impl UntrackedFile {
         Self {
             path: path_buf.into_boxed_path(),
             size,
-            is_binary
+            is_binary,
         }
     }
 }
@@ -113,7 +115,10 @@ impl<'de> Deserialize<'de> for UntrackedFile {
 
                 while let Some(key) = map.next_key()? {
                     match key {
-                        "path" => path = Some(PathBuf::from(map.next_value::<String>()?).into_boxed_path()),
+                        "path" => {
+                            path =
+                                Some(PathBuf::from(map.next_value::<String>()?).into_boxed_path())
+                        }
                         "size" => size = Some(map.next_value()?),
                         "isBinary" => is_binary = Some(map.next_value()?),
                         _ => (),
@@ -128,18 +133,11 @@ impl<'de> Deserialize<'de> for UntrackedFile {
             }
         }
 
-        const FIELDS: &[&str] = &[
-            "path",
-            "size",
-            "isBinary",
-        ];
+        const FIELDS: &[&str] = &["path", "size", "isBinary"];
 
         deserializer.deserialize_struct("UntrackedFile", FIELDS, UntrackedFileVisitor)
     }
 }
- 
-
-
 
 #[derive(Debug, Clone)]
 pub struct ChangedFile {
@@ -149,11 +147,7 @@ pub struct ChangedFile {
 }
 
 impl ChangedFile {
-    pub fn new<T: AsRef<Path>>(
-        path: T,
-        prev_object_id: Oid,
-        status: FileStatus,
-    ) -> Self {
+    pub fn new<T: AsRef<Path>>(path: T, prev_object_id: Oid, status: FileStatus) -> Self {
         let path_buf = path.as_ref().to_path_buf();
         Self {
             path: path_buf.into_boxed_path(),
@@ -176,13 +170,11 @@ impl Serialize for ChangedFile {
     }
 }
 
-
-
 #[derive(Debug, Clone)]
 pub struct FileHistoryEntry {
     /// 文件在该提交中的状态
     pub file: CommittedFile,
-    pub commit: Commit
+    pub commit: Commit,
 }
 
 impl Serialize for FileHistoryEntry {
@@ -191,10 +183,10 @@ impl Serialize for FileHistoryEntry {
         S: serde::Serializer,
     {
         let mut s = serializer.serialize_struct("FileHistoryEntry", 2)?;
-        s.serialize_field("commit", &self.commit)?; 
+        s.serialize_field("commit", &self.commit)?;
         s.serialize_field("file", &self.file)?;
         s.end()
-    } 
+    }
 }
 
 impl<'de> Deserialize<'de> for FileHistoryEntry {
@@ -233,26 +225,14 @@ impl<'de> Deserialize<'de> for FileHistoryEntry {
             }
         }
 
-        const FIELDS: &[&str] = &[
-            "commitId",
-            "file",
-            "commitDate",
-            "author",
-            "message",
-        ];
+        const FIELDS: &[&str] = &["commitId", "file", "commitDate", "author", "message"];
 
         deserializer.deserialize_struct("FileHistory", FIELDS, CommitVisitor)
     }
 }
 
 impl FileHistoryEntry {
-    pub fn new(
-        commit: Commit,
-        file: CommittedFile,
-    ) -> Self {
-        Self {
-            commit,
-            file,
-        }
+    pub fn new(commit: Commit, file: CommittedFile) -> Self {
+        Self { commit, file }
     }
 }

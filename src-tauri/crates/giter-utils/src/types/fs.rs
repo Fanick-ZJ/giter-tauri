@@ -1,7 +1,7 @@
 use serde::Serialize;
 
 #[derive(Serialize, Debug, PartialEq)]
-#[serde(transparent)]   // 或者 `untagged` 也行，因为只有一个字段
+#[serde(transparent)] // 或者 `untagged` 也行，因为只有一个字段
 pub struct EntryMode(u32);
 
 impl EntryMode {
@@ -24,8 +24,8 @@ impl From<i32> for EntryMode {
             0o100755 => EntryMode::BLOB_EXECUTABLE,
             0o120000 => EntryMode::LINK,
             0o160000 => EntryMode::COMMIT,
-            _ => EntryMode::UNREADABLE
-        }
+            _ => EntryMode::UNREADABLE,
+        };
     }
 }
 
@@ -55,13 +55,19 @@ pub struct Dir {
 pub enum FsNode {
     #[serde(rename = "file")]
     File(File), // 展开文件内容
-    
+
     #[serde(rename = "dir")]
-    Dir(Dir),   // 展开目录内容
+    Dir(Dir), // 展开目录内容
 }
 
 impl File {
-    pub fn new(path: String, name: String, object_id: String, size: usize, mode: EntryMode) -> Self {
+    pub fn new(
+        path: String,
+        name: String,
+        object_id: String,
+        size: usize,
+        mode: EntryMode,
+    ) -> Self {
         let path = if path.ends_with("/") {
             path[0..path.len() - 1].to_string()
         } else {
@@ -73,7 +79,7 @@ impl File {
             metadata: EntryMetadata {
                 size,
                 object_id,
-                mode
+                mode,
             },
         }
     }
@@ -92,7 +98,11 @@ impl Dir {
             path,
             name,
             children: Vec::new(),
-            metadata: EntryMetadata { size: 0, mode: EntryMode::TREE, object_id }
+            metadata: EntryMetadata {
+                size: 0,
+                mode: EntryMode::TREE,
+                object_id,
+            },
         }
     }
     pub fn get_children_mut(&mut self) -> &mut Vec<FsNode> {
@@ -102,9 +112,9 @@ impl Dir {
     pub fn abs_path(&self) -> String {
         if self.path.is_empty() {
             if self.name.is_empty() {
-                return "".into()
+                return "".into();
             } else {
-                return format!("{}/", self.name)
+                return format!("{}/", self.name);
             }
         } else {
             format!("{}/{}/", self.path, self.name)
