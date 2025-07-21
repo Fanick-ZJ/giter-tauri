@@ -9,10 +9,6 @@ defineOptions({
   name: 'RepoHome'
 })
 
-// 在window上挂在一个message对象实例，方便使用
-window.$message = useMessage()
-window.$notification = useNotification()
-
 const headerRef = useTemplateRef('headerRef')
 </script>
 

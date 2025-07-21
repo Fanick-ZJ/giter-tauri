@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { NFlex, useMessage } from 'naive-ui'
+import { NFlex, useMessage, useNotification } from 'naive-ui'
 import { EXPAND_MIN_WIDTH, MIN_HEIGHT, REPOLIST_MAX_WIDTH, REPOLIST_WIDTH } from '@/const'
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window'
 import { nextTick, onMounted, provide, ref, StyleValue } from 'vue'
@@ -11,6 +11,7 @@ import { useRepoStore } from '@/store/modules/repo'
 const homeRef = ref<InstanceType<typeof RepoHome>>()
 // 在window上挂在一个message对象实例，方便使用
 window.$message = useMessage()
+window.$notification = useNotification()
 
 const isExtend = ref(false)
 const homeStyle = ref<StyleValue>()

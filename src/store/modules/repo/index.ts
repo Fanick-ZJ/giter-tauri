@@ -89,6 +89,21 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
     return 0;
   }
 
+  const defaultSort = () => {
+    repos.value = repos.value.sort(repoSort)
+  }
+
+  const sortByStatus = () => {
+    repos.value = repos.value.sort((a, b) => {
+      // 按状态排序
+      const aStatus = status.get(a.path)?.value || RepoStatus.Ok
+      const bStatus = status.get(b.path)?.value || RepoStatus.Ok
+      if (aStatus < bStatus) return 1
+      else if (aStatus > bStatus) return -1
+      else return repoSort(a, b)
+    })
+  }
+
   const init_repo = async () => {
     const __repos = await readRepos()
     // 1. 立即初始化空列表并标记加载状态，避免白屏
@@ -104,7 +119,6 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
 
     // 4. 等待所有初始化完成（可选，用于后续操作）
     await Promise.all(initPromises)
-    repos.value.sort(repoSort)
   }
 
   // 添加仓库
@@ -167,6 +181,8 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
     update,
     getRepoByPath,
     getRepoById,
-    remove
+    remove,
+    sortByStatus,
+    defaultSort
   }
 })

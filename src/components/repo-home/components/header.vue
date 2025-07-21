@@ -4,7 +4,7 @@ import { useRepoStore } from "@/store/modules/repo";
 import { useNotificationStore } from "@/store/modules/notification";
 import { Repository } from "@/types";
 import { Icon } from "@iconify/vue";
-import { NButton, NModal, NBadge, NFlex, NCard } from 'naive-ui'
+import { NButton, NModal, NBadge, NFlex, NCard, NTooltip } from 'naive-ui'
 import { computed, ref } from "vue";
 import { createNofication } from "./notification";
 import { isRepo } from "@/utils/command";
@@ -63,6 +63,20 @@ const showFilter = () => {
   filterShow.value = !filterShow.value
 }
 
+const sortStatusClick = ref(false)
+const sortIcon = computed(() => {
+  return sortStatusClick.value? 'eos-icons:content-modified' : 'garden:sort-fill-12'
+})
+const sortByStatus = () => {
+  sortStatusClick.value = !sortStatusClick.value
+  if (sortStatusClick.value) {
+    repoStore.sortByStatus()
+  } else {
+    repoStore.defaultSort()
+  }
+}
+
+
 const handleFilter = (model: FilterModel) => {
   filterModel.value = model
   filterShow.value = false 
@@ -98,6 +112,16 @@ defineExpose({
           <Icon icon="lets-icons:message-alt-duotone" width="24" height="24"  color="gray"/>
         </NBadge>
       </NButton>  
+      <NTooltip>
+        <template #trigger>
+          <NButton quaternary circle @click="sortByStatus">
+            <template #icon>
+              <Icon :icon="sortIcon" width="24" height="24" />
+            </template>
+          </NButton>
+        </template>
+        按状态排序
+      </NTooltip>
       <NButton quaternary circle @click="showFilter">
         <template #icon>
           <Icon icon="line-md:filter" width="30" height="30" color="gray"/>
