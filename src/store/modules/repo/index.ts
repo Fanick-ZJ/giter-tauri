@@ -13,6 +13,7 @@ export type ValidRepository = Repository & { valid: boolean; loading: boolean }
 export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
   const repos = ref<ValidRepository[]>([])
   const status: Map<RepoPath, Ref<RepoStatus>> = new Map()
+  const _status_change_cbs: Function[] = []
 
   // 工具函数：验证仓库有效性（独立可复用，带明确类型）
   const validateRepo = async (path: string): Promise<boolean> => {
@@ -138,6 +139,7 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
     const { path, status } = event.payload as { path: string, status: RepoStatus }
     console.log('status change', path, status)
     setStatus(path, status)
+    _status_change_cbs.forEach((cb) => cb(path, status))
   })
 
 
@@ -173,10 +175,20 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
     repos.value.splice(index, 1)
   }
 
+  const addStatusChangeCb = (cb: Function) => {
+    _status_change_cbs.push(cb)
+    return () => {
+      const index = _status_change_cbs.findIndex((c) => c === cb)
+      if (index == -1) return
+      _status_change_cbs.splice(index, 1)
+    }
+  }
+
   return {
     init_repo,
     repos,
     add,
+    addStatusChangeCb,
     status,
     update,
     getRepoByPath,

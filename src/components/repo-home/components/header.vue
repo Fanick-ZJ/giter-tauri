@@ -5,7 +5,7 @@ import { useNotificationStore } from "@/store/modules/notification";
 import { Repository } from "@/types";
 import { Icon } from "@iconify/vue";
 import { NButton, NModal, NBadge, NFlex, NCard, NTooltip } from 'naive-ui'
-import { computed, ref } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import { createNofication } from "./notification";
 import { isRepo } from "@/utils/command";
 import { defaultRepository } from "@/types/util";
@@ -75,6 +75,17 @@ const sortByStatus = () => {
     repoStore.defaultSort()
   }
 }
+
+const cancelStatusChangedCb = repoStore.addStatusChangeCb((path, status) => {
+  if (sortStatusClick.value) {
+    repoStore.sortByStatus()
+  }
+})
+
+onUnmounted(() => {
+  cancelStatusChangedCb()
+})
+
 
 
 const handleFilter = (model: FilterModel) => {
