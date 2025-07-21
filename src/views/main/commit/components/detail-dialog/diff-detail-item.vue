@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, nextTick, onBeforeUnmount, PropType, Ref, ref, shallowRef, watch } from 'vue';
+import { computed, CSSProperties, inject, nextTick, onBeforeUnmount, PropType, Ref, ref, shallowRef, watch } from 'vue';
 import { DiffContent, CommitFile } from '@/types';
 import { Icon } from '@iconify/vue';
 import { NCard, NWatermark, NFlex, NButton, useDialog } from 'naive-ui';
@@ -243,10 +243,21 @@ const applyEditorStyle = () => {
   return decorations
 }
 
+const headerStyle = computed<CSSProperties>(() => {
+  return {
+    position: 'sticky', 
+    top: '-1px', 
+    zIndex: 5, 
+    backgroundColor: themeStore.isDark 
+      ? 'rgba(24, 24, 28, 0.9)' 
+      : 'rgba(255, 255, 255, 0.9)' 
+  }
+})
+
 </script>
 
 <template>
-  <NCard :header-style="{ position: 'sticky', top: '-1px', zIndex: 3 }">
+  <NCard :header-style="headerStyle">
     <template #header>
       <div>
         {{ file.path }}
