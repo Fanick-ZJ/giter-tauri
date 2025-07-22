@@ -1,6 +1,7 @@
+use git2::FileMode;
 use serde::Serialize;
 
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Debug, PartialEq, Clone)]
 #[serde(transparent)] // 或者 `untagged` 也行，因为只有一个字段
 pub struct EntryMode(u32);
 
@@ -26,6 +27,21 @@ impl From<i32> for EntryMode {
             0o160000 => EntryMode::COMMIT,
             _ => EntryMode::UNREADABLE,
         };
+    }
+}
+
+impl From<FileMode> for EntryMode {
+    fn from(value: FileMode) -> Self {
+        let entry_mode = match value {
+            FileMode::Blob => EntryMode::BLOB,
+            FileMode::BlobExecutable => EntryMode::BLOB_EXECUTABLE,
+            FileMode::Link => EntryMode::LINK,
+            FileMode::Commit => EntryMode::COMMIT,
+            FileMode::Tree => EntryMode::TREE,
+            FileMode::Unreadable => EntryMode::UNREADABLE,
+            FileMode::BlobGroupWritable => EntryMode::BLOB_GROUP_WRITABLE,
+        };
+        entry_mode
     }
 }
 

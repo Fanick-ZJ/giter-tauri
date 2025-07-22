@@ -22,7 +22,7 @@ export enum FileStatus {
   Ok = 'Ok',
 }
 
-export enum TreeFileMode {
+export enum EntryMode {
   Unreadable = 0o000000,
   Tree = 0o040000,
   Blob = 0o100644,

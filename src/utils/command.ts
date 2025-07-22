@@ -1,7 +1,6 @@
-import { ADD_WATCH, BLOB_CONTENT, COMMIT_CONTENT, FILE_DIFF, GET_AUTHORS, GET_BRANCHES, GET_COMMIT, GET_BRANCH_COMMITS, GET_CURRENT_BRANCH, GET_DRIVER, GET_FOLDERS, GET_SEPARATOR, IS_REPO, REMOVE_WATCH, SET_OWNERSHIP, WORK_STATUS, BRANCH_COMMIT_CONTRIBUTION, GET_GLOBAL_AUTHOR, GET_REPO_AUTHOR, GET_BRANCH_COMMITS_AFTER_FILTER, GET_CHANGED_FILES, GET_STAFED_FILES, ADD_TO_STAGE, REMOVE_FROM_STAGE, CHECKOUT_FILE, COMMIT, CURRENT_REMOTE_BRANCH, PUSH, PULL, SWITCH_BRANCH, REPO_SINGLE_SUBMIT, REPO_SINGLE_UNSUBMIT, FILE_HISTORY, BEFORE_REFERENCE_COMMITS_COUNT, REFERENCE_COMMIT_FILTER_DETAILS, REFERENCE_COMMIT_FILTER_COUNT, GET_COMMIT_TREE_RECURSIVE, GET_TREE, OBJECT_IS_BINARY, GET_REPO_BY_PATH, SAVE_BLOB } from "@/const/command";
 import { BRANCH_COMMIT_CONTRIBUTION_KEY, SINGLE_REPO_EMIT } from "@/const/listen";
 import { RepoStatus } from "@/enum";
-import { Author, Branch, Commit, CommitFilter, CommitStatistic, DiffContent, CommitFile, ChangedFile, FileHistoryItem, TreeDir, Repository } from "@/types";
+import { Author, Branch, Commit, CommitFilter, CommitStatistic, DiffContent, CommitEntry, ChangedFile, FileHistoryItem, TreeDir, Repository } from "@/types";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -88,80 +87,80 @@ class InvokeBus {
 type RepoPath = string
 const bus = InvokeBus.getInstance()
 export const addWatch = (repo: RepoPath) => {
-  return bus.invoke(ADD_WATCH, { repo });
+  return bus.invoke('add_watch', { repo });
 }
 
 export const getDriver = () => {
-  return bus.invoke(GET_DRIVER); 
+  return bus.invoke('get_driver'); 
 }
 
 export const getSeparator = () => {
-  return bus.invoke(GET_SEPARATOR);
+  return bus.invoke('get_separator');
 }
 
 export const getFolders = (path: string) => {
-  return bus.invoke(GET_FOLDERS, { path });
+  return bus.invoke('get_folders', { path });
 }
 
 export const isRepo = (repo: RepoPath): Promise<boolean> => {
-  return bus.invoke(IS_REPO, { repo });
+  return bus.invoke('is_repo', { repo });
 }
 
 export const workStatus = (repo: RepoPath) => {
-  return bus.invoke<RepoStatus>(WORK_STATUS, { repo })
+  return bus.invoke<RepoStatus>('work_status', { repo })
 }
 
 export const setOwnership = (repo: RepoPath) => {
-  return bus.invoke(SET_OWNERSHIP, { repo }) 
+  return bus.invoke('set_repo_ownership', { repo }) 
 }
 
 export const removeWatch = (repo: RepoPath) => {
-  return bus.invoke(REMOVE_WATCH , { repo })
+  return bus.invoke('remove_watch' , { repo })
 }
 
 export const getBranches = (repo: RepoPath) => {
-  const branches = bus.invoke<Branch[]>(GET_BRANCHES, { repo })
+  const branches = bus.invoke<Branch[]>('branches', { repo })
   return branches
 }
 
 export const getCurrentBranch = (repo: RepoPath) : Promise<Branch> => {
-  return bus.invoke<Branch>(GET_CURRENT_BRANCH, { repo })
+  return bus.invoke<Branch>('current_branch', { repo })
 }
 
 export const getBranchCommits = (repo: RepoPath, branch: Branch, count: Number) => {
-  return bus.invoke<Commit[]>(GET_BRANCH_COMMITS, { repo, branch, count }) 
+  return bus.invoke<Commit[]>('branch_commits', { repo, branch, count }) 
 }
 
 export const beforeReferenceCommitsCount = (repo: RepoPath, reference: string) => {
-  return bus.invoke<number>(BEFORE_REFERENCE_COMMITS_COUNT, { repo, reference }) 
+  return bus.invoke<number>('before_reference_commits_count', { repo, reference }) 
 }
 
 export const reference_commit_filter_details = (repo: RepoPath, reference: string, filter: CommitFilter, offset?: number, count?: number) => {
-  return bus.invoke<Commit[]>(REFERENCE_COMMIT_FILTER_DETAILS, { repo, reference, filter, offset, count}) 
+  return bus.invoke<Commit[]>('reference_commit_filter_details', { repo, reference, filter, offset, count}) 
 }
 
 export const reference_commit_filter_count = (repo: RepoPath, reference: string, filter: CommitFilter, offset?: number, count?: number) => {
-  return bus.invoke<number>(REFERENCE_COMMIT_FILTER_COUNT, { repo, reference, filter, offset, count  }) 
+  return bus.invoke<number>('reference_commit_filter_count', { repo, reference, filter, offset, count  }) 
 }
 
 export const getAuthors = (repo: RepoPath, branch: Branch) => {
-  return bus.invoke<Author[]>(GET_AUTHORS, { repo, branch }) 
+  return bus.invoke<Author[]>('authors', { repo, branch }) 
 }
 
 export const commitContent = (repo: RepoPath, cid: string) => {
-  return bus.invoke<CommitFile[]>(COMMIT_CONTENT, { repo, cid })
+  return bus.invoke<CommitEntry[]>('commit_content', { repo, cid })
 }
 
 export const getCommit = (repo: RepoPath, cid: string) => {
-  return bus.invoke<Commit>(GET_COMMIT, { repo, cid})
+  return bus.invoke<Commit>('get_commit', { repo, cid})
 }
 
 export const fileDiff = (repo: RepoPath, old_id: string, new_id: string) => {
-  return bus.invoke<DiffContent>(FILE_DIFF, { repo, old: old_id, 'new': new_id })
+  return bus.invoke<DiffContent>('file_diff', { repo, old: old_id, 'new': new_id })
 }
 
 export const getBlobContent = (repo: RepoPath, cid: String) => {
-  return bus.invoke<number[]>(BLOB_CONTENT, { repo, cid })
+  return bus.invoke<number[]>('blob_content', { repo, cid })
 }
 
 export const getBranchCommitContribution = (repo: RepoPath, branch: Branch): Promise<CommitStatistic[]> => {
@@ -176,59 +175,59 @@ export const getBranchCommitContribution = (repo: RepoPath, branch: Branch): Pro
         unsub() 
       })
     })
-    bus.invoke(BRANCH_COMMIT_CONTRIBUTION, { key, repo, branch }) 
+    bus.invoke('get_branch_commit_contribution', { key, repo, branch }) 
   })
 }
 
 export const getGlobalAuthor = () => {
-  return bus.invoke<Author>(GET_GLOBAL_AUTHOR)
+  return bus.invoke<Author>('get_global_author')
 }
 
 export const getRepoAuthor = (repo: RepoPath) => {
-  return bus.invoke<Author>(GET_REPO_AUTHOR, { repo })  
+  return bus.invoke<Author>('get_repo_author', { repo })  
 }
 
 export const getBranchCommitsAfterFilter = (repo: RepoPath, branch: Branch, filter: CommitFilter) => {
-  return bus.invoke<Commit[]>(GET_BRANCH_COMMITS_AFTER_FILTER, { repo, branch, filter })
+  return bus.invoke<Commit[]>('get_branch_commits_after_filter', { repo, branch, filter })
 }
 
 export const getChangedFiles = (repo: RepoPath) => {
-  return bus.invoke<ChangedFile[]>(GET_CHANGED_FILES, { repo }) 
+  return bus.invoke<ChangedFile[]>('get_changed_files', { repo }) 
 }
 
 export const getStagedFiles = (repo: RepoPath) => {
-  return bus.invoke<ChangedFile[]>(GET_STAFED_FILES, { repo }) 
+  return bus.invoke<ChangedFile[]>('get_staged_files', { repo }) 
 }
 
 export const addFileToStage = (repo: RepoPath, path: string) => {
-  return bus.invoke(ADD_TO_STAGE, { repo, path }) 
+  return bus.invoke('add_to_stage', { repo, path }) 
 }
 
 export const removeFileFromStage = (repo: RepoPath, path: string) => {
-  return bus.invoke(REMOVE_FROM_STAGE, { repo, path }) 
+  return bus.invoke('remove_from_stage', { repo, path }) 
 }
 
 export const checkoutFile = (repo: RepoPath, path: string) => {
-  return bus.invoke(CHECKOUT_FILE, { repo, path }) 
+  return bus.invoke('checkout_file', { repo, path }) 
 }
 
 export const commit = (repo: RepoPath, message: string, update_ref: string | undefined) => {
-  return bus.invoke(COMMIT, { repo, message, update_ref }) 
+  return bus.invoke('commit', { repo, message, update_ref }) 
 }
 
 export const currentRemoteBranch = (repo: RepoPath) => {
-  return bus.invoke<Branch>(CURRENT_REMOTE_BRANCH, { repo })
+  return bus.invoke<Branch>('current_remote_branch', { repo })
 }
 
 export const push = (repo: RepoPath, remote: string, branch: string, credentials:[string, String] | undefined) => {
-  return bus.invoke(PUSH, { repo, remote, branch, credentials }) 
+  return bus.invoke('push', { repo, remote, branch, credentials }) 
 }
 export const pull = (repo: RepoPath, remote: string, branch: string, credentials:[string, String] | undefined) => {
-  return bus.invoke(PULL, { repo, remote, branch, credentials }) 
+  return bus.invoke('pull', { repo, remote, branch, credentials }) 
 }
 
 export const switchBranch = (repo: RepoPath, branch: Branch) => {
-  return bus.invoke(SWITCH_BRANCH, { repo, branch })
+  return bus.invoke('switch_branch', { repo, branch })
 }
 
 /**
@@ -237,7 +236,7 @@ export const switchBranch = (repo: RepoPath, branch: Branch) => {
  * @returns 
  */
 export const singleRepoSubmit = (repo: RepoPath, cb: () => void) => {
-  bus.invoke(REPO_SINGLE_SUBMIT, { repo })
+  bus.invoke('repo_single_submit', { repo })
   console.log(repo)
   let url = `${SINGLE_REPO_EMIT}:${repo.replace(/\\/g, '/')}`
   console.log(url)
@@ -245,7 +244,7 @@ export const singleRepoSubmit = (repo: RepoPath, cb: () => void) => {
     cb()
   })
   let unsubmit = () => {
-    bus.invoke(REPO_SINGLE_UNSUBMIT, { repo })
+    bus.invoke('repo_single_unsubmit', { repo })
     unlisten.then((unsub) => {
       unsub() 
     })
@@ -255,25 +254,25 @@ export const singleRepoSubmit = (repo: RepoPath, cb: () => void) => {
 }
 
 export const fileHistory = (repo: RepoPath, filePath: string) => {
-  return bus.invoke<FileHistoryItem[]>(FILE_HISTORY, { repo, filePath }) 
+  return bus.invoke<FileHistoryItem[]>('file_history', { repo, filePath }) 
 }
 
 export const commitTree = (repo: RepoPath, commitId: string) => {
-  return bus.invoke<TreeDir>(GET_COMMIT_TREE_RECURSIVE, {repo, commitId})
+  return bus.invoke<TreeDir>('get_commit_tree_recursive', {repo, commitId})
 }
 
 export const getTree = (repo: RepoPath, objectId: string, treePath: undefined | string = undefined) => {
-  return bus.invoke<TreeDir>(GET_TREE, {repo, objectId, treePath})
+  return bus.invoke<TreeDir>('get_tree', {repo, objectId, treePath})
 }
 
 export const objectIsBinary = (repo: RepoPath, objectId: string) => {
-  return bus.invoke<TreeDir>(OBJECT_IS_BINARY, {repo, objectId})
+  return bus.invoke<boolean>('object_is_binary', {repo, objectId})
 }
 
 export const getRepoByPath = (repo: RepoPath) => {
-  return bus.invoke<Repository>(GET_REPO_BY_PATH, {path: repo})
+  return bus.invoke<Repository>('get_repo_by_path', {path: repo})
 }
 
 export const saveBlob = (repo: RepoPath, objectId: string, path: string) => {
-  return bus.invoke(SAVE_BLOB, {repo, objectId, path})
+  return bus.invoke('save_blob', {repo, objectId, path})
 }

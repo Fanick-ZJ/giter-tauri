@@ -1,16 +1,17 @@
 <script setup lang="ts">
-import { computed, CSSProperties, inject, nextTick, onBeforeUnmount, PropType, Ref, ref, shallowRef, watch } from 'vue';
-import { DiffContent, CommitFile } from '@/types';
+import { computed, CSSProperties, inject, nextTick, onBeforeUnmount, onMounted, PropType, Ref, ref, shallowRef, watch } from 'vue';
+import { DiffContent, CommitEntry } from '@/types';
 import { Icon } from '@iconify/vue';
 import { NCard, NWatermark, NFlex, NButton, useDialog } from 'naive-ui';
 import * as monaco from 'monaco-editor';
 import { bytesToString, getMonacoLanguage, withMinDelay } from '@/utils/tool';
 import { showFileHistory } from '@/utils/dialog';
 import LoadingView from '@/components/common/loading-view.vue';
-import { fileDiff, getBlobContent, fileHistory } from '@/utils/command';
+import { fileDiff, getBlobContent, objectIsBinary } from '@/utils/command';
 import { BinaryResult, processBinaryData } from './utils';
 import { commitIdKey } from './keys';
 import { useThemeStore } from '@/store/modules/theme'
+import { EntryMode } from '@/enum';
 
 defineOptions({
   name: 'DiffDetailComponent' 
@@ -22,7 +23,7 @@ const props = defineProps({
     required: true 
   },
   file: {
-    type: Object as PropType<CommitFile>,
+    type: Object as PropType<CommitEntry>,
     required: true
   }
 })
@@ -38,7 +39,7 @@ const binaryComps:Ref<BinaryResult> = shallowRef([undefined, undefined])
 
 // 暴露给外部调用，动态加载，避免拥堵
 const load = async () => {
-  if (props.file.isBinary) {
+  if (await objectIsBinary(props.repo, props.file.objectId)) {
     processBinaryData(props.repo, props.file)!.then(res => {
       binaryComps.value = res
       success.value = true	
@@ -107,6 +108,30 @@ const modifRatiStyle = computed(() => {
   return {
     background: `linear-gradient(to right, #4ade80 ${a * 100}%, #f87171 ${a * 100}%)`,
   }
+})
+
+// 将 isBinary 改为响应式引用
+const isBinary = ref<boolean>(false)
+const isBinaryLoading = ref<boolean>(true)
+
+// 在组件初始化时检查是否为二进制文件
+const checkIsBinary = async () => {
+  try {
+    isBinaryLoading.value = true
+    const result = await objectIsBinary(props.repo, props.file.objectId)
+    isBinary.value = result
+  } catch (error) {
+    console.error('检查二进制文件失败:', error)
+    isBinary.value = false
+  } finally {
+    isBinaryLoading.value = false
+  }
+}
+
+// 在组件挂载时检查
+onMounted(() => {
+  console.log(props.file.path, props.file.entryMode)
+  checkIsBinary()
 })
 
 defineExpose({
@@ -264,7 +289,8 @@ const headerStyle = computed<CSSProperties>(() => {
       </div>
     </template>
     <template #header-extra>
-      <div v-if="!file.isBinary" class="flex gap-1 items-center">
+      <!-- 直接使用响应式变量，无需 await -->
+      <div v-if="!isBinary" class="flex gap-1 items-center">
         <div class="text-green-400">
           {{ + addedLines.length  }}
         </div>
@@ -282,8 +308,9 @@ const headerStyle = computed<CSSProperties>(() => {
     </template>
     <LoadingView :loading="loading">
       <div>
-        <div v-if="success && !props.file.isBinary" ref="editorContainer"></div>
-        <div v-else-if="props.file.isBinary">
+        <!-- 直接使用响应式变量 -->
+        <div v-if="success && !isBinary" ref="editorContainer"></div>
+        <div v-else-if="isBinary">
           <NFlex>
             <div class="flex-1 gap-2">
               <NWatermark 

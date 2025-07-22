@@ -1,6 +1,6 @@
 <script setup lang="tsx">
 import { computed, nextTick, onBeforeUnmount, onMounted, provide, StyleValue, useTemplateRef, watch } from 'vue';
-import { Commit, CommitFile } from '@/types';
+import { Commit, CommitEntry } from '@/types';
 
 import { ref } from 'vue';
 import { NCard, NFlex, NLayout, NTag, NPagination, darkTheme, NConfigProvider } from 'naive-ui';
@@ -8,6 +8,7 @@ import { commitContent, fileDiff, getCommit } from '@/utils/command';
 import { useElementSize } from '@vueuse/core';
 import DiffDetailComponent from './diff-detail-item.vue';
 import { commitIdKey } from './keys';
+import { EntryMode } from '@/enum';
 
 defineOptions({
   name: 'CommitDetailComponent'
@@ -25,7 +26,7 @@ const props = defineProps({
   }
 })
 
-const commitFiles = ref<CommitFile[]>()
+const commitFiles = ref<CommitEntry[]>()
 const commit = ref<Commit>()
 provide(commitIdKey, props.commitId)
 
@@ -59,7 +60,8 @@ onMounted(async () => {
     window.$message.error('获取提交信息失败')
   }
   if (res[1].status === 'fulfilled') {
-    commitFiles.value = res[1].value 
+    // 过滤掉目录
+    commitFiles.value = res[1].value.filter(item => item.entryMode != EntryMode.Tree)
   } else {
     window.$message.error('获取提交内容失败') 
   }
@@ -173,7 +175,6 @@ watch(() => page.value, async () => {
         <NFlex justify="center">
           <template v-for="item in pageItems" :key="item.objectId + item.path">
             <DiffDetailComponent ref="diffDetailRefs" :repo="repo" :file="item"/>
-            
           </template>
         </NFlex>
       </NLayout>

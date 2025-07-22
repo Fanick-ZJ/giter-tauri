@@ -10,41 +10,37 @@ use serde::{
     ser::SerializeStruct,
 };
 
+use crate::types::fs::EntryMode;
+
 use super::{commit::Commit, status::FileStatus};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct CommittedFile {
+pub struct CommittedEntry {
     pub path: String,
-    pub size: usize,
     pub status: FileStatus,
     pub object_id: String,
+    pub entry_mode: EntryMode,
     pub prev_object_id: String,
-    pub blob_exist: bool,
-    pub is_binary: bool,
-    pub old_is_binary: bool,
+    pub prev_entry_mode: EntryMode,
 }
 
-impl CommittedFile {
+impl CommittedEntry {
     pub fn new(
         path: String,
-        size: usize,
         status: FileStatus,
         object_id: String,
+        entry_mode: EntryMode,
         prev_object_id: String,
-        blob_exist: bool,
-        is_binary: bool,
-        old_is_binary: bool,
+        prev_entry_mode: EntryMode
     ) -> Self {
         Self {
             path,
-            size,
             status,
             object_id,
+            entry_mode,
             prev_object_id,
-            blob_exist,
-            is_binary,
-            old_is_binary,
+            prev_entry_mode,
         }
     }
 }
@@ -173,7 +169,7 @@ impl Serialize for ChangedFile {
 #[derive(Debug, Clone)]
 pub struct FileHistoryEntry {
     /// 文件在该提交中的状态
-    pub file: CommittedFile,
+    pub file: CommittedEntry,
     pub commit: Commit,
 }
 
@@ -189,50 +185,8 @@ impl Serialize for FileHistoryEntry {
     }
 }
 
-impl<'de> Deserialize<'de> for FileHistoryEntry {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct CommitVisitor;
-
-        impl<'de> Visitor<'de> for CommitVisitor {
-            type Value = FileHistoryEntry;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("struct FileHistoryEntry")
-            }
-
-            fn visit_map<V>(self, mut map: V) -> Result<FileHistoryEntry, V::Error>
-            where
-                V: serde::de::MapAccess<'de>,
-            {
-                let mut commit = None;
-                let mut file = None;
-
-                while let Some(key) = map.next_key()? {
-                    match key {
-                        "commit" => commit = Some(map.next_value()?),
-                        "file" => file = Some(map.next_value()?),
-                        _ => (),
-                    }
-                }
-
-                Ok(FileHistoryEntry {
-                    commit: commit.ok_or_else(|| DeError::missing_field("commit"))?,
-                    file: file.ok_or_else(|| DeError::missing_field("file"))?,
-                })
-            }
-        }
-
-        const FIELDS: &[&str] = &["commitId", "file", "commitDate", "author", "message"];
-
-        deserializer.deserialize_struct("FileHistory", FIELDS, CommitVisitor)
-    }
-}
-
 impl FileHistoryEntry {
-    pub fn new(commit: Commit, file: CommittedFile) -> Self {
+    pub fn new(commit: Commit, file: CommittedEntry) -> Self {
         Self { commit, file }
     }
 }

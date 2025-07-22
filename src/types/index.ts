@@ -1,4 +1,4 @@
-import { FileStatus, TreeFileMode } from "@/enum";
+import { FileStatus, EntryMode as EntryMode } from "@/enum";
 import { CommonErrorCode } from "@/enum/error"
 import { MessageApiInjection } from "naive-ui/es/message/src/MessageProvider";
 import { NotificationApiInjection } from "naive-ui/es/notification/src/NotificationProvider";
@@ -42,16 +42,13 @@ export type Commit = {
 }
 
 
-export type CommitFile = {
+export type CommitEntry = {
   path: string
-  type: string
-  size: number
-  isBinary: boolean
-  oldIsBinary: boolean
-  prevObjectId: string
   status: FileStatus
   objectId: string
-  blobExist: boolean
+  entryMode: EntryMode,
+  prevObjectId: string
+  prevEntryMode: EntryMode,
 }
 
 export type ChangedFile = {
@@ -99,12 +96,12 @@ export type CommitFilter = {
 
 export type FileHistoryItem = {
   commit: Commit,
-  file: CommitFile,
+  file: CommitEntry,
 }
 
 export type TreeEntryMetadata = {
   size: number,
-  mode: TreeFileMode,
+  mode: EntryMode,
   object_id: string
 }
 

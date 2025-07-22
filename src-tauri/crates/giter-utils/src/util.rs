@@ -11,7 +11,8 @@ use serde_json::Value;
 use crate::types::author::Author;
 use crate::types::commit::Commit;
 use crate::types::error::GitUtilsErrorCode;
-use crate::types::file::CommittedFile;
+use crate::types::file::CommittedEntry;
+use crate::types::fs::EntryMode;
 use crate::types::status::FileStatus;
 
 pub fn has_git() -> bool {
@@ -75,8 +76,8 @@ pub fn build_file_between_tree(
     repo: &Repository,
     old_tree: &git2::Tree,
     new_tree: &git2::Tree,
-) -> Vec<CommittedFile> {
-    let mut files: Vec<CommittedFile> = Vec::new();
+) -> Vec<CommittedEntry> {
+    let mut files: Vec<CommittedEntry> = Vec::new();
     let diff = repo.diff_tree_to_tree(Some(old_tree), Some(new_tree), None);
     match diff {
         Ok(diff) => {
@@ -85,27 +86,19 @@ pub fn build_file_between_tree(
                 let new_id = delta.new_file().id();
                 let old_id = delta.old_file().id();
                 let status = change_status_to_file_status(&delta.status());
-                let new_blob = repo.find_blob(new_id);
-                let (exist, content) = match new_blob {
-                    Ok(blob) => (true, blob.content().to_vec()),
-                    Err(_) => (false, Vec::new()),
-                };
-                let size = content.len();
                 let path = match delta.new_file().path() {
                     Some(path) => path.to_str().unwrap_or("").to_string(),
                     None => "".to_string(),
                 };
-                let is_binary = delta.new_file().is_binary();
-                let old_is_binary = delta.old_file().is_binary();
-                let file = CommittedFile::new(
+                let entry_mode = EntryMode::from(delta.new_file().mode());
+                let prev_entry_mode = EntryMode::from(delta.old_file().mode());
+                let file = CommittedEntry::new(
                     path,
-                    size,
                     status,
                     new_id.to_string(),
+                    entry_mode,
                     old_id.to_string(),
-                    exist,
-                    is_binary,
-                    old_is_binary,
+                    prev_entry_mode
                 );
                 files.push(file);
             }

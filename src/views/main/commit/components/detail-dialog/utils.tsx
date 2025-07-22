@@ -1,4 +1,4 @@
-import { CommitFile } from "@/types";
+import { CommitEntry } from "@/types";
 import { getBlobContent } from "@/utils/command";
 import { fileExtension } from "@/utils/tool";
 import { NImage } from "naive-ui";
@@ -10,7 +10,7 @@ type BinaryComponent = {
 }
 export type BinaryResult = [BinaryComponent | undefined, BinaryComponent | undefined]
 
-const isImage = (file: CommitFile) => {
+const isImage = (file: CommitEntry) => {
   const imageTypes = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'svg', 'webp']
   const fileName = file.path.split('/').pop() || ''
   const fileType = fileName.split('.').pop()
@@ -23,7 +23,7 @@ const readFile = (repo: string,  cid: String) => {
   })
 } 
 
-const processImage  = (repo: string,  file: CommitFile) => {
+const processImage  = (repo: string,  file: CommitEntry) => {
   const result: BinaryResult = [undefined, undefined]
   let _resolve: (res: BinaryResult) => void
   let _reject: (err: any) => void
@@ -94,7 +94,7 @@ const processImage  = (repo: string,  file: CommitFile) => {
   return promise
 }
 
-export const processBinaryData = (repo: string,  file: CommitFile) => {
+export const processBinaryData = (repo: string,  file: CommitEntry) => {
   if (isImage(file)) {
     return processImage(repo, file)
   }

@@ -20,7 +20,7 @@ use giter_utils::{
         commit::Commit,
         diff::ContentDiff,
         error::GitUtilsErrorCode,
-        file::{ChangedFile, CommittedFile, FileHistoryEntry},
+        file::{ChangedFile, CommittedEntry, FileHistoryEntry},
         git_data_provider::GitDataProvider,
         status::WorkStatus,
     },
@@ -205,7 +205,7 @@ pub async fn current_remote_branch(repo: RepoPath) -> DataResult<Branch> {
 
 #[tauri::command]
 #[command_result]
-pub async fn commit_content(repo: RepoPath, cid: String) -> DataResult<Vec<CommittedFile>> {
+pub async fn commit_content(repo: RepoPath, cid: String) -> DataResult<Vec<CommittedEntry>> {
     let provider = get_provider(&repo)?;
     let oid = str_to_oid(&cid)?;
     provider.commit_content(oid)

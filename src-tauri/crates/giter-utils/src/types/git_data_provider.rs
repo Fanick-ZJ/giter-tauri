@@ -1,6 +1,6 @@
 use super::file::FileHistoryEntry;
 use super::{author::Author, branch::Branch, commit::Commit, status::WorkStatus};
-use crate::types::fs;
+use crate::types::fs::{self, EntryMode};
 use crate::types::fs::Dir;
 use crate::util::build_commit;
 use crate::util::change_status_to_file_status;
@@ -44,7 +44,7 @@ use super::contribution::CommitStatistic;
 use super::diff::ContentDiff;
 use super::error::GitUtilsErrorCode;
 use super::file::ChangedFile;
-use super::file::CommittedFile;
+use super::file::CommittedEntry;
 use super::file::UntrackedFile;
 use super::status::FileStatus;
 use super::status::status_to_changed_status;
@@ -518,8 +518,8 @@ impl GitDataProvider {
     }
 
     /// 获取一颗提交树的所有文件列表
-    fn tree_walk(&self, tree: &git2::Tree) -> Vec<CommittedFile> {
-        let mut files: Vec<CommittedFile> = Vec::new();
+    fn tree_walk(&self, tree: &git2::Tree) -> Vec<CommittedEntry> {
+        let mut files: Vec<CommittedEntry> = Vec::new();
         let _ = tree.walk(TreeWalkMode::PostOrder, |root, entry| {
             let path = Path::new(root);
             let path = path
@@ -529,31 +529,24 @@ impl GitDataProvider {
                 .to_string();
             let blob = self.repository.find_blob(entry.id());
             if blob.is_err() {
-                files.push(CommittedFile::new(
+                files.push(CommittedEntry::new(
                     path,
-                    0,
                     FileStatus::Added,
                     entry.id().to_string(),
+                    EntryMode::from(entry.filemode()),
                     "0".repeat(20),
-                    false,
-                    false,
-                    false,
+                    EntryMode::UNREADABLE,
                 ));
             } else {
-                let blob = blob.unwrap();
-                let size = blob.size();
                 let status = FileStatus::Added;
                 let object_id = entry.id().to_string();
-                let is_binary = blob.is_binary();
-                files.push(CommittedFile::new(
+                files.push(CommittedEntry::new(
                     path,
-                    size,
                     status,
                     object_id,
+                    EntryMode::from(entry.filemode()),
                     "0".repeat(20),
-                    true,
-                    is_binary,
-                    false,
+                    EntryMode::UNREADABLE,
                 ));
             }
             1
@@ -572,7 +565,7 @@ impl GitDataProvider {
     pub fn commit_content(
         &self,
         commit_id: impl Into<Oid>,
-    ) -> Result<Vec<CommittedFile>, GitUtilsErrorCode> {
+    ) -> Result<Vec<CommittedEntry>, GitUtilsErrorCode> {
         let repo = &self.repository;
         // 获取父提交
         let commit = repo.find_commit(commit_id.into())?;
@@ -586,7 +579,7 @@ impl GitDataProvider {
             let files = self.tree_walk(&now_tree);
             return Ok(files);
         }
-        let mut files: Vec<CommittedFile> = Vec::new();
+        let mut files: Vec<CommittedEntry> = Vec::new();
         // 对比两个树的差异
         let diff = repo.diff_tree_to_tree(old_tree.as_ref(), Some(&now_tree), None)?;
         let deltas = diff.deltas();
@@ -599,29 +592,16 @@ impl GitDataProvider {
                 .to_str()
                 .ok_or_else(|| anyhow::anyhow!("new file path is not valid utf-8"))?
                 .to_string();
-            // git2的is_blob函数好像有问题，直接用文件内容判断吧
-            let (is_binary, old_is_binary) = (
-                object_is_binary(new_file.id(), repo),
-                object_is_binary(old_file.id(), repo),
-            );
-            let size = new_file.size();
             let status = change_status_to_file_status(&delta.status());
-            let new_blob = repo.find_blob(delta.new_file().id());
             let new_id = new_file.id().to_string();
             let old_id = old_file.id().to_string();
-            let exist = match new_blob {
-                Ok(_) => true,
-                Err(_) => false,
-            };
-            let file = CommittedFile::new(
+            let file = CommittedEntry::new(
                 path,
-                size as usize,
                 status,
                 new_id,
+                EntryMode::from(new_file.mode()),
                 old_id,
-                exist,
-                is_binary,
-                old_is_binary,
+                EntryMode::from(old_file.mode()),
             );
             files.push(file);
         }

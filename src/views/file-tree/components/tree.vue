@@ -3,7 +3,7 @@ import { NSpace, TreeInst, NTree, TreeOption, TreeOverrideNodeClickBehavior, tre
 import { TreeDir } from '@/types';
 import { ComponentPublicInstance, computed, h, nextTick, onMounted, Ref, ref } from 'vue';
 import { fileHistory, getTree, saveBlob } from '@/utils/command';
-import { TreeFileMode } from '@/enum';
+import { EntryMode } from '@/enum';
 import { useElementSize } from '@vueuse/core';
 import FileIcon from '@/components/common/file-icon/index.vue'
 import { showFileHistory } from '@/utils/dialog';
@@ -26,7 +26,7 @@ const createData = (tree: TreeDir): TreeOption[] => {
     const children: TreeOption[] = []
     tree.children.forEach(child => {
         let subchildren:TreeOption[] | undefined = []
-        if (child.metadata.mode == TreeFileMode.Tree) {
+        if (child.metadata.mode == EntryMode.Tree) {
             subchildren.push(...createData(child as TreeDir))
         } else {
             subchildren = undefined
@@ -36,7 +36,7 @@ const createData = (tree: TreeDir): TreeOption[] => {
             label: child.name,
             key: path + KEY_INTERVAL + child.metadata.object_id,
             children: subchildren,
-            isLeaf: child.metadata.mode != TreeFileMode.Tree,
+            isLeaf: child.metadata.mode != EntryMode.Tree,
             prefix: () =>  h(FileIcon, {pathOrName: child.name, width: 15, height: 15})
         })
     })
