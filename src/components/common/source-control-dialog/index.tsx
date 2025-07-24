@@ -1,7 +1,7 @@
 // 使用组件，通过函数调用的方式，将组件附着在root上
 import {Component, computed, ComputedRef, defineComponent, nextTick, onBeforeMount, onBeforeUnmount, ref, watch } from 'vue'
 import { SourceConterolDialogProps } from './types'
-import { AbstractDialog } from '../abstract-dialog'
+import { useAbstractDialog, DialogOptions, DialogCallbacks, createDialog } from '../abstract-dialog'
 import { NButton, NDivider, NDropdown, NInput, NLayout, NLayoutContent, NLayoutSider, NScrollbar } from 'naive-ui'
 import { Icon } from '@iconify/vue'
 import { listen } from '@tauri-apps/api/event'
@@ -11,15 +11,13 @@ import { Branch, ChangedFile } from '@/types'
 
 import ChangedFileWidget from './components/changed-file-widget.vue'
 import { GitUtilsErrorCode } from '@/enum/error'
-import { RemoteUserPwdDialog } from '../remote-user-pwd-dialog'
 import { RemoteUserPwdDialogProps } from '../remote-user-pwd-dialog/types'
+import { createRemoteUserPwdDialog } from '../remote-user-pwd-dialog'
 
 const userAuthorRetry = (zindex: number, param: RemoteUserPwdDialogProps, cb?: (res) => void, ecb?: (e) => void) => {
-  const dlg = new RemoteUserPwdDialog(param)
-  dlg.setZIndex(zindex)
-  dlg.show()?.then(async (res) => {
+  createRemoteUserPwdDialog(param).then(async (res) => {
     cb && cb(res)
-  }).then((e) => {
+  }).catch((e) => {
     if (ecb) {
       ecb(e) 
     } else {
@@ -32,52 +30,50 @@ const className = '__source__control__container'
 
 const branchKeyPrefix = '__BRANCH__:'
 
-export class SourceControlDialog extends AbstractDialog<undefined> {
-  private commitMsg = ref('')
-  private props: SourceConterolDialogProps
-  private changedFiles = ref<ChangedFile[]>([])
-  private stagedFiles = ref<ChangedFile[]>([])
-  private branches = ref<Branch[]>([])
-  private currentBranch = ref<Branch>()
-  private currentRemoteBranch = ref<Branch | undefined>()
-  private computedOption?: ComputedRef<any[]>
-  constructor(props: SourceConterolDialogProps) {
-    super({
-      containerName: className,
-      buttonBox: 'custom',
-      title: '源码控制',
-      subTitle: props.repo.alias,
-    })
-    this.props = props
+export function useSourceControlDialog(props: SourceConterolDialogProps) {
+  const commitMsg = ref('')
+  const changedFiles = ref<ChangedFile[]>([])
+  const stagedFiles = ref<ChangedFile[]>([])
+  const branches = ref<Branch[]>([])
+  const currentBranch = ref<Branch>()
+  const currentRemoteBranchRef = ref<Branch | undefined>()
+  let computedOption: ComputedRef<any[]> | undefined
+  let dialogActions: any
+
+  const options: DialogOptions = {
+    containerName: className,
+    buttonBox: 'custom',
+    title: '源码控制',
+    subTitle: props.repo.alias,
   }
 
-  public beforeOk(): void {
-    console.log(this.commitMsg.value)
+  const beforeOk = (): void => {
+    console.log(commitMsg.value)
   }
 
-  public commit () {
-    commit(this.props.repo.path, this.commitMsg.value, undefined).then((res) => {
-      this.commitMsg.value = ''
+  const commitAction = () => {
+    commit(props.repo.path, commitMsg.value, undefined).then((res) => {
+      commitMsg.value = ''
       window.$message.success('提交成功')
     })
   }
 
-  public push() {
-    if (this.currentRemoteBranch.value) {
+  const pushAction = () => {
+    if (currentRemoteBranchRef.value) {
       // 获取remoteRef
-      const remoteRef = this.currentRemoteBranch.value.reference.split('/')[0]
-      push(this.props.repo.path, remoteRef, this.currentBranch.value!.name, undefined).then((res) => {
+      const remoteRef = currentRemoteBranchRef.value.reference.split('/')[0]
+      push(props.repo.path, remoteRef, currentBranch.value!.name, undefined).then((res) => {
         window.$message.success('推送成功')
       }).catch((e) => {
         // 如果是需要用户名密码的错误，弹出对话框
         if (e.code == GitUtilsErrorCode.PushNeedNameAndPassword) {
           window.$message.error('请输入远程仓库的用户名和密码')
           userAuthorRetry(
-            this.zIndex.value + 1, 
-            {subtitle: this.props.repo.alias}, 
+            dialogActions.zIndex.value + 1, 
+            {subtitle: props.repo.alias}, 
             (res) => {
               if (res) {
-                push(this.props.repo.path, remoteRef, this.currentBranch.value!.name, [res.username, res.password]).then((res) => {
+                push(props.repo.path, remoteRef, currentBranch.value!.name, [res.username, res.password]).then((res) => {
                   window.$message.success('推送成功')
                 }).catch((e) => {
                   if (e.code == GitUtilsErrorCode.RemoteHeadHasNotInLocal) {
@@ -97,21 +93,21 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
     }
   }
 
-  public pull() {
-    if (this.currentRemoteBranch.value) {
-      const remoteRef = this.currentRemoteBranch.value.reference.split('/')[0]
-      pull(this.props.repo.path, remoteRef, this.currentBranch.value!.name, undefined).then((res) => {
+  const pullAction = () => {
+    if (currentRemoteBranchRef.value) {
+      const remoteRef = currentRemoteBranchRef.value.reference.split('/')[0]
+      pull(props.repo.path, remoteRef, currentBranch.value!.name, undefined).then((res) => {
         window.$message.success('拉取成功')
       }).catch(e => {
         console.log(e)
         if (e.code == GitUtilsErrorCode.PushNeedNameAndPassword) {
           window.$message.error('请输入远程仓库的用户名和密码')
           userAuthorRetry(
-            this.zIndex.value + 1, 
-            {subtitle: this.props.repo.alias}, 
+            dialogActions.zIndex.value + 1, 
+            {subtitle: props.repo.alias}, 
             (res) => {
               if (res) {
-                pull(this.props.repo.path, remoteRef, this.currentBranch.value!.name, [res.username, res.password]).then((res) => {
+                pull(props.repo.path, remoteRef, currentBranch.value!.name, [res.username, res.password]).then((res) => {
                   window.$message.success('拉取成功')
                 }).catch((e) => {
                   if (e.code == GitUtilsErrorCode.HasConflicts) {
@@ -131,14 +127,14 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
     } 
   }
 
-  public switchBranch (branch_name: string) {
+  const switchBranchAction = (branch_name: string) => {
     const branchName = branch_name.replace(branchKeyPrefix, '')
-    if (branchName == this.currentBranch.value?.reference) {
+    if (branchName == currentBranch.value?.reference) {
       window.$message.error('当前分支已经是' + branchName)
     } 
     else {
-      const branch = this.branches.value.find((branch) => branch.reference == branchName)
-      branch && switchBranch(this.props.repo.path, branch).then((res) => {
+      const branch = branches.value.find((branch) => branch.reference == branchName)
+      branch && switchBranch(props.repo.path, branch).then((res) => {
         window.$message.success('切换分支成功') 
       }).catch((e) => {
         window.$message.error(e.message)
@@ -146,21 +142,20 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
     } 
   }
 
-  public customFooter(): Component | undefined {
-    const self = this;
-    this.computedOption = computed(() => {
+  const customFooter = (): Component => {
+    const computedOption = computed(() => {
       const options: any[] = []
       options.push({
         label: '切换分支',
         key: 'switch-branch',
-        children: self.branches.value.map((branch) => {
+        children: branches.value.map((branch) => {
           return {
             label: branch.name,
             key: branchKeyPrefix + branch.reference
           }
         })
       })
-      if (self.currentRemoteBranch.value) {
+      if (currentRemoteBranchRef.value) {
         options.push({
           label: '推送',
           key: 'push' 
@@ -183,13 +178,13 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
     }
     const handleSelect = (e) => {
       if (e === 'push') {
-        this.push()
+        pushAction()
       }
       else if (e === 'pull') {
-        this.pull()
+        pullAction()
       }
       else if (e.startsWith(branchKeyPrefix)) {
-        this.switchBranch(e)
+        switchBranchAction(e)
       }
     }
     return () => (
@@ -197,7 +192,7 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
       <NDropdown trigger='click' 
         overlap 
         scrollable 
-        options={self.computedOption?.value} 
+        options={computedOption?.value} 
         menu-props={menuProps}
         on-select={handleSelect}
         arrow-wrapper-style={{
@@ -207,15 +202,14 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
           更多
         </NButton>
       </NDropdown>
-      <NButton onClick={self.close.bind(self)}>
+      <NButton onClick={dialogActions.close}>
         关闭
       </NButton>
     </div>
     )
   }
   
-  public content(): Component {
-    let self = this
+  const content = (): Component => {
     return defineComponent({
       name: 'SourceControlDialog',
       setup() {
@@ -238,30 +232,30 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
           }
         ]
         const flush = () => {
-          getChangedFiles(self.props.repo.path).then((files) => {
-            self.changedFiles.value = files
+          getChangedFiles(props.repo.path).then((files) => {
+            changedFiles.value = files
           })
-          getStagedFiles(self.props.repo.path).then((files) => {
-            self.stagedFiles.value = files
+          getStagedFiles(props.repo.path).then((files) => {
+            stagedFiles.value = files
           })
-          getBranches(self.props.repo.path).then((branches) => {
-            console.log(branches)
-            self.branches.value = branches 
+          getBranches(props.repo.path).then((branchList) => {
+            console.log(branchList)
+            branches.value = branchList 
           })
-          currentRemoteBranch(self.props.repo.path).then((branch) => {
-            self.currentRemoteBranch.value = branch
+          currentRemoteBranch(props.repo.path).then((branch) => {
+            currentRemoteBranchRef.value = branch
           }).catch((e) => {
-            self.currentRemoteBranch.value = undefined
+            currentRemoteBranchRef.value = undefined
           })
-          getCurrentBranch(self.props.repo.path).then((branch) => {
-            self.currentBranch.value = branch 
+          getCurrentBranch(props.repo.path).then((branch) => {
+            currentBranch.value = branch 
           })
         }
         onBeforeMount(() => {
           flush() 
         })
         const unsubscrib = listen<StatusChangePayloadType>(STATUS_CHANGE, (event) => {
-          if (event.payload.path === self.props.repo.path) {
+          if (event.payload.path === props.repo.path) {
             flush()
           }
         })
@@ -275,11 +269,11 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
           <div class='grid grid-cols-1 grid-rows-[auto_1fr] max-h-full'>
             {/* 头部commit书写区域 */}
             <div class='flex flex-col gap-2 mb-1'>
-              <NInput maxlength="200" v-model:value={self.commitMsg.value} autosize={{minRows: 1, maxRows: 3}} type="textarea" placeholder="请输入提交内容">
+              <NInput maxlength="200" v-model:value={commitMsg.value} autosize={{minRows: 1, maxRows: 3}} type="textarea" placeholder="请输入提交内容">
               </NInput>
               <div class='flex h-[30px] bg-[#0078d4] text-white rounded-sm'>
-                <NButton class='flex-1' color='#026ec1' text textColor={'white'} onClick={self.commit.bind(self)}>
-                  {`提交(${self.currentBranch.value?.name})`}
+                <NButton class='flex-1' color='#026ec1' text textColor={'white'} onClick={commitAction}>
+                  {`提交(${currentBranch.value?.name})`}
                 </NButton>
                 <NDropdown text trigger='click' options={commitOptions}>
                   <div class='flex justify-center items-center hover:bg-[#026ec1]'>
@@ -296,8 +290,8 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
               <NLayoutContent>
                 <div>
                   {
-                    self.stagedFiles.value.map((file) => {
-                      return <ChangedFileWidget repo={self.props.repo} key={file.path} file={file} type='staged'/>
+                    stagedFiles.value.map((file) => {
+                      return <ChangedFileWidget repo={props.repo} key={file.path} file={file} type='staged'/>
                     })
                   }
                 </div>
@@ -307,16 +301,16 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
                 after:border-b after:flex-1 after:block
                 after:h-full'>
                   {
-                    self.stagedFiles.value.length > 0 && <div class='px-1 text-xs text-gray-600'>暂存↑</div>
+                    stagedFiles.value.length > 0 && <div class='px-1 text-xs text-gray-600'>暂存↑</div>
                   }
                   {
-                    self.changedFiles.value.length > 0 && <div class='px-1 text-xs text-gray-600'>修改↓</div>
+                    changedFiles.value.length > 0 && <div class='px-1 text-xs text-gray-600'>修改↓</div>
                   }
                 </div>
                 <div class="flex-1">
                   {
-                    self.changedFiles.value.map((file) => {
-                      return <ChangedFileWidget repo={self.props.repo} key={file.path} file={file} type='changed'/> 
+                    changedFiles.value.map((file) => {
+                      return <ChangedFileWidget repo={props.repo} key={file.path} file={file} type='changed'/> 
                     })
                   } 
                 </div>
@@ -327,4 +321,31 @@ export class SourceControlDialog extends AbstractDialog<undefined> {
       }
     })
   }
+
+  const callbacks: DialogCallbacks = {
+    beforeOk,
+    customFooter,
+    content
+  }
+
+  dialogActions = useAbstractDialog(options, callbacks)
+  
+  return {
+    ...dialogActions,
+    commitMsg,
+    changedFiles,
+    stagedFiles,
+    branches,
+    currentBranch,
+    currentRemoteBranch: currentRemoteBranchRef,
+    commitAction,
+    pushAction,
+    pullAction,
+    switchBranchAction
+  }
+}
+
+export function createSourceControlDialog(props: SourceConterolDialogProps): Promise<undefined> {
+  const dialog = useSourceControlDialog(props)
+  return dialog.showDialog()
 }

@@ -9,7 +9,7 @@ import Glassmorphism from '@/components/common/glassmorphism.vue';
 import StatusLight from './status-light.vue';
 import { viewExtend } from '@/types/key';
 import { useRouter } from 'vue-router';
-import { SourceControlDialog } from '@/components/common/source-control-dialog/index';
+import { createSourceControlDialog } from '@/components/common/source-control-dialog/index';
 
 const props = defineProps({
   repo: {
@@ -62,10 +62,9 @@ const toContribution = async () => {
 
 const handleLightClick = () => {
   if (!validTip()) return
-  const dlg = new SourceControlDialog({
+  createSourceControlDialog({
     repo: props.repo
-  })
-  dlg.show()?.then((res) => {
+  }).then((res) => {
     console.log(res) 
   })
 }

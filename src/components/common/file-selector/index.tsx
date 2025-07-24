@@ -3,7 +3,7 @@ import {Component, defineComponent, nextTick, ref, Ref, useTemplateRef, watch } 
 import FileSelector from './index.vue'
 import { FileSelectorOptions } from './types'
 import { createSingletonComponent } from '@/utils/tool'
-import { AbstractDialog } from '../abstract-dialog'
+import { useAbstractDialog, DialogOptions, DialogCallbacks } from '../abstract-dialog'
 import FileTree from './tree.vue'
 import { NInput } from 'naive-ui'
 import { fileNameIconMap } from '../file-icon/fileicons'
@@ -24,19 +24,16 @@ export const useFileSelector = (options: FileSelectorOptions): (Promise<string>)
   return comp.instance.$.exposed?.show()
 }
 
-export class FileSelectorDialog extends AbstractDialog<string | string[]> {
-  private props: FileSelectorOptions
-  constructor (props: FileSelectorOptions) {
-    super({
-      containerName: className,
-      buttonBox: 'ok-cancel',
-      title: '选择文件',
-    }) 
-    this.props = props
+export function useFileSelectorDialog(props: FileSelectorOptions) {
+  let dialogActions: any;
+  
+  const options: DialogOptions = {
+    containerName: className,
+    buttonBox: 'ok-cancel',
+    title: '选择文件',
   }
 
-  public content(): Component {
-    const self = this
+  const content = (): Component => {
     return defineComponent({
      name: 'FileSelectorDialog',
      setup () {
@@ -44,21 +41,36 @@ export class FileSelectorDialog extends AbstractDialog<string | string[]> {
       const selected = ref('')
       const changed = (val: string) => {
         selected.value = val
-        self.setReturnData(val)
+        dialogActions.setReturnData(val)
       }
       watch(() => fileTreeRef.value?.checkedKeys, (val) => {
         if (val && val.length > 0) {
           selected.value = ''
-          self.setReturnData(val)
+          dialogActions.setReturnData(val)
         }
       })
        return () => (
         <div>
           <NInput placeholder='请输入文件路径' type='text' size='tiny' v-model:value={selected.value}/>
-          <FileTree ref='fileTreeRef' {...self.props} onChange={changed}/>
+          <FileTree ref='fileTreeRef' {...props} onChange={changed}/>
         </div>
        )
      } 
     })
   }
+  
+  const callbacks: DialogCallbacks = {
+    content
+  }
+  
+  dialogActions = useAbstractDialog<string | string[]>(options, callbacks)
+  
+  return {
+    ...dialogActions
+  }
+}
+
+export function createFileSelectorDialog(props: FileSelectorOptions): Promise<string | string[]> {
+  const dialog = useFileSelectorDialog(props)
+  return dialog.showDialog()
 }

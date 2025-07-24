@@ -7,7 +7,7 @@ import { upToDataElement } from '@/utils/dom';
 import { useFileInfoDialog } from '@/components/common/info-dialog';
 import { openFileManager } from '@/utils/tool';
 import { FilterModel } from '../types';
-import { SourceControlDialog } from '@/components/common/source-control-dialog';
+import { createSourceControlDialog } from '@/components/common/source-control-dialog';
 
 defineOptions({
   name: 'RepoList'
@@ -83,10 +83,9 @@ const handleSelect = (key: string) => {
       break;
     case 'source-control':
       if (!repo) return
-      const dlg = new SourceControlDialog({
+      createSourceControlDialog({
         repo: repo
-      })
-      dlg.show()?.then((res) => {
+      }).then((res) => {
         console.log(res) 
       })
       break;

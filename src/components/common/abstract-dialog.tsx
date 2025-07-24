@@ -1,202 +1,219 @@
-import { createSingletonComponent, InstanceManager, InstanceProps } from "@/utils/tool";
+import { createSingletonComponent, InstanceManager } from "@/utils/tool";
 import { NButton, NCard, NDialogProvider } from "naive-ui";
-import { Component, defineComponent, h, nextTick, ref, Ref } from "vue";
+import { Component, defineComponent, h, nextTick, ref, Ref, computed } from "vue";
 
-type DialogOptions = {
+export type DialogOptions = {
   buttonBox?: 'cancel' | 'ok' | 'ok-cancel' | 'custom',
   containerName: string,
   title?: string | Ref<string>,
   subTitle?: string | Ref<string>,
   width?: string,
-  height?: string
+  height?: string,
+  closeOnClickOutside?: boolean
 }
 
-// R 组件返回类型
-// P 组件props类型
-export class AbstractDialog<R> {
-  private containerName: string;
-  private _promise?: Promise<R>;  // 界面显示时的promise
-  private _resolve: Function = () => undefined; // 界面显示时的resolve
-  private _reject: Function = () => undefined;  // 界面显示时的reject
-  private _show: Ref<boolean>;  // 界面是否显示
-  private title: string | Ref<string>;  // 界面标题
-  private subTitle: string | Ref<string>; // 界面副标题
-  private comp?: InstanceManager<Component> // 界面实例
-  protected zIndex = ref(3); // 界面层级
-  private buttonBox: 'cancel' | 'ok' | 'ok-cancel' | 'custom'; // 按钮框
-  private width: string; // 界面宽度
-  private height: string; // 界面高度
-  private returnData?: R; // 界面返回数据
+export type DialogState<R> = {
+  show: Ref<boolean>
+  zIndex: Ref<number>
+  returnData: Ref<R | undefined>
+  resolve: Ref<((value: R | PromiseLike<R>) => void) | null>
+  reject: Ref<((reason?: any) => void) | null>
+  comp: Ref<InstanceManager<Component> | undefined>
+}
 
-  constructor(options: DialogOptions) {
-    this.containerName = options.containerName
-    this.title = options.title || ''
-    this.subTitle = options.subTitle || ''
-    this.buttonBox = options.buttonBox || 'ok'
-    this.width = options.width || '80%';
-    this.height = options.height || '80%';
-    this._show = ref(false);
+export type DialogActions<R> = {
+  showDialog: () => Promise<R>
+  setReturnData: (data: R) => void
+  setZIndex: (zIndex: number) => void
+  ok: () => void
+  close: () => void
+  cleanup: () => Promise<void>
+}
+
+export type DialogCallbacks = {
+  beforeOk?: () => void
+  beforeClose?: () => void
+  content: () => Component
+  header?: () => Component
+  customFooter?: () => Component
+}
+
+// 创建对话框 Hook
+export function useAbstractDialog<R>(
+  options: DialogOptions,
+  callbacks: DialogCallbacks
+): DialogActions<R> {
+  // 状态管理
+  const state: DialogState<R> = {
+    show: ref(false),
+    zIndex: ref(1000),
+    returnData: ref<R | undefined>(undefined) as Ref<R | undefined>,
+    resolve: ref<((value: R | PromiseLike<R>) => void) | null>(null),
+    reject: ref<((reason?: any) => void) | null>(null),
+    comp: ref<InstanceManager<Component> | undefined>(undefined)
   }
 
-  public show() {
-    let self = this;
-    try {
-      this.comp = createSingletonComponent({
-        className: this.containerName,
-        component: this.component(),
-        props: {}
-      })
-    } catch (e) {
-     window.$message.error('窗口实例已存在')
-     return 
-    }
-    this._promise = new Promise((resolve, reject) => {
-      self._resolve = resolve;
-      self._reject = reject;
-    }); 
-    this._show.value = true;
-    return this._promise;
-  }
-
-  public setReturnData(data: R) {
-    this.returnData = data; 
-  }
-
-  // OK按钮回调前
-  public beforeOk() {}
-
-  // OK按钮回调
-  protected ok() {
-    this.beforeOk();
-    this._resolve(this.returnData);
-    if (this.comp) {
-      this.comp.unmount()
-      this.comp = undefined
-    }
-    this._show.value = false; 
-  }
-  
-  public beforeClose() {}
-
-  protected async close () {
-    // 调用关闭回调
-    this.beforeClose()
-    this._reject(); 
-    this._show.value = false;
+  // 清理方法
+  const cleanup = async () => {
+    state.show.value = false
     await nextTick()
-    // 卸载组件
-    this.comp?.unmount();
-    this.comp = undefined;
+    if (state.comp.value) {
+      state.comp.value.unmount()
+      state.comp.value = undefined
+    }
   }
 
-  private mouseMove (e: MouseEvent) {
-   e.preventDefault() 
+  // 操作方法
+  const actions: DialogActions<R> = {
+    showDialog: () => {
+      try {
+        state.comp.value = createSingletonComponent({
+          className: options.containerName,
+          component: createDialogComponent(options, state, actions, callbacks),
+          props: {}
+        })
+      } catch (e) {
+        window.$message.error('窗口实例已存在')
+        return Promise.reject(new Error('窗口实例已存在'))
+      }
+
+      const promise = new Promise<R>((resolve, reject) => {
+        state.resolve.value = resolve
+        state.reject.value = reject
+      })
+
+      state.show.value = true
+      return promise
+    },
+
+    setReturnData: (data: R) => {
+      state.returnData.value = data
+    },
+
+    setZIndex: (zIndex: number) => {
+      state.zIndex.value = zIndex
+    },
+
+    ok: () => {
+      callbacks.beforeOk?.()
+      state.resolve.value?.(state.returnData.value!)
+      cleanup()
+    },
+
+    close: () => {
+      callbacks.beforeClose?.()
+      state.reject.value?.(new Error('用户取消操作'))
+      cleanup()
+    },
+
+    cleanup
   }
 
-  public content(): Component { 
-    return () => <></>
-  }
+  return actions
+}
 
-  public setZIndex(zIndex: number) {
-    this.zIndex.value = zIndex; 
-  }
-
-  public header(): Component | undefined {
-    const self = this;
-    return () => (
-      <div class='flex w-max gap-2 overflow-x-hidden'>
-        <div class='flex-1'>
-          <div class='text-lg font-bold'>
-            {self.title}
+// 创建对话框组件
+function createDialogComponent<R>(
+  options: DialogOptions,
+  state: DialogState<R>,
+  actions: DialogActions<R>,
+  callbacks: DialogCallbacks
+): Component {
+  return defineComponent({
+    name: 'AbstractDialog',
+    setup() {
+      // 头部组件
+      const headerComponent = callbacks.header ? callbacks.header() : () => (
+        <div class='flex w-max gap-2 overflow-x-hidden'>
+          <div class='flex-1'>
+            <div class='text-lg font-bold'>
+              {options.title}
+            </div>
+          </div>
+          <div class='text-sm flex items-end'>
+            {options.subTitle}
           </div>
         </div>
-        <div class='text-sm flex items-end'>
-          {self.subTitle}
-        </div>
-      </div> 
-    )
-  }
-
-  public customFooter(): Component | undefined {
-    return undefined 
-  }
-
-  private footer(): Component | undefined {
-    const self = this;
-    if (this.buttonBox === 'cancel') {
-      return () => (
-        <div class="flex justify-end">
-          <NButton onClick={self.close.bind(self)}>
-            关闭
-          </NButton>
-        </div>
       )
-    }
-    else if (this.buttonBox === 'ok') {
-      return () => (
-        <div class="flex justify-end">
-          <NButton onClick={self.ok.bind(self)}>
-            确定
-          </NButton>
-        </div>
-      ) 
-    }
-    else if (this.buttonBox === 'ok-cancel') {
-      return () => (
-        <div class="flex justify-end gap-2">
-          <NButton onClick={self.ok.bind(self)} type='primary'>
-            确定
-          </NButton>
-          <NButton onClick={self.close.bind(self)}>
-            取消
-          </NButton>
-        </div>
-      ) 
-    } else {
-      console.log('custom footer')
-      return self.customFooter()
-    }
-  }
 
-  private component (): Component {
-    const self = this;
-    return defineComponent({
-      name: 'AbstractDialog',
-      setup() {
-        const header = self.header()
-        const footer = self.footer()
-        const slots = {
-          default: () => h(self.content()),
-          header: () => header ? h(header!) : undefined,
-          footer: () => footer ? h(footer!) : undefined
+      // 底部组件
+      const footerComponent = computed(() => {
+        if (options.buttonBox === 'cancel') {
+          return () => (
+            <div class="flex justify-end">
+              <NButton onClick={actions.close}>
+                关闭
+              </NButton>
+            </div>
+          )
+        } else if (options.buttonBox === 'ok') {
+          return () => (
+            <div class="flex justify-end">
+              <NButton onClick={actions.ok}>
+                确定
+              </NButton>
+            </div>
+          )
+        } else if (options.buttonBox === 'ok-cancel') {
+          return () => (
+            <div class="flex justify-end gap-2">
+              <NButton onClick={actions.ok} type='primary'>
+                确定
+              </NButton>
+              <NButton onClick={actions.close}>
+                取消
+              </NButton>
+            </div>
+          )
+        } else {
+          return callbacks.customFooter?.()
         }
-        const style = {
-          width: self.width,
-          height: self.height 
-        }
-        return () => (
+      })
+
+      const slots = {
+        default: () => h(callbacks.content()),
+        header: () => h(headerComponent),
+        footer: () => footerComponent.value ? h(footerComponent.value) : undefined
+      }
+
+      const style = {
+        width: options.width || '80%',
+        height: options.height || '80%'
+      }
+
+      const closeOnClickOutside = options.closeOnClickOutside ?? true
+
+      return () => (
         <>
-        {
-          self._show.value ? (
-            <div 
-              style={{zIndex: self.zIndex.value}}
+          {state.show.value ? (
+            <div
+              style={{ zIndex: state.zIndex.value }}
               class='w-screen h-screen bg-slate-400/50 flex items-center justify-center fixed top-0 left-0'
-              onMousemove={self.mouseMove.bind(self)}>
+              onClick={(e) => e.target === e.currentTarget && closeOnClickOutside && actions.close()}
+            >
               <NDialogProvider>
-                <NCard style={style}
-                  closable 
-                  onClose={self.close.bind(self)} 
+                <NCard
+                  style={style}
+                  closable
+                  onClose={actions.close}
                   v-slots={slots}
-                  headerStyle={{'overflow-x': 'hidden', 'overflow-y': 'hidden'}}
-                  contentStyle={{'overflow-y': 'hidden'}}>
+                  headerStyle={{ 'overflow-x': 'hidden', 'overflow-y': 'hidden' }}
+                  contentStyle={{ 'overflow-y': 'hidden' }}
+                >
                 </NCard>
               </NDialogProvider>
             </div>
-          ) : null
-        }
+          ) : null}
         </>
-        ) 
-      }
-    })
-  }
+      )
+    }
+  })
+}
+
+// 创建对话框的便捷函数
+export function createDialog<R>(
+  options: DialogOptions,
+  callbacks: DialogCallbacks
+): DialogActions<R> {
+  return useAbstractDialog<R>(options, callbacks)
 }
