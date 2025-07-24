@@ -8,6 +8,7 @@ import { FileHistoryEventData } from '@/windows/file-history';
 import { getBlobContent } from '@/utils/command';
 import { FileHistoryItem } from '@/types';
 import { bytesToString } from '@/utils/tool';
+import { createCompareSelectDialog } from './compare-select-dialog';
 
 const props = defineProps<{
   history: FileHistoryEventData,
@@ -16,6 +17,7 @@ const props = defineProps<{
 
 const useTabHandler = () => {
   const curCommit = ref('')
+  const tabsRef = ref<InstanceType<typeof NTabs>>()
   const currentHistoryFileContent = ref('')
   const getHistoryContent = async (history: FileHistoryItem) => {
     return getBlobContent(props.history.repo, history.file.objectId).then((res) => {
@@ -36,12 +38,14 @@ const useTabHandler = () => {
     return true
   }
   return {
+    tabsRef,
     curCommit,
     currentHistoryFileContent,
     handlePaneChange,
   }
 }
 const {
+  tabsRef,
   curCommit,
   currentHistoryFileContent,
   handlePaneChange,
@@ -62,9 +66,12 @@ const useCompareHistory = () => {
   const compareHistory = async (history: FileHistoryItem) => {
     isComparing.value = true
     comparedHistory.value = history
-  }
-  const historyComboDialog = () => {
-    
+    await nextTick()
+    createCompareSelectDialog({
+      historyList: props.history.history,
+    }).then(res => {
+      console.log(res)
+    })
   }
   const compareEnd = () => {
     isComparing.value = false
@@ -86,7 +93,16 @@ const {
 
 
 watch(() => props.history.focusCommit, async (val) => {
+  if (!val) {
+    return
+  }
   await initializeCommit(val)
+  curCommit.value = val
+  nextTick(() => {
+    tabsRef.value?.syncBarPosition()
+    // 自动滚动到对应的 tab 位置
+    scrollToTab(val)
+  })
 }, {
   immediate: true,
 })
@@ -96,6 +112,39 @@ async function initializeCommit(val: string | undefined) {
     return
   }
   await handlePaneChange(val)
+}
+
+function scrollToTab(commitId: string) {
+  nextTick(() => {
+    // 等待 DOM 更新后再查找元素
+    setTimeout(() => {
+      // 尝试多种选择器来找到对应的 tab 元素
+      let tabElement = document.querySelector(`[data-name="${commitId}"]`) as HTMLElement
+      
+      // 如果第一种方式找不到，尝试其他方式
+      if (!tabElement && tabsRef.value) {
+        const tabsContainer = tabsRef.value.$el
+        // 查找包含 commitId 的 tab 元素
+        const allTabs = tabsContainer.querySelectorAll('.n-tab')
+        for (const tab of allTabs) {
+          if (tab.getAttribute('data-name') === commitId || 
+              tab.textContent?.includes(commitId.substring(0, 8))) {
+            tabElement = tab as HTMLElement
+            break
+          }
+        }
+      }
+      
+      if (tabElement) {
+        // 滚动到该 tab 位置
+        tabElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'center'
+        })
+      }
+    }, 100)
+  })
 }
 </script>
 
@@ -107,6 +156,7 @@ async function initializeCommit(val: string | undefined) {
       :style="{height: `${props.height}px`}"
       :tab-style="{width: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}"
       placement="left"
+      ref="tabsRef"
       @before-leave="handlePaneChange"
       :type="'line'">
       <NTabPane
@@ -128,7 +178,7 @@ async function initializeCommit(val: string | undefined) {
                 </NEllipsis>
               </div>
               <NFlex>
-                <NButton class="h-[25px]" circle >
+                <NButton class="h-[25px]" circle @click="compareHistory(item)">
                   <template #icon>
                     <Icon icon="iconamoon:compare-bold" width="24" height="24" />
                   </template>
