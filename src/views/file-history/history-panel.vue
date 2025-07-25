@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import dayjs from 'dayjs';
 import Editor from '@/components/common/editor/editor.vue';
+import HistoryComparePanel from './history-compare-panel.vue'
 import { Icon } from '@iconify/vue'
 import { NTabs, NTabPane, NSpace, NSpin, NFlex, NButton, NText, NEllipsis, NLayout, NScrollbar } from 'naive-ui'
-import { ref, watch, computed, nextTick, onMounted } from 'vue';
+import { ref, watch, computed, nextTick, onMounted, Ref } from 'vue';
 import { FileHistoryEventData } from '@/windows/file-history';
 import { getBlobContent } from '@/utils/command';
 import { FileHistoryItem } from '@/types';
@@ -64,24 +65,34 @@ const useCompareHistory = () => {
   const comparedHistory = ref<FileHistoryItem>()
   const isComparing = ref(false)
   const compareHistory = async (history: FileHistoryItem) => {
-    isComparing.value = true
-    comparedHistory.value = history
     await nextTick()
     createCompareSelectDialog({
       historyList: props.history.history,
-    }).then(res => {
-      console.log(res)
+    }).then( res => {
+      comparedHistory.value = res
+      isComparing.value = true
     })
   }
+  
   const compareEnd = () => {
     isComparing.value = false
     comparedHistory.value = undefined
   }
+  
+  const updateTargetHandle = (targetId: string) => {
+    props.history.history.forEach(item => {
+      if (item.commit.commitId == targetId) {
+        comparedHistory.value = item
+      }
+    })
+  }
+
   return {
     compareHistory,
     compareEnd,
     isComparing,
     comparedHistory,
+    updateTargetHandle
   }
 }
 const {
@@ -89,6 +100,7 @@ const {
   compareEnd,
   isComparing,
   comparedHistory,
+  updateTargetHandle,
 } = useCompareHistory()
 
 
@@ -149,8 +161,9 @@ function scrollToTab(commitId: string) {
 </script>
 
 <template>
-  <NSpace vertical class="h-full">
+  <div class="h-full">
     <NTabs
+      v-if="!isComparing"
       :key="history.path"
       v-model:value="curCommit"
       :style="{height: `${props.height}px`}"
@@ -158,7 +171,8 @@ function scrollToTab(commitId: string) {
       placement="left"
       ref="tabsRef"
       @before-leave="handlePaneChange"
-      :type="'line'">
+      :type="'line'"
+    >
       <NTabPane
         v-for="(item, index) in history.history"
         :key="item.commit.commitId"
@@ -211,5 +225,15 @@ function scrollToTab(commitId: string) {
         </Editor>
       </NTabPane>
     </NTabs>
-  </NSpace>
+    <HistoryComparePanel
+      v-else 
+      :repo="history.repo"
+      :current-id="curCommit" 
+      :tagret-id="comparedHistory!.commit.commitId" 
+      :history-list="history.history"
+      @update-target-id="updateTargetHandle"
+      @exit="compareEnd"
+    >
+    </HistoryComparePanel>
+  </div>
 </template>

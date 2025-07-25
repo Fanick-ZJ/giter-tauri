@@ -342,7 +342,7 @@ const headerStyle = computed<CSSProperties>(() => {
                 :rotate="-15">
                 <component v-if="binaryComps[1]" :is="binaryComps[1].name" v-bind="binaryComps[1].param"/>
                 <div v-else class="text-center text-lg font-medium text-gray-900 italic dark:text-gray-200 ">
-                  没有就的数据喔😊
+                  没有旧的数据喔😊
                 </div>
               </NWatermark>
             </div>

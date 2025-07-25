@@ -8,9 +8,7 @@ type CompareSelectDialogProps = {
     historyList: FileHistoryItem[]
 }
 
-type DialogReturnType = {
-  selectedHistory: FileHistoryItem | undefined
-}
+type DialogReturnType = FileHistoryItem
 
 export function useCompareSelectDialog(props: CompareSelectDialogProps) {
   const selectedHistory = ref<string>()
@@ -24,11 +22,14 @@ export function useCompareSelectDialog(props: CompareSelectDialogProps) {
     width: '500px'
   };
   
-  const beforeOk = (): void => {
+  const beforeOk = (): boolean => {
     const selected = props.historyList.find(item => item.file.objectId === selectedHistory.value)
-    dialogActions.setReturnData({
-      selectedHistory: selected
-    })
+    if (selected == undefined) {
+      window.$message.warning("请选择要比较的历史")
+      return false
+    }
+    dialogActions.setReturnData(selected!)
+    return true
   }
 
   const content = (): Component => {
@@ -41,7 +42,7 @@ export function useCompareSelectDialog(props: CompareSelectDialogProps) {
               <NText>请选择要对比的历史版本：</NText>
             </div>
             <NRadioGroup v-model:value={selectedHistory.value}>
-              <NScrollbar style="max-height: 280px;">
+              <NScrollbar style="max-height: 200px;">
                 <NFlex vertical>
                   {props.historyList.map((item) => (
                     <NRadio

@@ -31,7 +31,7 @@ export type DialogActions<R> = {
 }
 
 export type DialogCallbacks = {
-  beforeOk?: () => void
+  beforeOk?: () => boolean
   beforeClose?: () => void
   content: () => Component
   header?: () => Component
@@ -95,7 +95,9 @@ export function useAbstractDialog<R>(
     },
 
     ok: () => {
-      callbacks.beforeOk?.()
+      if (!callbacks.beforeOk?.()) {
+        return
+      }
       state.resolve.value?.(state.returnData.value!)
       cleanup()
     },
@@ -173,7 +175,7 @@ function createDialogComponent<R>(
       const slots = {
         default: () => h(callbacks.content()),
         header: () => h(headerComponent),
-        footer: () => footerComponent.value ? h(footerComponent.value) : undefined
+        action: () => footerComponent.value ? h(footerComponent.value) : undefined
       }
 
       const style = {

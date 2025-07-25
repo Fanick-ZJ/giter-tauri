@@ -93,6 +93,7 @@ const panelHeight = computed(() => {
         :closable="true"
         :name="historyKey(item)"
         :tab="basename(item.path)"
+        class="h-full"
         :show-close="true">
         <HistoryPanel :history="item" :height="panelHeight"/>
       </NTabPane>
