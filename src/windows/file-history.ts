@@ -22,7 +22,7 @@ class FileHistoryWindow {
   private static buildWindow() { 
     FileHistoryWindow.window = new WebviewWindow("file-history", FileHistoryWindow.options())
     FileHistoryWindow.window.once(TauriEvent.WINDOW_CREATED, () => {
-      FileHistoryWindow.window.setMinSize(new LogicalSize(1000, 600))
+      FileHistoryWindow.window.setMinSize(new LogicalSize(1024, 600))
     })
     FileHistoryWindow.hasWindow = true;
     FileHistoryWindow.window.once(TauriEvent.WINDOW_DESTROYED, () => {
@@ -33,7 +33,7 @@ class FileHistoryWindow {
   private static options(): Omit<WebviewOptions, 'x' | 'y' | 'width' | 'height'> & WindowOptions {
     return {
       title: "文件历史",
-      width: 1000,
+      width: 1024,
       height: 600,
       resizable: true,
       maximizable: true,

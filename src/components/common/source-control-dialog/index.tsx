@@ -47,8 +47,9 @@ export function useSourceControlDialog(props: SourceConterolDialogProps) {
     subTitle: props.repo.alias,
   }
 
-  const beforeOk = (): void => {
+  const beforeOk = (): boolean => {
     console.log(commitMsg.value)
+    return true
   }
 
   const commitAction = () => {

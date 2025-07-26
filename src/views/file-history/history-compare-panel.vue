@@ -8,6 +8,8 @@ import { computed, Ref, ref, watch } from 'vue';
 import { getBlobContent } from '@/utils/command';
 import { bytesToString } from '@/utils/tool';
 import { FileOption } from '@/components/common/editor/types';
+import HistoryHeader from './history-header.vue';
+import { template } from 'lodash';
 
 const props = defineProps<{
     repo: string,
@@ -21,6 +23,9 @@ const useHistoryItem = () => {
         return props.historyList.find(item => item.commit.commitId == props.tagretId)
     })
     const messageShow = ref(false)
+    const showMessageHandler = () => {
+      messageShow.value = !messageShow.value
+    }
     const currentItem = computed(() => {
         return props.historyList.find(item => item.commit.commitId == props.currentId)
     })
@@ -81,7 +86,8 @@ const useHistoryItem = () => {
         original,
         modified,
         prevHistoryHandler,
-        nextHistoryHandler
+        nextHistoryHandler,
+        showMessageHandler
     }
 }
 const {
@@ -91,7 +97,8 @@ const {
   original,
   modified,
   prevHistoryHandler,
-  nextHistoryHandler
+  nextHistoryHandler,
+  showMessageHandler
 } = useHistoryItem()
 
 const emit = defineEmits<{
@@ -115,13 +122,11 @@ const emit = defineEmits<{
       <NGrid :x-gap="12" :cols="2">
         <NGi v-if="targetItem != undefined">
           <!-- 头部标题和按钮 -->
-          <NFlex :justify="'space-between'" :align="'center'" class="px-1 mb-2" ref="header">
-            <div>
-              <NEllipsis style="max-width:300px">
-              {{ targetItem.commit.title }}
-              </NEllipsis>
-            </div>
-            <NFlex>
+          <HistoryHeader 
+            :history="targetItem" 
+            :show-message="messageShow"
+            @show-message-click="showMessageHandler">
+            <template #left-action>
               <NButton class="h-[25px]" @click="prevHistoryHandler" circle>
                 <template #icon>
                     <Icon icon="typcn:chevron-left" width="24" height="24" />
@@ -132,72 +137,27 @@ const emit = defineEmits<{
                     <Icon icon="typcn:chevron-right" width="24" height="24" />
                 </template>
               </NButton>
-              <NButton class="h-[25px]" @click="messageShow = !messageShow" circle>
-                <template #icon>
-                    <Icon v-if="messageShow" icon="mage:message-dots" width="24" height="24" />
-                    <Icon v-else icon="eva:arrow-down-outline" width="24" height="24" />
-                </template>
-              </NButton>
-            </NFlex>
-          </NFlex>
-          <NLayout content-class="px-1">
-            <NScrollbar 
-                :style="{maxHeight: messageShow ? '100px' : '0px'}" 
-                class="transition-all duration-300"
-            >
-                {{ targetItem.commit.message }}
-            </NScrollbar>
-            <NFlex :justify="'space-between'">
-                <div class="text-lg dark:text-gray-400">
-                {{ targetItem.commit.authorName }}
-                </div>
-                <div class="text-sm dark:text-gray-400">
-                {{ dayjs(targetItem.commit.datetime).format('YYYY-MM-DD HH:mm:ss') }}
-                </div>
-            </NFlex>
-          </NLayout>
+            </template>
+          </HistoryHeader>
         </NGi>
         <NGi v-else :justify="'center'" :align="'center'">
           没找到此目标文件
         </NGi>
         <NGi v-if="currentItem">
           <!-- 头部标题和按钮 -->
-          <NFlex :justify="'space-between'" :align="'center'" class="px-1 mb-2" ref="header">
-            <div>
-              <NEllipsis style="max-width:300px">
-              {{ currentItem.commit.title }}
-              </NEllipsis>
-            </div>
-            <NFlex>
-              <NButton class="h-[25px]" @click="messageShow = !messageShow" circle>
-                <template #icon>
-                    <Icon v-if="messageShow" icon="mage:message-dots" width="24" height="24" />
-                    <Icon v-else icon="eva:arrow-down-outline" width="24" height="24" />
-                </template>
-              </NButton>
+          <HistoryHeader 
+            :history="currentItem" 
+            :show-message="messageShow"
+            @show-message-click="showMessageHandler"
+          >
+            <template #right-action>
               <NButton class="h-[25px]" @click="() => emit('exit')" circle>
                 <template #icon>
                     <Icon icon="mingcute:exit-line" width="24" height="24" />
                 </template>
               </NButton>
-            </NFlex>
-          </NFlex>
-          <NLayout content-class="px-1">
-            <NScrollbar 
-                :style="{maxHeight: messageShow ? '100px' : '0px'}" 
-                class="transition-all duration-300"
-            >
-                {{ currentItem.commit.message }}
-            </NScrollbar>
-            <NFlex :justify="'space-between'">
-                <div class="text-lg dark:text-gray-400">
-                {{ currentItem.commit.authorName }}
-                </div>
-                <div class="text-sm dark:text-gray-400">
-                {{ dayjs(currentItem.commit.datetime).format('YYYY-MM-DD HH:mm:ss') }}
-                </div>
-            </NFlex>
-          </NLayout>
+            </template>
+          </HistoryHeader>
         </NGi>
         <NGi v-else :justify="'center'" :align="'center'">
           没找到此目标文件

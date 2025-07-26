@@ -30,7 +30,6 @@ const useEditorModel = () => {
     const modifiedModel = monaco.editor.createModel(props.modified.content, autoDetectLanguage('modified'))
     
     watch(() => props.original.content, (newVal, oldVal) => {
-        console.log(newVal)
         originModel.setValue(newVal!)
     })
 

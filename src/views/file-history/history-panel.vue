@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import dayjs from 'dayjs';
 import Editor from '@/components/common/editor/editor.vue';
 import HistoryComparePanel from './history-compare-panel.vue'
 import { Icon } from '@iconify/vue'
-import { NTabs, NTabPane, NSpace, NSpin, NFlex, NButton, NText, NEllipsis, NLayout, NScrollbar } from 'naive-ui'
-import { ref, watch, computed, nextTick, onMounted, Ref } from 'vue';
+import { NTabs, NTabPane, NButton } from 'naive-ui'
+import { ref, watch, nextTick } from 'vue';
 import { FileHistoryEventData } from '@/windows/file-history';
 import { getBlobContent } from '@/utils/command';
 import { FileHistoryItem } from '@/types';
 import { bytesToString } from '@/utils/tool';
 import { createCompareSelectDialog } from './compare-select-dialog';
+import HistoryHeader from './history-header.vue';
 
 const props = defineProps<{
   history: FileHistoryEventData,
@@ -54,12 +54,15 @@ const {
 
 const useStyle = () => {
   const showMessage = ref(false)
-
+  const showMessageHandler = () => {
+    showMessage.value = !showMessage.value
+  }
   return {
     showMessage,
+    showMessageHandler
   }
 }
-const { showMessage } = useStyle()
+const { showMessage, showMessageHandler } = useStyle()
 
 const useCompareHistory = () => {
   const comparedHistory = ref<FileHistoryItem>()
@@ -185,42 +188,15 @@ function scrollToTab(commitId: string) {
           :content="currentHistoryFileContent"
           :readonly="true">
           <template #header>
-            <NFlex :justify="'space-between'" :align="'center'" class="px-1 mb-2" ref="header">
-              <div>
-                <NEllipsis style="max-width:300px">
-                  {{ item.commit.title }}
-                </NEllipsis>
-              </div>
-              <NFlex>
+            <HistoryHeader :history="item" :show-message="showMessage" @show-message-click="showMessageHandler">
+              <template #right-action>
                 <NButton class="h-[25px]" circle @click="compareHistory(item)">
                   <template #icon>
                     <Icon icon="iconamoon:compare-bold" width="24" height="24" />
                   </template>
                 </NButton>
-                <NButton class="h-[25px]" @click="showMessage = !showMessage" circle>
-                  <template #icon>
-                    <Icon v-if="showMessage" icon="mage:message-dots" width="24" height="24" />
-                    <Icon v-else icon="eva:arrow-down-outline" width="24" height="24" />
-                  </template>
-                </NButton>
-              </NFlex>
-            </NFlex>
-            <NLayout content-class="px-1">
-              <NScrollbar 
-                :style="{maxHeight: showMessage ? '100px' : '0px'}" 
-                class="transition-all duration-300"
-              >
-                {{ item.commit.message }}
-              </NScrollbar>
-              <NFlex :justify="'space-between'">
-                <div class="text-lg dark:text-gray-400">
-                  {{ item.commit.authorName }}
-                </div>
-                <div class="text-sm dark:text-gray-400">
-                  {{ dayjs(item.commit.datetime).format('YYYY-MM-DD HH:mm:ss') }}
-                </div>
-              </NFlex>
-            </NLayout>
+              </template>
+            </HistoryHeader>
           </template>
         </Editor>
       </NTabPane>
