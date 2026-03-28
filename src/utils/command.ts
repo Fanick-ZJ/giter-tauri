@@ -276,3 +276,7 @@ export const getRepoByPath = (repo: RepoPath) => {
 export const saveBlob = (repo: RepoPath, objectId: string, path: string) => {
   return bus.invoke('save_blob', {repo, objectId, path})
 }
+
+export const scanReposFolder = (folderPath: string) => {
+  return bus.invoke<string[]>('scan_repos_folder', { folderPath })
+}

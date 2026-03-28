@@ -24,7 +24,24 @@ const data: Ref<TreeOption[]> = ref([])
 const treeWrapperRef = ref<HTMLElement>()
 const createData = (tree: TreeDir): TreeOption[] => {
     const children: TreeOption[] = []
-    tree.children.forEach(child => {
+
+    // 先对子节点进行排序
+    const sortedChildren = [...tree.children].sort((a, b) => {
+        const isDirA = a.metadata.mode == EntryMode.Tree
+        const isDirB = b.metadata.mode == EntryMode.Tree
+
+        // 文件夹在前，文件在后
+        if (isDirA !== isDirB) {
+            return isDirA ? -1 : 1
+        }
+
+        // 同类型按首字母排序
+        const nameA = a.name.toLowerCase()
+        const nameB = b.name.toLowerCase()
+        return nameA.localeCompare(nameB, 'zh-CN', { sensitivity: 'base' })
+    })
+
+    sortedChildren.forEach(child => {
         let subchildren:TreeOption[] | undefined = []
         if (child.metadata.mode == EntryMode.Tree) {
             subchildren.push(...createData(child as TreeDir))

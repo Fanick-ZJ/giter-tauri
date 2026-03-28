@@ -124,13 +124,23 @@ export const useRepoStore = defineStore(SetupStoreId.Repo, () => {
 
   // 添加仓库
   const add = (repo: Repository) => {
+    console.log('开始添加仓库到store:', repo)
     saveRepo(repo).then((res: QueryResult) => {
+      console.log('保存仓库到数据库成功:', res)
       repo.id = res.lastInsertId as number
       // @ts-ignore
       _init_opt(repo).then((res) => {
+        console.log('仓库初始化完成:', res)
         repos.value.push(res)
-        repos.value.sort(repoSort) 
+        repos.value.sort(repoSort)
+        console.log('当前仓库列表:', repos.value)
+      }).catch((err) => {
+        console.error('仓库初始化失败:', err)
+        window.$message.error(`仓库初始化失败: ${err instanceof Error ? err.message : '未知错误'}`)
       })
+    }).catch((err) => {
+      console.error('保存仓库到数据库失败:', err)
+      window.$message.error(`保存仓库失败: ${err instanceof Error ? err.message : '未知错误'}`)
     })
   }
 

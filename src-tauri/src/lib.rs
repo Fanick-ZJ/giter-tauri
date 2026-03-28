@@ -7,7 +7,7 @@ mod utils;
 use std::collections::HashMap;
 
 use crate::{
-    cmd::{get_commit_tree_recursive, get_repo_by_path, get_tree, object_is_binary, save_blob},
+    cmd::{get_commit_tree_recursive, get_repo_by_path, get_tree, object_is_binary, save_blob, scan_repos_folder},
     utils::resolve,
 };
 use cmd::{
@@ -118,7 +118,8 @@ pub fn run() {
             get_tree,
             object_is_binary,
             get_repo_by_path,
-            save_blob
+            save_blob,
+            scan_repos_folder
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

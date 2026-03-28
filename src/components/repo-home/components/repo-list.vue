@@ -93,16 +93,58 @@ const handleSelect = (key: string) => {
 }
 
 const filtedRepos = ref<ValidRepository[]>()
+
+// 处理滚轮过滤事件
+const handleWheelFilter = (direction: 'up' | 'down', repoPath: string) => {
+  if (direction === 'up') {
+    // 向上滚动：隐藏仓库
+    hiddenRepos.value.add(repoPath)
+  } else {
+    // 向下滚动：显示仓库
+    hiddenRepos.value.delete(repoPath)
+  }
+  // 保存状态
+  saveWheelFilter()
+}
+
+// 重置所有滚轮过滤
+const resetWheelFilter = () => {
+  const count = hiddenRepos.value.size
+  hiddenRepos.value.clear()
+  saveWheelFilter() // 清除本地存储
+  window.$message.success(`已重置所有滚轮过滤，显示 ${count} 个仓库`)
+}
+
+// 键盘快捷键：Ctrl+Shift+R 重置过滤
+const handleKeydown = (e: KeyboardEvent) => {
+  if (e.ctrlKey && e.shiftKey && e.key === 'R') {
+    e.preventDefault()
+    resetWheelFilter()
+  }
+}
+
+// 添加键盘事件监听
+if (typeof window !== 'undefined') {
+  window.addEventListener('keydown', handleKeydown)
+}
+
+// 获取当前隐藏的仓库数量
+const hiddenCount = computed(() => hiddenRepos.value.size)
+
 watch([() => props.filter, () => repoStore.repos], (newVal) => {
   const filter = newVal[0]
-  if (!filter || Object.keys(filter).length == 0) return repoStore.repos
+  if (!filter || Object.keys(filter).length == 0) {
+    filtedRepos.value = repoStore.repos
+    return
+  }
   let repos = repoStore.repos
+
   repos = repos.filter((repo) => {
     if (filter.alias && repo.alias.indexOf(filter.alias!) == -1) {
       return false
     }
     if (filter.path && repo.path.indexOf(filter.path!) == -1) {
-      return false 
+      return false
     }
     if (typeof filter.top != 'undefined') {
       if (filter.top == 'yes' && !repo.top) return false
@@ -117,7 +159,7 @@ watch([() => props.filter, () => repoStore.repos], (newVal) => {
       if (filter.valid == 'no' && repo.valid) return false
     }
     if (filter.order && repo.order!= filter.order) {
-      return false 
+      return false
     }
     return true
   })
@@ -145,5 +187,5 @@ watch([() => props.filter, () => repoStore.repos], (newVal) => {
 
 
 <style scoped>
-
+/* 移除滚轮过滤相关样式，恢复正常界面滚动 */
 </style>

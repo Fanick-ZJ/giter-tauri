@@ -9,7 +9,7 @@ use crate::{
     },
     utils::{
         dirs,
-        fs::{get_first_level_dirs, get_logical_driver},
+        fs::{get_first_level_dirs, get_logical_driver, scan_repos_in_folder},
     },
 };
 use giter_macros::command_result;
@@ -452,4 +452,12 @@ pub fn create_window(
 pub async fn get_repo_by_path(path: String) -> Option<store::Repository> {
     let store = handle::Handle::global().store().unwrap();
     return store.get_repo_by_path(path);
+}
+
+#[tauri::command]
+#[command_result]
+pub async fn scan_repos_folder(folder_path: String) -> CommonResult<Vec<String>> {
+    let repos = scan_repos_in_folder(&folder_path)
+        .map_err(|e| CommonError::PathInvalid(e.to_string()))?;
+    Ok(repos)
 }

@@ -95,7 +95,7 @@ export function useAbstractDialog<R>(
     },
 
     ok: () => {
-      if (!callbacks.beforeOk?.()) {
+      if (callbacks.beforeOk && !callbacks.beforeOk()) {
         return
       }
       state.resolve.value?.(state.returnData.value!)
@@ -180,7 +180,10 @@ function createDialogComponent<R>(
 
       const style = {
         width: options.width || '80%',
-        height: options.height || '80%'
+        height: options.height || '80%',
+        maxWidth: '95vw',
+        maxHeight: '95vh',
+        minWidth: '300px'
       }
 
       const closeOnClickOutside = options.closeOnClickOutside ?? true
@@ -190,7 +193,7 @@ function createDialogComponent<R>(
           {state.show.value ? (
             <div
               style={{ zIndex: state.zIndex.value }}
-              class='w-screen h-screen bg-slate-400/50 flex items-center justify-center fixed top-0 left-0'
+              class='w-screen h-screen bg-slate-400/50 flex items-center justify-center fixed top-0 left-0 p-4'
               onClick={(e) => e.target === e.currentTarget && closeOnClickOutside && actions.close()}
             >
               <NDialogProvider>
@@ -201,6 +204,7 @@ function createDialogComponent<R>(
                   v-slots={slots}
                   headerStyle={{ 'overflow-x': 'hidden', 'overflow-y': 'hidden' }}
                   contentStyle={{ 'overflow-y': 'hidden' }}
+                  class="shadow-2xl"
                 >
                 </NCard>
               </NDialogProvider>

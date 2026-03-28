@@ -7,11 +7,11 @@ import { Icon } from "@iconify/vue";
 import { NButton, NModal, NBadge, NFlex, NCard, NTooltip } from 'naive-ui'
 import { computed, onUnmounted, ref, watch } from "vue";
 import { createNofication } from "./notification";
-import { isRepo } from "@/utils/command";
+import { isRepo, getRepoByPath } from "@/utils/command";
 import { defaultRepository } from "@/types/util";
 import { FilterModel } from "../types";
 import RepoFilterForm from "./repo-filter-form.vue";
-import { createFileSelectorDialog } from "@/components/common/file-selector/index.tsx";
+import { createRepoSelectorDialog } from "@/components/common/repo-selector/index";
 
 defineOptions({
   name: 'HomePageHeaders'
@@ -19,35 +19,51 @@ defineOptions({
 const repoStore = useRepoStore()
 const notifStore = useNotificationStore()
 
-const add = () => {
-  createFileSelectorDialog({directory: true}).then(async (path) => {
-    if (
-        path === undefined 
-      || path === '' 
-      || (Array.isArray(path) && path.length === 0)) {
+const add = async () => {
+  try {
+    const result = await createRepoSelectorDialog({ multiple: true })
+
+    if (!result) {
       window.$message.error('请选择仓库目录')
-      return 
+      return
     }
-    if (!Array.isArray(path)) {
-      if (!await isRepo(path)) {
-        window.$message.error(`请选择有效的仓库目录: ${path}`)
-        return
-      }
-      useFileInfoDialog({path, mode: 'add'}).then((repo: Repository) => {
-        repoStore.add(repo)
-      })
-    } else {
-      for (const p of path) {
-        if (!await isRepo(p)) {
-          window.$message.error(`请选择有效的仓库目录: ${p}`)
-          return
+
+    console.log('添加仓库结果:', result)
+
+    const paths = Array.isArray(result) ? result : [result]
+    let addedCount = 0
+    let skippedCount = 0
+
+    for (const path of paths) {
+      console.log('处理路径:', path)
+      try {
+        const existingRepo = await getRepoByPath(path)
+        console.log('已存在仓库:', existingRepo)
+        if (existingRepo === undefined || existingRepo === null) {
+          const newRepo = defaultRepository(path)
+          console.log('添加新仓库:', newRepo)
+          repoStore.add(newRepo)
+          addedCount++
+          // 等待一小段时间让异步操作完成
+          await new Promise(resolve => setTimeout(resolve, 500))
+        } else {
+          skippedCount++
         }
-      }
-      for (const p of path) {
-        repoStore.add(defaultRepository(p))
+      } catch (err) {
+        console.error('处理仓库时出错:', path, err)
+        window.$message.error(`添加仓库 ${path} 失败: ${err instanceof Error ? err.message : '未知错误'}`)
       }
     }
-  })
+
+    if (addedCount > 0) {
+      window.$message.success(`成功添加 ${addedCount} 个仓库${skippedCount > 0 ? `，跳过 ${skippedCount} 个已存在的仓库` : ''}`)
+    } else if (skippedCount > 0) {
+      window.$message.info(`所有仓库已存在`)
+    }
+  } catch (error) {
+    // 用户取消操作，不显示错误
+    console.log('取消添加仓库或发生错误:', error)
+  }
 }
 
 const filterShow = ref(false)

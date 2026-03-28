@@ -55,15 +55,16 @@ const obserAll = () => {
 onMounted(async () => {
   const res = await Promise.allSettled([getCommit(props.repo, props.commitId), commitContent(props.repo, props.commitId)])
   if (res[0].status === 'fulfilled') {
-    commit.value = res[0].value 
+    commit.value = res[0].value
   } else {
     window.$message.error('获取提交信息失败')
   }
   if (res[1].status === 'fulfilled') {
-    // 过滤掉目录
-    commitFiles.value = res[1].value.filter(item => item.entryMode != EntryMode.Tree)
+    // 过滤掉目录，只保留文件
+    let files = res[1].value.filter(item => item.entryMode != EntryMode.Tree)
+    commitFiles.value = files
   } else {
-    window.$message.error('获取提交内容失败') 
+    window.$message.error('获取提交内容失败')
   }
   // 设置滚动条的z-index,在layout上设置了style无效
   containerRef.value!.querySelector('.n-scrollbar-rail')!.setAttribute('style', 'z-index: 4')

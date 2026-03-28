@@ -16,11 +16,12 @@ export function useRemoteUserPwdDialog(props: RemoteUserPwdDialogProps) {
     width: '300px'
   };
   
-  const beforeOk = (): void => {
+  const beforeOk = (): boolean => {
     dialogActions.setReturnData({
       username: username.value,
       password: password.value
     })
+    return true
   }
 
   const content = (): Component => {

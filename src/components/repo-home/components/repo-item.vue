@@ -17,6 +17,7 @@ const props = defineProps({
     required: true
   }
 })
+
 const store = useRepoStore()
 const status = computed(() => {
   return store.status.get(props.repo.path)?.value || RepoStatus.Ok
@@ -65,18 +66,25 @@ const handleLightClick = () => {
   createSourceControlDialog({
     repo: props.repo
   }).then((res) => {
-    console.log(res) 
+    console.log(res)
   })
+}
+
+// 滚轮事件处理：让事件正常传播，不阻止默认行为
+const handleCardWheel = (event: WheelEvent) => {
+  // 不调用preventDefault，让事件自然传播到父级滚动容器
+  // 什么都不做，只是确保事件能够传播
 }
 
 </script>
 <template>
   <!-- 若仓库为无效仓库，就添加斜线标志 -->
-  <NCard 
+  <NCard
     :class="repo.valid ? '' : 'bg-diagonal-stripes bg-repeat bg-stripes shadow-lg'"
-    content-style="font-size: 20px"
+    content-style="font-size: 20px;"
     :data-repo="repo.path"
-    class="overflow-hidden">
+    class="repo-item-card"
+    @wheel="handleCardWheel">
     <div class="relative">
       <div class="absolute right-[-18px] top-2" v-if="repo.top">
         <NPopover>
@@ -115,4 +123,23 @@ const handleLightClick = () => {
 
 
 <style scoped lang="scss">
+/* 确保滚轮事件能够正常传播到父级滚动容器 */
+.repo-item-card {
+  /* 移除可能阻止滚轮事件的属性 */
+  overflow: visible;
+
+  &:hover {
+    /* 确保hover状态不会阻止滚轮事件 */
+    pointer-events: auto;
+  }
+}
+
+/* 确保NCard内部不会创建滚动上下文 */
+:deep(.n-card) {
+  overflow: visible;
+}
+
+:deep(.n-card__content) {
+  overflow: visible;
+}
 </style>
