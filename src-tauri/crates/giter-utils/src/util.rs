@@ -316,5 +316,6 @@ pub fn time_to_ymd(stamp: i64) -> Result<String> {
         chrono::offset::LocalResult::None => Err(anyhow!("Invalid timestamp".to_string())),
     };
     let datetime = t?;
-    Ok(datetime.format("%Y-%m-%d").to_string())
+    // 包含时间和时区信息，使 git --since/--until 能精确匹配用户选择的日期范围
+    Ok(datetime.format("%Y-%m-%d %H:%M:%S %z").to_string())
 }
