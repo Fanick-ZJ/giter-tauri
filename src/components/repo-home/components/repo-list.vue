@@ -94,32 +94,10 @@ const handleSelect = (key: string) => {
 
 const filtedRepos = ref<ValidRepository[]>()
 
-// 处理滚轮过滤事件
-const handleWheelFilter = (direction: 'up' | 'down', repoPath: string) => {
-  if (direction === 'up') {
-    // 向上滚动：隐藏仓库
-    hiddenRepos.value.add(repoPath)
-  } else {
-    // 向下滚动：显示仓库
-    hiddenRepos.value.delete(repoPath)
-  }
-  // 保存状态
-  saveWheelFilter()
-}
-
-// 重置所有滚轮过滤
-const resetWheelFilter = () => {
-  const count = hiddenRepos.value.size
-  hiddenRepos.value.clear()
-  saveWheelFilter() // 清除本地存储
-  window.$message.success(`已重置所有滚轮过滤，显示 ${count} 个仓库`)
-}
-
 // 键盘快捷键：Ctrl+Shift+R 重置过滤
 const handleKeydown = (e: KeyboardEvent) => {
   if (e.ctrlKey && e.shiftKey && e.key === 'R') {
     e.preventDefault()
-    resetWheelFilter()
   }
 }
 
@@ -128,8 +106,6 @@ if (typeof window !== 'undefined') {
   window.addEventListener('keydown', handleKeydown)
 }
 
-// 获取当前隐藏的仓库数量
-const hiddenCount = computed(() => hiddenRepos.value.size)
 
 watch([() => props.filter, () => repoStore.repos], (newVal) => {
   const filter = newVal[0]

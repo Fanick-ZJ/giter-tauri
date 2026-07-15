@@ -2,7 +2,7 @@
 import dayjs from 'dayjs';
 import { Icon } from '@iconify/vue'
 import { FileHistoryItem } from '@/types';
-import { NFlex, NLayout, NScrollbar, NEllipsis, NButton, NCard } from 'naive-ui';
+import { NFlex, NLayout, NScrollbar, NEllipsis, NButton, NCard, useMessage } from 'naive-ui';
 import { getCurrentInstance, PropType, ref } from 'vue';
 import { template } from 'lodash';
 
@@ -16,8 +16,13 @@ const props = defineProps({
     required: true
   }
 })
+const message = useMessage()
 const instance = getCurrentInstance()
-
+const commitClickHandler = () => {
+  const text = navigator.clipboard
+  text.writeText(props.history.commit.commitId)
+  message.success('已复制commit id到剪贴板')
+}
 const emit = defineEmits<{
   (e: 'showMessageClick'): void
 }>()
@@ -60,8 +65,13 @@ const emit = defineEmits<{
         <div class="text-lg dark:text-gray-400">
           {{ history.commit.authorName }}
         </div>
-        <div class="text-sm dark:text-gray-400">
-          {{ dayjs(history.commit.datetime).format('YYYY-MM-DD HH:mm:ss') }}
+        <div class='flex justify-between items-center gap-2'>    
+            <NButton type="info" dashed size='small' @click=commitClickHandler>
+                {{history.commit.commitId.slice(0, 8)}}
+            </NButton>
+            <div class="text-sm dark:text-gray-400">
+            {{ dayjs(history.commit.datetime).format('YYYY-MM-DD HH:mm:ss') }}
+            </div>
         </div>
       </div>
     </template>
