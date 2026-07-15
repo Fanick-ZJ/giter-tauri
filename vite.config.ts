@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
+import Icons from 'unplugin-icons/vite'
 import path from 'path'
 import vueJsx from '@vitejs/plugin-vue-jsx'
 import monacoEditorPlugin from 'vite-plugin-monaco-editor-esm';
@@ -10,6 +11,7 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(async () => ({
   plugins: [
     vue(), 
+    Icons({}),
     vueJsx(),
     svgLoader(),
     monacoEditorPlugin(),

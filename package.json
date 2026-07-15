@@ -10,6 +10,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@iconify/json": "^2.2.500",
     "@iconify/vue": "^4.3.0",
     "@tauri-apps/api": "^2.5.0",
     "@tauri-apps/plugin-dialog": "~2.3.1",
@@ -28,6 +29,7 @@
     "lodash-es": "^4.17.21",
     "monaco-editor": "^0.52.2",
     "pinia": "^2.3.1",
+    "unplugin-icons": "^23.0.1",
     "vite-svg-loader": "^5.1.0",
     "vue": "^3.5.13",
     "vue-router": "^4.5.0"
