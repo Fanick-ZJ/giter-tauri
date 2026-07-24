@@ -1,95 +1,137 @@
 <script setup lang="ts">
-import { useThemeStore } from '@/store/modules/theme'
-import { extname, getMonacoLanguage } from '@/utils/tool'
-import * as monaco from 'monaco-editor'
-import { getCurrentInstance, onMounted, ref, watch } from 'vue'
-import { FileOption } from './types';
+import { loadMonaco } from "@/composables/useMonaco";
+import { useThemeStore } from "@/store/modules/theme";
+import { getMonacoLanguage } from "@/utils/tool";
+import type * as monaco from "monaco-editor";
+import { getCurrentInstance, onMounted, ref, watch } from "vue";
+import { FileOption } from "./types";
 
 const props = defineProps<{
-    original: FileOption,
-    modified: FileOption,
-    readonly: boolean
-}>()
+  original: FileOption;
+  modified: FileOption;
+  readonly: boolean;
+}>();
 
-const instance = getCurrentInstance()
+const instance = getCurrentInstance();
 let editor: monaco.editor.IStandaloneDiffEditor;
+let monacoApi: typeof monaco;
 const editorBody = ref<HTMLElement>();
-const themeStore = useThemeStore()
+const themeStore = useThemeStore();
 
-
-const autoDetectLanguage = (type: 'original' | 'modified') => {
-  const has_language = instance?.vnode.props?.[type]['language'] != undefined
-  if (has_language) {
-    return instance?.vnode.props?.[type]['language']
+const autoDetectLanguage = (type: "original" | "modified") => {
+  const hasLanguage =
+    instance?.vnode.props?.[type]["language"] != undefined;
+  if (hasLanguage) {
+    return instance?.vnode.props?.[type]["language"];
   }
-  return getMonacoLanguage(instance?.vnode.props?.[type]['filename'] || '') 
-}
+  return getMonacoLanguage(
+    instance?.vnode.props?.[type]["filename"] || "",
+  );
+};
 
 const useEditorModel = () => {
-    const originModel = monaco.editor.createModel(props.original.content, autoDetectLanguage('original'))
-    const modifiedModel = monaco.editor.createModel(props.modified.content, autoDetectLanguage('modified'))
-    
-    watch(() => props.original.content, (newVal, oldVal) => {
-        originModel.setValue(newVal!)
-    })
+  const originModel = monacoApi.editor.createModel(
+    props.original.content,
+    autoDetectLanguage("original"),
+  );
+  const modifiedModel = monacoApi.editor.createModel(
+    props.modified.content,
+    autoDetectLanguage("modified"),
+  );
 
-    watch(() => props.modified.content, (newVal, oldVal) => {
-        modifiedModel.setValue(newVal!)
-    })
+  watch(
+    () => props.original.content,
+    (newVal) => {
+      originModel.setValue(newVal!);
+    },
+  );
 
-    return {
-        originModel,
-        modifiedModel
-    }
-}
+  watch(
+    () => props.modified.content,
+    (newVal) => {
+      modifiedModel.setValue(newVal!);
+    },
+  );
 
-const { originModel, modifiedModel} = useEditorModel()
+  return { originModel, modifiedModel };
+};
+
+// 注意：useEditorModel 依赖 monacoApi，需在 initEditor 中调用
+let originModel: monaco.editor.ITextModel;
+let modifiedModel: monaco.editor.ITextModel;
 
 // 监听主题变化
-watch(() => themeStore.isDark, (isDark) => {
-  if (editor) {
-    monaco.editor.setTheme(isDark ? 'vs-dark' : 'vs')
-  }
-})
+watch(
+  () => themeStore.isDark,
+  (isDark) => {
+    if (editor && monacoApi) {
+      monacoApi.editor.setTheme(isDark ? "vs-dark" : "vs");
+    }
+  },
+);
 
 const initEditor = () => {
-  if (!editorBody.value) return
+  if (!editorBody.value || !monacoApi) return;
 
-  editor = monaco.editor.createDiffEditor(editorBody.value, {
-    theme: themeStore.isDark ? 'vs-dark' : 'vs', // 根据主题设置
-    minimap: {
-      enabled: false,
+  originModel = monacoApi.editor.createModel(
+    props.original.content,
+    autoDetectLanguage("original"),
+  );
+  modifiedModel = monacoApi.editor.createModel(
+    props.modified.content,
+    autoDetectLanguage("modified"),
+  );
+
+  // 监听 content 变化
+  watch(
+    () => props.original.content,
+    (newVal) => {
+      originModel.setValue(newVal!);
     },
-    scrollBeyondLastLine: false, // 禁用在最后一行之后滚动
-    automaticLayout: true, // 自动布局
+  );
+  watch(
+    () => props.modified.content,
+    (newVal) => {
+      modifiedModel.setValue(newVal!);
+    },
+  );
+
+  editor = monacoApi.editor.createDiffEditor(editorBody.value, {
+    theme: themeStore.isDark ? "vs-dark" : "vs",
+    minimap: { enabled: false },
+    scrollBeyondLastLine: false,
+    automaticLayout: true,
     scrollbar: {
-      // vertical: 'hidden', // 禁用纵向滚动条
-      horizontal: 'auto', // 保持横向滚动条自动显示
-      handleMouseWheel: true, // 监听鼠标滚轮事件
-      alwaysConsumeMouseWheel: false, // 允许滚动事件冒泡
+      horizontal: "auto",
+      handleMouseWheel: true,
+      alwaysConsumeMouseWheel: false,
     },
-    readOnly: props.readonly, // 设置只读模式
+    readOnly: props.readonly,
     contextmenu: false,
-  })
-}
-  
-onMounted(() => {
-  initEditor()
+  });
+
   editor.setModel({
     original: originModel,
-    modified: modifiedModel
-  })
-})
+    modified: modifiedModel,
+  });
+};
+
+onMounted(async () => {
+  monacoApi = await loadMonaco();
+  initEditor();
+});
 </script>
 
 <template>
-  
   <div class="editor-container w-full h-full flex flex-col">
     <div class="editor-header">
-      <slot name="header"/>
+      <slot name="header" />
     </div>
     <div class="flex-1 relative">
-      <div class="editor-body absolute w-full h-full flex-auto" ref="editorBody"></div>
+      <div
+        class="editor-body absolute w-full h-full flex-auto"
+        ref="editorBody"
+      ></div>
     </div>
   </div>
 </template>

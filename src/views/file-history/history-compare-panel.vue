@@ -9,7 +9,6 @@ import { getBlobContent } from '@/utils/command';
 import { bytesToString } from '@/utils/tool';
 import { FileOption } from '@/components/common/editor/types';
 import HistoryHeader from './history-header.vue';
-import { template } from 'lodash';
 
 const props = defineProps<{
     repo: string,

@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { useThemeStore } from '@/store/modules/theme'
-import { extname, getMonacoLanguage } from '@/utils/tool'
-import * as monaco from 'monaco-editor'
-import { getCurrentInstance, onMounted, ref, watch } from 'vue'
+import { loadMonaco } from "@/composables/useMonaco";
+import { useThemeStore } from "@/store/modules/theme";
+import { getMonacoLanguage } from "@/utils/tool";
+import type * as monaco from "monaco-editor";
+import { getCurrentInstance, onMounted, ref, watch } from "vue";
 
 const props = defineProps({
   language: {
     type: String,
-    default: 'plain-text'
+    default: "plain-text",
   },
   filename: {
     type: String,
@@ -15,105 +16,112 @@ const props = defineProps({
   },
   content: {
     type: String,
-    default: ''
+    default: "",
   },
   readonly: {
     type: Boolean,
-    default: false
-  }
-})
+    default: false,
+  },
+});
 
-const instance = getCurrentInstance()
+const instance = getCurrentInstance();
 let editor: monaco.editor.IStandaloneCodeEditor;
+let monacoApi: typeof monaco;
 const editorBody = ref<HTMLElement>();
+const themeStore = useThemeStore();
 
 const autoDetectLanguage = () => {
-  const has_language = instance?.vnode.props?.['language'] != undefined
-  if (has_language) {
-    return instance?.vnode.props?.['language']
+  const hasLanguage = instance?.vnode.props?.["language"] != undefined;
+  if (hasLanguage) {
+    return instance?.vnode.props?.["language"];
   }
-  return getMonacoLanguage(props.filename || '') 
-}
-const themeStore = useThemeStore()
+  return getMonacoLanguage(props.filename || "");
+};
+
 // 监听主题变化
-watch(() => themeStore.isDark, (isDark) => {
-  if (editor) {
-    monaco.editor.setTheme(isDark ? 'vs-dark' : 'vs')
-  }
-})
+watch(
+  () => themeStore.isDark,
+  (isDark) => {
+    if (editor && monacoApi) {
+      monacoApi.editor.setTheme(isDark ? "vs-dark" : "vs");
+    }
+  },
+);
 
 const initEditor = () => {
-  if (!editorBody.value) return
+  if (!editorBody.value || !monacoApi) return;
 
-  editor = monaco.editor.create(editorBody.value, {
+  editor = monacoApi.editor.create(editorBody.value, {
     value: props.content,
     language: autoDetectLanguage(),
-    theme: themeStore.isDark ? 'vs-dark' : 'vs', // 根据主题设置
-    minimap: {
-      enabled: false,
-    },
-    scrollBeyondLastLine: false, // 禁用在最后一行之后滚动
-    automaticLayout: true, // 自动布局
+    theme: themeStore.isDark ? "vs-dark" : "vs",
+    minimap: { enabled: false },
+    scrollBeyondLastLine: false,
+    automaticLayout: true,
     scrollbar: {
-      // vertical: 'hidden', // 禁用纵向滚动条
-      horizontal: 'auto', // 保持横向滚动条自动显示
-      handleMouseWheel: true, // 监听鼠标滚轮事件
-      alwaysConsumeMouseWheel: false, // 允许滚动事件冒泡
+      horizontal: "auto",
+      handleMouseWheel: true,
+      alwaysConsumeMouseWheel: false,
     },
-    readOnly: props.readonly, // 设置只读模式
+    readOnly: props.readonly,
     contextmenu: false,
-  })
-  editor.getDomNode()!.style.width = '100%'
-  editor.getDomNode()!.style.height = '100%' // 新增高度设置
-  updateEditorHeight()
-}
+  });
+  editor.getDomNode()!.style.width = "100%";
+  editor.getDomNode()!.style.height = "100%";
+  updateEditorHeight();
+};
 
-// 更新编辑器高度
 const updateEditorHeight = () => {
-  if (!editor) return;
+  if (!editor || !monacoApi) return;
   const height = calculateEditorHeight();
-  editor.getDomNode()!.style.height = `${height}px`; // 设置高度
-  editor.layout(); // 重新布局
-}
+  editor.getDomNode()!.style.height = `${height}px`;
+  editor.layout();
+};
 
 function calculateEditorHeight() {
-  const lineHeight = editor.getOption(monaco.editor.EditorOption.lineHeight);
+  const lineHeight = editor.getOption(
+    monacoApi.editor.EditorOption.lineHeight,
+  );
   const lineCount = editor.getModel()!.getLineCount();
-  const scrollBeyondLastLine = editor.getOption(monaco.editor.EditorOption.scrollBeyondLastLine);
-  
-  // 计算基础高度（所有行高之和）
+  const scrollBeyondLastLine = editor.getOption(
+    monacoApi.editor.EditorOption.scrollBeyondLastLine,
+  );
+
   let totalHeight = lineHeight * lineCount;
-  
-  // 添加滚动边界的额外空间（每超出1行增加1行高度）
   if (scrollBeyondLastLine) {
     totalHeight += lineHeight;
   }
-  
-  // 获取容器可用高度
-  const containerHeight = editorBody.value?.parentElement?.clientHeight || 0;
-  
-  // 返回两者中的较小值，确保不超过容器高度
+
+  const containerHeight =
+    editorBody.value?.parentElement?.clientHeight || 0;
   return Math.min(totalHeight, containerHeight) - 50;
 }
-  
-onMounted(() => {
-  initEditor()
-})
 
-watch(() => props.content, (newValue, oldValue) => {
-  editor.setValue(newValue)
-  monaco.editor.setModelLanguage(editor.getModel()!, autoDetectLanguage())
-})
+onMounted(async () => {
+  monacoApi = await loadMonaco();
+  initEditor();
+});
+
+watch(
+  () => props.content,
+  (newValue) => {
+    if (!editor || !monacoApi) return;
+    editor.setValue(newValue);
+    monacoApi.editor.setModelLanguage(editor.getModel()!, autoDetectLanguage());
+  },
+);
 </script>
 
 <template>
-  
   <div class="editor-container w-full h-full flex flex-col">
     <div class="editor-header">
-      <slot name="header"/>
+      <slot name="header" />
     </div>
     <div class="flex-1 min-h-0 relative">
-      <div class="editor-body absolute w-full h-full flex-auto" ref="editorBody"></div>
+      <div
+        class="editor-body absolute w-full h-full flex-auto"
+        ref="editorBody"
+      ></div>
     </div>
   </div>
 </template>
